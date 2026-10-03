@@ -1,95 +1,87 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
-import { Panel, Stat } from "@/components/ui-kit";
-import { calcDemurrage, fmtMoney } from "@/lib/case-data";
-import { cn } from "@/lib/utils";
+import { Button, Panel, Stat } from "@/components/ui-kit";
+import { calculateCaseDemurrage, getCaseWorkspace } from "@/lib/case.functions";
+import { fmtMoney } from "@/lib/case-data";
 
 export const Route = createFileRoute("/cases/$caseId/financials")({
-  head: () => ({ meta: [{ title: "Financial exposure | CargoIQ" }, { name: "description", content: "Deterministic demurrage calculation versus charged amount." }] }),
+  loader: ({ params }) => getCaseWorkspace({ data: { caseId: params.caseId } }),
+  head: () => ({ meta: [{ title: "Financial exposure | CargoIQ" }] }),
   component: FinPage,
 });
 
-const BASE = { rate: 175, units: 12, currency: "USD", rulesVersion: "v2.4 · SC-2025-114" };
-const CHARGED = calcDemurrage({ ...BASE, start: "2026-08-04", release: "2026-08-19", freeDays: 4 });
-
-function Choice<T extends string | number>({ label, value, opts, onChange }: { label: string; value: T; opts: { v: T; l: string; s: string }[]; onChange: (v: T) => void }) {
-  return (
-    <div>
-      <div className="mb-2 text-xs text-muted-foreground">{label}</div>
-      <div className="grid gap-2 sm:grid-cols-2">
-        {opts.map((o) => (
-          <button key={String(o.v)} onClick={() => onChange(o.v)} className={cn("rounded-md border p-3 text-left", value === o.v ? "border-primary bg-primary/5" : "hover:bg-accent")}>
-            <div className="font-mono text-sm">{o.l}</div><div className="text-xs text-muted-foreground">{o.s}</div>
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
+const defaultTiers = [
+  { fromDay: 1, toDay: 5, dailyRate: 175 },
+  { fromDay: 6, toDay: 10, dailyRate: 220 },
+  { fromDay: 11, dailyRate: 280 },
+];
 
 function FinPage() {
+  const data = Route.useLoaderData();
+  const { caseId } = Route.useParams();
+  const router = useRouter();
+  const latest = data.calculations[0] as any;
   const [start, setStart] = useState("2026-08-05");
   const [release, setRelease] = useState("2026-08-15");
   const [freeDays, setFree] = useState(5);
-  const calc = calcDemurrage({ ...BASE, start, release, freeDays });
-  const recovery = CHARGED.total - calc.total;
-  const max = CHARGED.elapsed;
+  const [units, setUnits] = useState(12);
+  const [charged, setCharged] = useState(23100);
+  const [result, setResult] = useState<any>(latest ?? null);
+  const currency = latest?.currency ?? "USD";
+
+  async function calculate() {
+    const row = await calculateCaseDemurrage({
+      data: {
+        caseId,
+        start,
+        release,
+        freeDays,
+        units,
+        chargedAmount: charged,
+        currency,
+        tieredRates: defaultTiers,
+        ruleVersion: "DEMURRAGE-SA-2026-v1",
+      },
+    });
+    setResult(row);
+    await router.invalidate();
+  }
+
+  const calculated = result ? Number(result.calculated_amount_minor) / 100 : 0;
+  const chargedAmount = result ? Number(result.charged_amount_minor ?? 0) / 100 : charged;
+  const recovery = Math.max(0, chargedAmount - calculated);
 
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Stat label="Charged by carrier" value={fmtMoney(CHARGED.total, "USD")} tone="disputed" />
-        <Stat label="CargoIQ calculated" value={fmtMoney(calc.total, "USD")} tone="primary" />
-        <Stat label="Potential recovery" value={fmtMoney(recovery, "USD")} tone="observed" />
-        <Stat label="Chargeable days" value={`${calc.chargeable} vs ${CHARGED.chargeable}`} />
+        <Stat label="Charged" value={fmtMoney(chargedAmount, currency)} tone="disputed" />
+        <Stat label="Calculated" value={fmtMoney(calculated, currency)} tone="primary" />
+        <Stat label="Variance / recovery" value={fmtMoney(recovery, currency)} tone="observed" />
+        <Stat label="Rule" value="DEMURRAGE-SA-2026" />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_420px]">
-        <Panel title="Day-by-day exposure · per container">
-          <div className="space-y-3">
-            {[{ name: "Carrier invoice", r: { ...CHARGED, free: 4 }, tone: "disputed" }, { name: "CargoIQ evidence", r: { ...calc, free: freeDays }, tone: "primary" }].map((row) => (
-              <div key={row.name}>
-                <div className="mb-1 flex justify-between text-xs"><span className="text-muted-foreground">{row.name}</span><span className="font-mono">{row.r.chargeable} chargeable / {row.r.elapsed} elapsed</span></div>
-                <div className="flex gap-0.5">
-                  {Array.from({ length: max }).map((_, i) => {
-                    const offset = row.name === "Carrier invoice" ? 0 : Math.round((Date.parse(start) - Date.parse("2026-08-04")) / 864e5);
-                    const d = i - offset;
-                    const inRange = d >= 0 && d < row.r.elapsed;
-                    const free = inRange && d < row.r.free;
-                    return <div key={i} className={cn("h-8 flex-1 rounded-sm", !inRange && "bg-secondary/40", free && "bg-observed/40", inRange && !free && (row.tone === "disputed" ? "bg-disputed/70" : "bg-primary/80"))} />;
-                  })}
-                </div>
-              </div>
-            ))}
-            <div className="flex justify-between font-mono text-[10px] text-muted-foreground"><span>04 Aug</span><span>19 Aug</span></div>
-            <div className="flex gap-4 text-xs text-muted-foreground">
-              <span><i className="mr-1 inline-block h-2 w-3 rounded-sm bg-observed/40" />Free time</span>
-              <span><i className="mr-1 inline-block h-2 w-3 rounded-sm bg-primary/80" />Chargeable (evidenced)</span>
-              <span><i className="mr-1 inline-block h-2 w-3 rounded-sm bg-disputed/70" />Chargeable (carrier)</span>
-            </div>
-          </div>
-          <table className="mt-6 w-full font-mono text-sm">
-            <tbody className="divide-y">
-              {[["Chargeable days", calc.chargeable], ["× Daily rate", fmtMoney(BASE.rate, "USD")], ["× Containers", BASE.units], ["= Calculated", fmtMoney(calc.total, "USD")], ["Charged", fmtMoney(CHARGED.total, "USD")], ["Recovery", fmtMoney(recovery, "USD")]].map(([k, v]) => (
-                <tr key={k as string}><td className="py-2 text-muted-foreground">{k}</td><td className="py-2 text-right">{v}</td></tr>
-              ))}
-            </tbody>
+      <Panel title="Deterministic commercial rules">
+        <div className="grid gap-4 md:grid-cols-5">
+          <label className="text-sm">Start<input type="date" value={start} onChange={(e) => setStart(e.target.value)} className="mt-1 w-full rounded border bg-background px-2 py-2" /></label>
+          <label className="text-sm">Release<input type="date" value={release} onChange={(e) => setRelease(e.target.value)} className="mt-1 w-full rounded border bg-background px-2 py-2" /></label>
+          <label className="text-sm">Free days<input type="number" value={freeDays} onChange={(e) => setFree(Number(e.target.value))} className="mt-1 w-full rounded border bg-background px-2 py-2" /></label>
+          <label className="text-sm">Units<input type="number" value={units} onChange={(e) => setUnits(Number(e.target.value))} className="mt-1 w-full rounded border bg-background px-2 py-2" /></label>
+          <label className="text-sm">Charged amount<input type="number" value={charged} onChange={(e) => setCharged(Number(e.target.value))} className="mt-1 w-full rounded border bg-background px-2 py-2" /></label>
+        </div>
+
+        <div className="mt-5 overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead><tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground"><th className="py-2">Tier</th><th className="py-2">Days</th><th className="py-2">Rate</th></tr></thead>
+            <tbody>{defaultTiers.map((t, i) => <tr key={i} className="border-b"><td className="py-2">Tier {i + 1}</td><td className="py-2">{t.fromDay}–{t.toDay ?? "∞"}</td><td className="py-2 font-mono">{currency} {t.dailyRate}</td></tr>)}</tbody>
           </table>
-        </Panel>
+        </div>
 
-        <Panel title="Commercial rule inputs">
-          <div className="space-y-5">
-            <Choice label="Start of free time" value={start} onChange={setStart} opts={[{ v: "2026-08-04", l: "04 Aug", s: "Carrier notice (disputed)" }, { v: "2026-08-05", l: "05 Aug", s: "AIS berth (observed)" }]} />
-            <Choice label="Release date" value={release} onChange={setRelease} opts={[{ v: "2026-08-19", l: "19 Aug", s: "Carrier invoice" }, { v: "2026-08-15", l: "15 Aug", s: "Terminal release log" }]} />
-            <Choice label="Free days" value={freeDays} onChange={setFree} opts={[{ v: 4, l: "4 days", s: "Carrier invoice" }, { v: 5, l: "5 days", s: "Contract §7.2" }]} />
-            <dl className="grid grid-cols-2 gap-2 border-t pt-4 font-mono text-xs">
-              <dt className="text-muted-foreground">Rate</dt><dd>{fmtMoney(BASE.rate, "USD")}/day/unit</dd>
-              <dt className="text-muted-foreground">Currency</dt><dd>{BASE.currency}</dd>
-              <dt className="text-muted-foreground">Rules</dt><dd>{BASE.rulesVersion}</dd>
-            </dl>
-          </div>
-        </Panel>
-      </div>
+        <Button className="mt-5" onClick={calculate}>Calculate & persist audit run</Button>
+      </Panel>
+
+      {result && <Panel title="Stored calculation">
+        <pre className="overflow-auto text-xs">{JSON.stringify(result.result_payload ?? result, null, 2)}</pre>
+      </Panel>}
     </div>
   );
 }

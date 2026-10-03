@@ -1,82 +1,116 @@
-# Cargo Insight Engine
+# CargoIQ — Investigative Evidence & Dispute Intelligence
 
-Build CargoIQ — Investigative Evidence & Dispute Intelligence platform. I want it to be professional, clean, sleek, easy to use, and render visuals for evidence.
+CargoIQ is the NahaLabs evidence-first platform for freight, demurrage and port logistics disputes.
 
-PRD:
-CargoIQ — Investigative Evidence & Dispute Intelligence
+## Forward-development repository
 
-Product: CargoIQ
-Company: NahaLabs (Pty) Ltd
-Repository: Naha1981/cargoiq-qwen
-Current branch: main
-PRD version: 3.0
-Date: 3 October 2026
+Primary repository from 3 October 2026:
+https://github.com/Naha1981/cargo-iq-lovable
 
-1. Product Definition
-CargoIQ is an investigative evidence platform for freight, port and logistics disputes.
-Its job is not to replace a TMS.
-Its job is to answer:
-What actually happened, what evidence supports it, where do the records disagree, what financial exposure follows from the documented facts, and what can we defensibly present to another party?
+Previous migration reference:
+https://github.com/Naha1981/cargoiq-qwen
 
-CargoIQ combines:
-Customer documents + operational records + external observations + geospatial evidence + deterministic commercial rules
-into a human-reviewed investigation and evidence pack.
+Original tactical/recon reference:
+https://github.com/bilawalsidhu/gods-eye-view
 
-Product promise:
-Reconstruct what happened. Prove what can be proven. Expose contradictions. Calculate the money. Package the evidence.
+CargoIQ does not copy the original project wholesale. Its visual ideas are used as a case-scoped evidence investigation surface.
 
-2. Initial Dispute Types
-P0:
-- Demurrage
-- Detention
-- Storage
-- Truck waiting time
-- Accessorial charges
-- Carrier overcharges
+## Stack
 
-3. Core Investigation Workflow
-Case opened → Documents/records uploaded → Evidence extracted → Claims created → Timeline constructed → Contradictions identified → External observations requested → AIS / satellite / weather / port evidence attached → Commercial rules applied → Financial exposure calculated → Human review → Evidence pack generated → Approved investigation → Recovery / dispute action
+- TanStack Start
+- React 19
+- Vite + Lovable TanStack config
+- Tailwind CSS v4
+- Lovable Cloud / Supabase PostgreSQL
+- Supabase native Auth
+- PostgreSQL Row-Level Security
+- Private Supabase Storage
+- TanStack server functions
+- AISStream-compatible vessel feeds
+- Copernicus Sentinel STAC
+- Open-Meteo Marine
 
-4. CargoIQ Evidence Model
-Every material assertion must carry provenance.
-Evidence classes: CUSTOMER_PRIMARY, CONTRACTUAL, OFFICIAL_PUBLIC, LICENSED_COMMERCIAL, INDEPENDENT_OBSERVATION, DERIVED, INFERRED, DISPUTED, UNKNOWN.
-Visually distinguish: Observed, Reported, Derived, Inferred, Disputed.
+## Core workflow
 
-5. God's Eye View (Geospatial & Timeline Surface)
-Interactive visual investigation surface (e.g., Durban Harbour / port terminal):
-- Case-linked vessel movements (AIS position & timeline)
-- Satellite scenes (Sentinel-1 / Sentinel-2)
-- Mapped infrastructure & terminal boundaries
-- Temporal alignment of observations against investigation timeline
+Documents / records
+→ extracted claims
+→ timeline
+→ contradictions
+→ independent corroboration
+→ deterministic money
+→ human review
+→ immutable evidence pack
 
-6. Document Investigation & Contradiction Engine
-- Document upload, claim extraction, provenance tagging, page references
-- Contradiction detection (e.g., carrier availability timestamp vs terminal release timestamp) with side-by-side human review resolution
+## Evidence truth rules
 
-7. Deterministic Financial Engine
-- Demurrage calculation: start date, release date, free days, daily rate, currency, commercial rules version
-- Calculated vs charged amount, potential recovery breakdown
+CargoIQ distinguishes:
 
-8. Evidence Pack Generator & Human Approval
-- Immutable, versioned evidence pack export (v1, v2, v3) with SHA-256 hash, timeline, contradiction logs, audit trail, and approval status.
+- OBSERVED
+- REPORTED
+- DERIVED
+- INFERRED
+- DISPUTED
 
-This project was built with [Lovable](https://lovable.dev).
+External data is corroboration unless the source itself establishes the disputed event. Inferences never become verified automatically.
 
-## Build with Lovable
+## Lovable Cloud setup
 
-Continue developing this project in the [Lovable editor](https://lovable.dev/projects/5d4898c0-b107-4604-a530-da8960775175).
+Apply the SQL migration at:
+supabase/migrations/20261003202300_cargoiq_core.sql
 
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: every change made in Lovable is committed straight to this repository.
-- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
+Required client variables:
 
-## Development
+- VITE_SUPABASE_URL
+- VITE_SUPABASE_PUBLISHABLE_KEY
 
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
+Optional server variables:
 
-```sh
-git clone <this-repository-url>
-cd <repository-name>
-npm i
-npm run dev
-```
+- GEMINI_API_KEY
+- GEMINI_MODEL
+- AISSTREAM_API_KEY
+- AIS_PUBLIC_HTTP_URL
+
+The SQL migration creates tenant-scoped tables, Auth onboarding, RLS, private case-document storage and the audit trail.
+
+## Document pipeline
+
+Documents are stored under:
+case-documents/{tenant_id}/{case_id}/{filename}
+
+The server downloads the private object, computes SHA-256 and stores immutable metadata. Extraction can use Gemini for structured PDF evidence or a deterministic CSV/TXT fallback. Claims and timestamped timeline events are persisted for human review.
+
+## God’s Eye View
+
+/cases/$caseId/map is a tactical case-scoped HUD with:
+
+- authenticated/live-sensor status ribbons;
+- UTC master clock;
+- target lock and coordinates;
+- sensor azimuth / field-of-view;
+- CRT scanlines and vignette;
+- targeting reticle;
+- AIS route and SOG trail;
+- Sentinel-1 and Sentinel-2 footprints;
+- temporal playback;
+- AIS/SAR/MSI/weather/infrastructure toggles;
+- timeline alignment;
+- contradiction callouts.
+
+It is an evidence surface, not an autonomous truth machine.
+
+## Launch gate
+
+CargoIQ is pilot-ready when:
+
+1. Lovable Cloud migration is applied;
+2. native Auth sign-up/sign-in works;
+3. RLS isolation is tested with two tenants;
+4. a document uploads and hashes;
+5. extraction creates reviewable claims;
+6. a contradiction is persisted and resolved;
+7. AIS/Sentinel/weather corroboration attaches to a case;
+8. deterministic demurrage is reproducible;
+9. evidence pack hashing is reproducible;
+10. an investigator approves a frozen pack.
+
+The 50-client production gate additionally requires provider/licence review, backups, observability, billing and repeatable onboarding.

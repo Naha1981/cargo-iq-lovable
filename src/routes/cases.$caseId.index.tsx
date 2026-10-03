@@ -11,10 +11,10 @@ export const Route = createFileRoute("/cases/$caseId/")({
 
 function TimelinePage() {
   const [active, setActive] = useState<Set<Nature>>(new Set(Object.keys(NATURE_LABEL) as Nature[]));
-  const [sel, setSel] = useState(TIMELINE[1].id);
+  const [sel, setSel] = useState(TIMELINE[1]!.id);
   const events = TIMELINE.filter((e) => active.has(e.nature));
-  const t0 = new Date(TIMELINE[0].at).getTime();
-  const t1 = new Date(TIMELINE[TIMELINE.length - 1].at).getTime();
+  const t0 = new Date(TIMELINE[0]!.at).getTime();
+  const t1 = new Date(TIMELINE[TIMELINE.length - 1]!.at).getTime();
   const pos = (s: string) => ((new Date(s).getTime() - t0) / (t1 - t0)) * 100;
   const selected = TIMELINE.find((e) => e.id === sel)!;
 

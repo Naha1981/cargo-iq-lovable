@@ -9,11 +9,11 @@ export const Route = createFileRoute("/cases/$caseId/map")({
   component: MapPage,
 });
 
-const T0 = new Date(AIS_TRACK[0].at).getTime();
+const T0 = new Date(AIS_TRACK[0]!.at).getTime();
 const T1 = new Date("2026-08-19T00:00").getTime();
 
 function vesselAt(t: number) {
-  let prev = AIS_TRACK[0];
+  let prev = AIS_TRACK[0]!;
   for (const p of AIS_TRACK) {
     const pt = new Date(p.at).getTime();
     if (pt >= t) {

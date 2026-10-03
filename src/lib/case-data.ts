@@ -107,6 +107,6 @@ export function calcDemurrage(i: DemurrageInput) {
   const chargeable = Math.max(0, elapsed - i.freeDays);
   return { elapsed, chargeable, total: chargeable * i.rate * i.units };
 }
-function ymd(s: string): [number, number, number] { const [y, m, d] = s.slice(0, 10).split("-").map(Number); return [y, m - 1, d]; }
+function ymd(s: string): [number, number, number] { const [y, m, d] = s.slice(0, 10).split("-").map(Number) as [number, number, number]; return [y, m - 1, d]; }
 
 export function getCase(id: string) { return CASES.find((c) => c.id === id); }

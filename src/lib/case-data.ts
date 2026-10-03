@@ -14,7 +14,7 @@ export interface CaseSummary {
 }
 
 export const CASES: CaseSummary[] = [
-  { id: "CIQ-2026-0142", title: "MSC Aurora — demurrage on 12 × 40HC", type: "Demurrage", counterparty: "Meridian Line", port: "Durban", status: "Investigating", exposure: 21000, recovery: 10500, currency: "USD", opened: "2026-09-02", contradictions: 3 },
+  { id: "CIQ-2026-0142", title: "MSC Aurora — demurrage on 12 × 40HC", type: "Demurrage", counterparty: "Meridian Line", port: "Durban", status: "Investigating", exposure: 23100, recovery: 12600, currency: "USD", opened: "2026-09-02", contradictions: 3 },
   { id: "CIQ-2026-0139", title: "Pier 2 truck waiting time — Sept batch", type: "Truck waiting time", counterparty: "Coastline Haulage", port: "Durban", status: "In review", exposure: 48200, recovery: 17350, currency: "ZAR", opened: "2026-08-27", contradictions: 5 },
   { id: "CIQ-2026-0131", title: "Detention on reefer equipment", type: "Detention", counterparty: "Atlas Container", port: "Cape Town", status: "Approved", exposure: 9800, recovery: 4200, currency: "USD", opened: "2026-08-11", contradictions: 2 },
   { id: "CIQ-2026-0127", title: "Storage overcharge — Maydon Wharf", type: "Storage", counterparty: "Bayside Terminals", port: "Durban", status: "Recovery", exposure: 132400, recovery: 61900, currency: "ZAR", opened: "2026-07-30", contradictions: 4 },
@@ -94,7 +94,7 @@ export const SATELLITE = [
 ];
 
 export const fmtMoney = (n: number, c: string) =>
-  new Intl.NumberFormat("en-ZA", { style: "currency", currency: c, maximumFractionDigits: 0 }).format(n);
+  new Intl.NumberFormat("en-US", { style: "currency", currency: c, maximumFractionDigits: 0 }).format(n);
 export const fmtDT = (s: string) =>
   new Date(s).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "UTC" });
 

@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import { Button, ClassTag, NatureBadge, Panel } from "@/components/ui-kit";
-import { CONTRADICTIONS, DOCS, type Doc } from "@/lib/case-data";
+import { CLAIMS, CONTRADICTIONS, DOCS, type Doc } from "@/lib/case-data";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/cases/$caseId/documents")({
@@ -13,6 +13,9 @@ function DocsPage() {
   const [docs, setDocs] = useState<Doc[]>(DOCS);
   const [res, setRes] = useState<Record<string, "a" | "b" | undefined>>({});
   const file = useRef<HTMLInputElement>(null);
+  const [selDoc, setSelDoc] = useState("DOC-01");
+  const [review, setReview] = useState<Record<string, "verified" | "disputed">>({});
+  const claims = CLAIMS.filter((c) => c.doc === selDoc);
 
   const onUpload = (files: FileList | null) => {
     if (!files) return;
@@ -30,7 +33,7 @@ function DocsPage() {
       }>
         <ul className="divide-y">
           {docs.map((d) => (
-            <li key={d.id} className="flex items-start gap-3 py-3">
+            <li key={d.id} onClick={() => setSelDoc(d.id)} className={cn("-mx-2 flex cursor-pointer items-start gap-3 rounded px-2 py-3 hover:bg-accent", selDoc === d.id && "bg-accent")}>
               <div className="grid h-10 w-8 shrink-0 place-items-center rounded-sm border bg-panel font-mono text-[9px] text-muted-foreground">{d.name.split(".").pop()?.toUpperCase()}</div>
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-medium">{d.name}</div>
@@ -44,6 +47,28 @@ function DocsPage() {
       </Panel>
 
       <div className="space-y-4">
+        <Panel title={`Extracted claims · ${selDoc}`} action={<span className="font-mono text-xs text-muted-foreground">{Object.keys(review).length}/{CLAIMS.length} reviewed</span>}>
+          {claims.length === 0 ? <p className="text-sm text-muted-foreground">Extraction pending for this document.</p> : (
+            <ul className="divide-y">{claims.map((c) => {
+              const r = review[c.id];
+              return (
+                <li key={c.id} className="grid items-center gap-3 py-3 md:grid-cols-[1fr_auto]">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                      <span className="font-mono">{c.id} · p.{c.page}</span><NatureBadge n={r === "disputed" ? "disputed" : c.nature} /><ClassTag c={c.cls} />
+                      <span className="font-mono">conf {(c.confidence * 100).toFixed(0)}%</span>
+                    </div>
+                    <div className="mt-1 text-sm">{c.text}: <span className="font-mono">{c.value}</span></div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => setReview({ ...review, [c.id]: "verified" })} className={cn("rounded border px-2.5 py-1 text-xs", r === "verified" ? "border-observed bg-observed/15 text-observed" : "hover:bg-accent")}>Verify</button>
+                    <button onClick={() => setReview({ ...review, [c.id]: "disputed" })} className={cn("rounded border px-2.5 py-1 text-xs", r === "disputed" ? "border-disputed bg-disputed/15 text-disputed" : "hover:bg-accent")}>Dispute</button>
+                  </div>
+                </li>
+              );
+            })}</ul>
+          )}
+        </Panel>
         <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Contradictions · side-by-side review</h2>
         {CONTRADICTIONS.map((c) => {
           const r = res[c.id];

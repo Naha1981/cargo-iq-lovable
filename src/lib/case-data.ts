@@ -110,3 +110,15 @@ export function calcDemurrage(i: DemurrageInput) {
 function ymd(s: string): [number, number, number] { const [y, m, d] = s.slice(0, 10).split("-").map(Number) as [number, number, number]; return [y, m - 1, d]; }
 
 export function getCase(id: string) { return CASES.find((c) => c.id === id); }
+
+export interface Claim { id: string; doc: string; page: number; text: string; value: string; cls: EvidenceClass; nature: Nature; confidence: number }
+export const CLAIMS: Claim[] = [
+  { id: "CL-01", doc: "DOC-01", page: 1, text: "Release date of containers", value: "19 Aug 2026", cls: "CUSTOMER_PRIMARY", nature: "reported", confidence: 0.97 },
+  { id: "CL-02", doc: "DOC-01", page: 2, text: "Free time applied", value: "4 days", cls: "CUSTOMER_PRIMARY", nature: "reported", confidence: 0.93 },
+  { id: "CL-03", doc: "DOC-01", page: 1, text: "Demurrage total charged", value: "USD 25,200", cls: "CUSTOMER_PRIMARY", nature: "reported", confidence: 0.99 },
+  { id: "CL-04", doc: "DOC-02", page: 1, text: "Containers available from", value: "04 Aug 2026 08:00", cls: "CUSTOMER_PRIMARY", nature: "reported", confidence: 0.95 },
+  { id: "CL-05", doc: "DOC-03", page: 2, text: "Gate-out / release to merchant", value: "15 Aug 2026 10:05", cls: "CUSTOMER_PRIMARY", nature: "reported", confidence: 0.98 },
+  { id: "CL-06", doc: "DOC-04", page: 3, text: "Discharge completed (crane log gap)", value: "05 Aug 2026 ~14:30", cls: "INFERRED", nature: "inferred", confidence: 0.71 },
+  { id: "CL-07", doc: "DOC-05", page: 17, text: "Free time §7.2", value: "5 calendar days", cls: "CONTRACTUAL", nature: "reported", confidence: 0.99 },
+  { id: "CL-08", doc: "DOC-05", page: 18, text: "Demurrage daily rate, 40HC", value: "USD 175", cls: "CONTRACTUAL", nature: "reported", confidence: 0.99 },
+];

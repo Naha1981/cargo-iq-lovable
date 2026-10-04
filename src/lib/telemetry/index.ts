@@ -80,7 +80,7 @@ export function initTelemetry(): void {
   void captureTelemetry("app_opened", {
     product: TELEMETRY_PRODUCT,
     environment: env.MODE ?? "unknown",
-    app_version: env.VITE_APP_VERSION,
+    ...(env.VITE_APP_VERSION ? { app_version: env.VITE_APP_VERSION } : {}),
     platform: "web",
   });
 }

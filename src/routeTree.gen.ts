@@ -10,6 +10,8 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthRouteImport } from './routes/auth'
+import { Route as NewCaseRouteImport } from './routes/new-case'
 import { Route as CasesCaseIdRouteImport } from './routes/cases.$caseId'
 import { Route as CasesCaseIdIndexRouteImport } from './routes/cases.$caseId.index'
 import { Route as CasesCaseIdDocumentsRouteImport } from './routes/cases.$caseId.documents'
@@ -20,6 +22,16 @@ import { Route as CasesCaseIdPackRouteImport } from './routes/cases.$caseId.pack
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const NewCaseRoute = NewCaseRouteImport.update({
+  id: '/new-case',
+  path: '/new-case',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CasesCaseIdRoute = CasesCaseIdRouteImport.update({
@@ -55,6 +67,8 @@ const CasesCaseIdPackRoute = CasesCaseIdPackRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
+  '/new-case': typeof NewCaseRoute
   '/cases/$caseId': typeof CasesCaseIdRouteWithChildren
   '/cases/$caseId/documents': typeof CasesCaseIdDocumentsRoute
   '/cases/$caseId/financials': typeof CasesCaseIdFinancialsRoute
@@ -64,6 +78,8 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
+  '/new-case': typeof NewCaseRoute
   '/cases/$caseId/documents': typeof CasesCaseIdDocumentsRoute
   '/cases/$caseId/financials': typeof CasesCaseIdFinancialsRoute
   '/cases/$caseId/map': typeof CasesCaseIdMapRoute
@@ -73,6 +89,8 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
+  '/new-case': typeof NewCaseRoute
   '/cases/$caseId': typeof CasesCaseIdRouteWithChildren
   '/cases/$caseId/documents': typeof CasesCaseIdDocumentsRoute
   '/cases/$caseId/financials': typeof CasesCaseIdFinancialsRoute
@@ -84,6 +102,8 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/auth'
+    | '/new-case'
     | '/cases/$caseId'
     | '/cases/$caseId/documents'
     | '/cases/$caseId/financials'
@@ -93,6 +113,8 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/auth'
+    | '/new-case'
     | '/cases/$caseId/documents'
     | '/cases/$caseId/financials'
     | '/cases/$caseId/map'
@@ -101,6 +123,8 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/auth'
+    | '/new-case'
     | '/cases/$caseId'
     | '/cases/$caseId/documents'
     | '/cases/$caseId/financials'
@@ -111,6 +135,8 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthRoute: typeof AuthRoute
+  NewCaseRoute: typeof NewCaseRoute
   CasesCaseIdRoute: typeof CasesCaseIdRouteWithChildren
 }
 
@@ -121,6 +147,20 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/new-case': {
+      id: '/new-case'
+      path: '/new-case'
+      fullPath: '/new-case'
+      preLoaderRoute: typeof NewCaseRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/cases/$caseId': {
@@ -190,6 +230,8 @@ const CasesCaseIdRouteWithChildren = CasesCaseIdRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthRoute: AuthRoute,
+  NewCaseRoute: NewCaseRoute,
   CasesCaseIdRoute: CasesCaseIdRouteWithChildren,
 }
 export const routeTree = rootRouteImport

@@ -21,7 +21,7 @@ export const getCurrentUser = createServerFn({ method: "GET" }).handler(async ()
   };
 });
 
-export const ensureOrganization = createServerFn({ method: "POST" }).handler(async ({ data }: { data: { name?: string } }) => {
+export const ensureOrganization = createServerFn({ method: "POST" }).inputValidator((d: { name?: string }) => d).handler(async ({ data }) => {
   const supabase = createClient();
   const { data: { user }, error } = await supabase.auth.getUser();
   if (error || !user) throw new Error("UNAUTHENTICATED");

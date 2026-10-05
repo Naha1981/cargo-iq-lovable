@@ -190,7 +190,7 @@ export const corroborateCase = createServerFn({ method: "POST" })
     const observations = [
       ...ais.map((x) => ({ source: x.source, observation_type: "AIS_POSITION", observed_at: x.observedAt, latitude: x.latitude, longitude: x.longitude, payload: x, confidence: 0.8, limitation: "AIS corroborates reported vessel position; it does not prove contractual liability." })),
       ...scenes.map((x) => ({ source: "Copernicus Sentinel Data Space", observation_type: x.sensor === "SENTINEL-1" ? "SENTINEL_1_SCENE" : "SENTINEL_2_SCENE", observed_at: x.acquiredAt, latitude: x.bbox ? (x.bbox[1] + x.bbox[3]) / 2 : null, longitude: x.bbox ? (x.bbox[0] + x.bbox[2]) / 2 : null, payload: x, confidence: 0.7, limitation: "Scene metadata corroborates spatial/temporal coverage; imagery requires human inspection before shipment-specific conclusions." })),
-      ...weather.slice(0, 48).map((x) => ({ source: x.source, observation_type: "MARINE_WEATHER", observed_at: x.time, latitude: center[0], longitude: center[1], payload: x, confidence: 0.6, limitation: "Weather is contextual evidence and does not establish delay responsibility by itself." })),
+      ...weather.slice(0, 48).map((x: any) => ({ source: x.source, observation_type: "MARINE_WEATHER", observed_at: x.time, latitude: center[0], longitude: center[1], payload: x, confidence: 0.6, limitation: "Weather is contextual evidence and does not establish delay responsibility by itself." })),
     ];
 
     if (observations.length) {

@@ -8,9 +8,9 @@ export function createClient() {
   return createServerClient(url, key, {
     cookies: {
       getAll: () => Object.entries(getCookies()).map(([name, value]) => ({ name, value })),
-      setAll: (cookies, headers) => {
+      setAll: (cookies: { name: string; value: string; options?: any }[], headers?: Record<string, string>) => {
         cookies.forEach(({ name, value, options }) => setCookie(name, value, options));
-        Object.entries(headers).forEach(([name, value]) => setResponseHeader(name, value));
+        Object.entries(headers ?? {}).forEach(([name, value]) => setResponseHeader(name, value));
       },
     },
   });

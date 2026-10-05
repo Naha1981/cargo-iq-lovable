@@ -53,10 +53,26 @@ CargoIQ distinguishes:
 
 External data is corroboration unless the source itself establishes the disputed event. Inferences never become verified automatically.
 
+## CCTV computer-vision evidence
+
+CargoIQ can accept event-specific CCTV observations from a customer-site Lot Vulture edge deployment.
+
+CCTV / IP camera → Lot Vulture → CargoIQ edge adapter → signed HTTPS → CCTV observation → case timeline → evidence pack
+
+RTSP camera credentials and continuous camera streams stay at the customer site. CargoIQ stores normalized event metadata and source artefacts for material events.
+
+The CCTV evidence model preserves source/camera/zone provenance, timestamps, model/version metadata, provider confidence when available, SHA-256 over the actual media bytes, human review status and explicit limitations.
+
+CCTV remains INDEPENDENT_OBSERVATION. It does not automatically identify a vehicle, establish shipment identity or decide legal liability.
+
+See:
+- docs/CCTV-EVIDENCE-ARCHITECTURE.md
+- docs/SOURCE-LICENSE-REGISTER.md
+- edge/lotvulture-cargoiq/README.md
+
 ## Lovable Cloud setup
 
-Apply the SQL migration at:
-supabase/migrations/20261003202300_cargoiq_core.sql
+Apply the SQL migrations under supabase/migrations/.
 
 Required client variables:
 
@@ -69,6 +85,8 @@ Optional server variables:
 - GEMINI_MODEL
 - AISSTREAM_API_KEY
 - AIS_PUBLIC_HTTP_URL
+- SUPABASE_SERVICE_ROLE_KEY (server only)
+- CARGOI_Q_CCTV_ENCRYPTION_KEY (server only)
 
 The SQL migration creates tenant-scoped tables, Auth onboarding, RLS, private case-document storage and the audit trail.
 

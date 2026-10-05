@@ -30,3 +30,11 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+
+# CargoIQ CCTV edge runtime secrets/state
+edge/lotvulture-cargoiq/.venv/
+edge/lotvulture-cargoiq/state.json
+edge/lotvulture-cargoiq/zone-map.json
+edge/lotvulture-cargoiq/spool/
+edge/lotvulture-cargoiq/__pycache__/

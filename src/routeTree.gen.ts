@@ -17,6 +17,8 @@ import { Route as CasesCaseIdIndexRouteImport } from './routes/cases.$caseId.ind
 import { Route as CasesCaseIdDocumentsRouteImport } from './routes/cases.$caseId.documents'
 import { Route as CasesCaseIdFinancialsRouteImport } from './routes/cases.$caseId.financials'
 import { Route as CasesCaseIdMapRouteImport } from './routes/cases.$caseId.map'
+import { Route as CasesCaseIdCctvRouteImport } from './routes/cases.$caseId.cctv'
+import { Route as ApiCctvIngestRouteImport } from './routes/api.cctv.ingest'
 import { Route as CasesCaseIdPackRouteImport } from './routes/cases.$caseId.pack'
 
 const IndexRoute = IndexRouteImport.update({
@@ -59,6 +61,16 @@ const CasesCaseIdMapRoute = CasesCaseIdMapRouteImport.update({
   path: '/map',
   getParentRoute: () => CasesCaseIdRoute,
 } as any)
+const CasesCaseIdCctvRoute = CasesCaseIdCctvRouteImport.update({
+  id: '/cctv',
+  path: '/cctv',
+  getParentRoute: () => CasesCaseIdRoute,
+} as any)
+const ApiCctvIngestRoute = ApiCctvIngestRouteImport.update({
+  id: '/api/cctv/ingest',
+  path: '/api/cctv/ingest',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CasesCaseIdPackRoute = CasesCaseIdPackRouteImport.update({
   id: '/pack',
   path: '/pack',
@@ -73,7 +85,9 @@ export interface FileRoutesByFullPath {
   '/cases/$caseId/documents': typeof CasesCaseIdDocumentsRoute
   '/cases/$caseId/financials': typeof CasesCaseIdFinancialsRoute
   '/cases/$caseId/map': typeof CasesCaseIdMapRoute
+  '/cases/$caseId/cctv': typeof CasesCaseIdCctvRoute
   '/cases/$caseId/pack': typeof CasesCaseIdPackRoute
+  '/api/cctv/ingest': typeof ApiCctvIngestRoute
   '/cases/$caseId/': typeof CasesCaseIdIndexRoute
 }
 export interface FileRoutesByTo {
@@ -83,7 +97,9 @@ export interface FileRoutesByTo {
   '/cases/$caseId/documents': typeof CasesCaseIdDocumentsRoute
   '/cases/$caseId/financials': typeof CasesCaseIdFinancialsRoute
   '/cases/$caseId/map': typeof CasesCaseIdMapRoute
+  '/cases/$caseId/cctv': typeof CasesCaseIdCctvRoute
   '/cases/$caseId/pack': typeof CasesCaseIdPackRoute
+  '/api/cctv/ingest': typeof ApiCctvIngestRoute
   '/cases/$caseId': typeof CasesCaseIdIndexRoute
 }
 export interface FileRoutesById {
@@ -108,7 +124,9 @@ export interface FileRouteTypes {
     | '/cases/$caseId/documents'
     | '/cases/$caseId/financials'
     | '/cases/$caseId/map'
+    | '/cases/$caseId/cctv'
     | '/cases/$caseId/pack'
+    | '/api/cctv/ingest'
     | '/cases/$caseId/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -129,7 +147,9 @@ export interface FileRouteTypes {
     | '/cases/$caseId/documents'
     | '/cases/$caseId/financials'
     | '/cases/$caseId/map'
+    | '/cases/$caseId/cctv'
     | '/cases/$caseId/pack'
+    | '/api/cctv/ingest'
     | '/cases/$caseId/'
   fileRoutesById: FileRoutesById
 }
@@ -137,6 +157,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthRoute: typeof AuthRoute
   NewCaseRoute: typeof NewCaseRoute
+  ApiCctvIngestRoute: typeof ApiCctvIngestRoute
   CasesCaseIdRoute: typeof CasesCaseIdRouteWithChildren
 }
 
@@ -198,6 +219,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CasesCaseIdMapRouteImport
       parentRoute: typeof CasesCaseIdRoute
     }
+    '/cases/$caseId/cctv': {
+      id: '/cases/$caseId/cctv'
+      path: '/cctv'
+      fullPath: '/cases/$caseId/cctv'
+      preLoaderRoute: typeof CasesCaseIdCctvRouteImport
+      parentRoute: typeof CasesCaseIdRoute
+    }
+    '/api/cctv/ingest': {
+      id: '/api/cctv/ingest'
+      path: '/api/cctv/ingest'
+      fullPath: '/api/cctv/ingest'
+      preLoaderRoute: typeof ApiCctvIngestRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/cases/$caseId/pack': {
       id: '/cases/$caseId/pack'
       path: '/pack'
@@ -212,6 +247,7 @@ interface CasesCaseIdRouteChildren {
   CasesCaseIdDocumentsRoute: typeof CasesCaseIdDocumentsRoute
   CasesCaseIdFinancialsRoute: typeof CasesCaseIdFinancialsRoute
   CasesCaseIdMapRoute: typeof CasesCaseIdMapRoute
+  CasesCaseIdCctvRoute: typeof CasesCaseIdCctvRoute
   CasesCaseIdPackRoute: typeof CasesCaseIdPackRoute
   CasesCaseIdIndexRoute: typeof CasesCaseIdIndexRoute
 }
@@ -220,6 +256,7 @@ const CasesCaseIdRouteChildren: CasesCaseIdRouteChildren = {
   CasesCaseIdDocumentsRoute: CasesCaseIdDocumentsRoute,
   CasesCaseIdFinancialsRoute: CasesCaseIdFinancialsRoute,
   CasesCaseIdMapRoute: CasesCaseIdMapRoute,
+  CasesCaseIdCctvRoute: CasesCaseIdCctvRoute,
   CasesCaseIdPackRoute: CasesCaseIdPackRoute,
   CasesCaseIdIndexRoute: CasesCaseIdIndexRoute,
 }
@@ -232,6 +269,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthRoute: AuthRoute,
   NewCaseRoute: NewCaseRoute,
+  ApiCctvIngestRoute: ApiCctvIngestRoute,
   CasesCaseIdRoute: CasesCaseIdRouteWithChildren,
 }
 export const routeTree = rootRouteImport

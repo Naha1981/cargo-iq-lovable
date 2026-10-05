@@ -1,0 +1,17 @@
+{
+  "1:101": {
+    "code": "GATE-04",
+    "type": "GATE_ENTRY",
+    "semantic_purpose": "Main terminal entrance vehicle zone"
+  },
+  "1:102": {
+    "code": "STAGING-A",
+    "type": "STAGING_AREA",
+    "semantic_purpose": "Truck staging area"
+  },
+  "1:103": {
+    "code": "LOADING-07",
+    "type": "LOADING_BAY",
+    "semantic_purpose": "Loading bay observation zone"
+  }
+}

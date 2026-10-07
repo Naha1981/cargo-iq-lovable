@@ -7,6 +7,7 @@ import { fmtMoney } from "@/lib/case-data";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/")({
+  ssr: false,
   loader: async () => {
     const session = await getCurrentUser();
     if (!session.user) return { session, cases: [] };

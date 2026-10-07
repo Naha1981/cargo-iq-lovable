@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth.functions";
 import { getCase } from "@/lib/case.functions";
 
 export const Route = createFileRoute("/cases/$caseId")({
+  ssr: false,
   beforeLoad: async () => {
     const session = await getCurrentUser();
     if (!session.user) throw redirect({ to: "/auth" });

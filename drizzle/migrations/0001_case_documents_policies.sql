@@ -1,0 +1,2 @@
+CREATE POLICY "Tenant read case docs" ON storage.objects FOR SELECT TO authenticated USING (bucket_id = 'case-documents' AND public.is_tenant_member(((storage.foldername(name))[1])::uuid));
+CREATE POLICY "Tenant upload case docs" ON storage.objects FOR INSERT TO authenticated WITH CHECK (bucket_id = 'case-documents' AND public.is_tenant_member(((storage.foldername(name))[1])::uuid));

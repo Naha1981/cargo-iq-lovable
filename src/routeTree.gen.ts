@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as DiagnosticsRouteImport } from './routes/diagnostics'
 import { Route as NewCaseRouteImport } from './routes/new-case'
 import { Route as CasesCaseIdRouteImport } from './routes/cases.$caseId'
 import { Route as ApiCctvIngestRouteImport } from './routes/api/cctv/ingest'
@@ -29,6 +30,11 @@ const IndexRoute = IndexRouteImport.update({
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DiagnosticsRoute = DiagnosticsRouteImport.update({
+  id: '/diagnostics',
+  path: '/diagnostics',
   getParentRoute: () => rootRouteImport,
 } as any)
 const NewCaseRoute = NewCaseRouteImport.update({
@@ -80,6 +86,7 @@ const CasesCaseIdPackRoute = CasesCaseIdPackRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/diagnostics': typeof DiagnosticsRoute
   '/new-case': typeof NewCaseRoute
   '/cases/$caseId': typeof CasesCaseIdRouteWithChildren
   '/api/cctv/ingest': typeof ApiCctvIngestRoute
@@ -93,6 +100,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/diagnostics': typeof DiagnosticsRoute
   '/new-case': typeof NewCaseRoute
   '/api/cctv/ingest': typeof ApiCctvIngestRoute
   '/cases/$caseId/cctv': typeof CasesCaseIdCctvRoute
@@ -106,6 +114,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/diagnostics': typeof DiagnosticsRoute
   '/new-case': typeof NewCaseRoute
   '/cases/$caseId': typeof CasesCaseIdRouteWithChildren
   '/api/cctv/ingest': typeof ApiCctvIngestRoute
@@ -121,6 +130,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/auth'
+    | '/diagnostics'
     | '/new-case'
     | '/cases/$caseId'
     | '/api/cctv/ingest'
@@ -134,6 +144,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/auth'
+    | '/diagnostics'
     | '/new-case'
     | '/api/cctv/ingest'
     | '/cases/$caseId/cctv'
@@ -146,6 +157,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/auth'
+    | '/diagnostics'
     | '/new-case'
     | '/cases/$caseId'
     | '/api/cctv/ingest'
@@ -160,6 +172,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthRoute: typeof AuthRoute
+  DiagnosticsRoute: typeof DiagnosticsRoute
   NewCaseRoute: typeof NewCaseRoute
   CasesCaseIdRoute: typeof CasesCaseIdRouteWithChildren
   ApiCctvIngestRoute: typeof ApiCctvIngestRoute
@@ -179,6 +192,13 @@ declare module '@tanstack/react-router' {
       path: '/auth'
       fullPath: '/auth'
       preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/diagnostics': {
+      id: '/diagnostics'
+      path: '/diagnostics'
+      fullPath: '/diagnostics'
+      preLoaderRoute: typeof DiagnosticsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/new-case': {
@@ -272,6 +292,7 @@ const CasesCaseIdRouteWithChildren = CasesCaseIdRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthRoute: AuthRoute,
+  DiagnosticsRoute: DiagnosticsRoute,
   NewCaseRoute: NewCaseRoute,
   CasesCaseIdRoute: CasesCaseIdRouteWithChildren,
   ApiCctvIngestRoute: ApiCctvIngestRoute,

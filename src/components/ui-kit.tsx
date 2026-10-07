@@ -87,7 +87,7 @@ export function AppHeader() {
           <span className="hidden text-xs text-muted-foreground sm:inline">Evidence & Dispute Intelligence</span>
         </Link>
         <div className="flex items-center gap-3 text-xs text-muted-foreground">
-          <span className="hidden font-mono md:inline">PROVENANCE FIRST · RLS ACTIVE</span>
+          <Link to="/diagnostics" className="hover:text-foreground">Diagnostics</Link>
           <button onClick={logout} className="rounded border bg-secondary px-2 py-1 text-xs hover:bg-accent">Sign out</button>
         </div>
       </div>

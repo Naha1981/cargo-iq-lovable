@@ -12,7 +12,7 @@ export const Route = createFileRoute("/diagnostics")({
     { property: "og:type", content: "website" },
     { name: "twitter:card", content: "summary" },
   ] }),
-  errorComponent: ({ error }) => <div className="p-10 text-sm text-disputed">Diagnostics failed: {error.message}</div>,
+  errorComponent: ({ error }) => <div className="p-10 text-sm text-disputed">Diagnostics failed: {String((error as Error)?.message ?? error)}</div>,
   component: Diagnostics,
 });
 

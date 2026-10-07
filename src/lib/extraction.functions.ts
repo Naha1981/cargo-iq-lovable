@@ -32,7 +32,7 @@ function parseJsonModel(text: string): ClaimDraft[] {
     evidence_class: String(row.evidence_class ?? "CUSTOMER_PRIMARY"),
     nature: ["OBSERVED","REPORTED","DERIVED","INFERRED"].includes(row.nature) ? row.nature : "REPORTED",
     confidence: Number.isFinite(Number(row.confidence)) ? Math.max(0, Math.min(1, Number(row.confidence))) : 0.7,
-    timestamp_claimed: row.timestamp_claimed ? new Date(row.timestamp_claimed).toISOString() : undefined,
+    timestamp_claimed: row.timestamp_claimed && !isNaN(Date.parse(row.timestamp_claimed)) ? new Date(row.timestamp_claimed).toISOString() : undefined,
   })).filter((row: ClaimDraft) => row.claim_text.length > 0);
 }
 
@@ -46,33 +46,74 @@ function bytesToBase64(bytes: Uint8Array) {
 }
 
 async function extractWithGemini(bytes: ArrayBuffer, mimeType: string, filename: string) {
-  const key = process.env.GEMINI_API_KEY;
-  if (!key) throw new Error("GEMINI_API_KEY_NOT_CONFIGURED");
-  const model = process.env.GEMINI_MODEL ?? "gemini-2.5-flash";
-  const endpoint = "https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":generateContent?key=" + encodeURIComponent(key);
-  const binary = bytesToBase64(new Uint8Array(bytes));
+  const key = process.env["LOVABLE_API_KEY"];
+  if (!key) throw new Error("AI_KEY_NOT_CONFIGURED");
   const prompt = [
-    "You are CargoIQ's evidence extraction engine.",
+    "You are CargoIQ's evidence extraction engine for freight, port and logistics disputes.",
     "Extract only facts anchored to the document. Never invent missing data.",
-    "Return a JSON array. Each item: page_number, claim_text, claim_type, normalized_value, evidence_class, nature, confidence, timestamp_claimed.",
     "Use evidence_class CUSTOMER_PRIMARY unless clearly CONTRACTUAL or OFFICIAL_PUBLIC.",
     "Use OBSERVED for explicit facts, REPORTED for a party assertion, DERIVED only for arithmetic shown, INFERRED only where inference is explicit.",
-    "Dates must be ISO-8601 when confident. Confidence is 0..1.",
+    "Dates ISO-8601 when confident, else empty string. Confidence 0..1. page_number is the 1-based page the fact appears on.",
     "Filename: " + filename,
   ].join("\n");
+  const isText = /^text\//.test(mimeType) || /\.(csv|txt)$/i.test(filename);
+  const isImage = /^image\//.test(mimeType);
+  const b64 = isText ? "" : bytesToBase64(new Uint8Array(bytes));
+  const content: any[] = [{ type: "input_text", text: prompt }];
+  if (isText) content.push({ type: "input_text", text: "DOCUMENT (page 1):\n" + new TextDecoder().decode(bytes).slice(0, 200000) });
+  else if (isImage) content.push({ type: "input_image", image_url: `data:${mimeType};base64,${b64}` });
+  else content.push({ type: "input_file", filename, file_data: `data:${mimeType || "application/pdf"};base64,${b64}` });
 
-  const response = await fetch(endpoint, {
+  const schema = {
+    type: "object", additionalProperties: false, required: ["claims"],
+    properties: { claims: { type: "array", items: {
+      type: "object", additionalProperties: false,
+      required: ["page_number", "claim_text", "claim_type", "value", "evidence_class", "nature", "confidence", "timestamp_claimed"],
+      properties: {
+        page_number: { type: "integer" }, claim_text: { type: "string" }, claim_type: { type: "string" }, value: { type: "string" },
+        evidence_class: { type: "string", enum: ["CUSTOMER_PRIMARY", "CONTRACTUAL", "OFFICIAL_PUBLIC"] },
+        nature: { type: "string", enum: ["OBSERVED", "REPORTED", "DERIVED", "INFERRED"] },
+        confidence: { type: "number" }, timestamp_claimed: { type: "string" },
+      } } } },
+  };
+
+  const res = await fetch("https://ai.gateway.lovable.dev/v1/responses", {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", "Lovable-API-Key": key, Authorization: `Bearer ${key}`, "X-Lovable-AIG-SDK": "fetch" },
     body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }, { inlineData: { mimeType, data: binary } }] }],
-      generationConfig: { responseMimeType: "application/json" },
+      model: "openai/gpt-6-astra", stream: true, store: false,
+      reasoning: { effort: "low" },
+      input: [{ role: "user", content }],
+      text: { format: { type: "json_schema", name: "claims", strict: true, schema } },
     }),
   });
-  if (!response.ok) throw new Error("GEMINI_" + response.status);
-  const json = await response.json() as any;
-  const text = json?.candidates?.[0]?.content?.parts?.map((p: any) => p.text ?? "").join("") ?? "";
-  return parseJsonModel(text);
+  if (!res.ok || !res.body) {
+    const msg = await res.text().catch(() => "");
+    if (res.status === 402) throw new Error("AI credits exhausted — add credits in workspace settings.");
+    if (res.status === 429) throw new Error("AI is rate limited — try again in a minute.");
+    throw new Error("AI_" + res.status + " " + msg.slice(0, 200));
+  }
+  const reader = res.body.getReader();
+  const dec = new TextDecoder();
+  let buf = "", out = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    const lines = buf.split("\n");
+    buf = lines.pop() ?? "";
+    for (const line of lines) {
+      if (!line.startsWith("data:")) continue;
+      const d = line.slice(5).trim();
+      if (!d || d === "[DONE]") continue;
+      try {
+        const ev = JSON.parse(d);
+        if (ev.type === "response.output_text.delta") out += ev.delta ?? "";
+        if (ev.type === "response.failed" || ev.type === "error") throw new Error("AI_FAILED " + JSON.stringify(ev.error ?? ev.response?.error ?? "").slice(0, 200));
+      } catch (e) { if (e instanceof Error && e.message.startsWith("AI_FAILED")) throw e; }
+    }
+  }
+  return parseJsonModel(out).map((c) => ({ ...c, timestamp_claimed: c.timestamp_claimed || undefined }));
 }
 
 function timestampConflict(a: ClaimDraft, b: ClaimDraft) {
@@ -180,6 +221,6 @@ export async function extractDocumentClaimsForPath(input: {
 }
 
 export const extractionHealth = createServerFn({ method: "GET" }).handler(async () => ({
-  configured: Boolean(process.env.GEMINI_API_KEY),
-  model: process.env.GEMINI_MODEL ?? "gemini-2.5-flash",
+  configured: Boolean(process.env["LOVABLE_API_KEY"]),
+  model: "openai/gpt-6-astra",
 }));

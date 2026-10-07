@@ -135,7 +135,7 @@ export async function extractDocumentClaimsForPath(input: {
   if (docError || !doc) throw docError ?? new Error("DOCUMENT_NOT_FOUND");
 
   const { data: blob, error: blobError } = await input.supabase.storage.from("case-documents").download(doc.file_path);
-  if (blobError || !blob) throw blobError ?? new Error("DOCUMENT_DOWNLOAD_FAILED");
+  if (blobError || !blob) throw new Error(doc.file_path.startsWith("demo/") ? "This is a sample document with no file attached — upload a real file to extract claims." : "Could not read the uploaded file.");
   const bytes = await blob.arrayBuffer();
 
   let claims: ClaimDraft[] = [];

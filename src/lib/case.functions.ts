@@ -232,6 +232,10 @@ export const calculateCaseDemurrage = createServerFn({ method: "POST" })
   }))
   .middleware([tenantMiddleware])
   .handler(async ({ data, context }) => {
+    const { data: flaggedRows, error: flaggedError } = await context.supabase
+      .from("contradictions").select("id").eq("case_id", data.caseId).eq("status", "FLAGGED").limit(1);
+    if (flaggedError) throw flaggedError;
+    if (flaggedRows?.length) throw new Error("BLOCKED: resolve open contradictions first.");
     const result = calculateDemurrage(data);
     const calculatedMinor = Math.round(result.total * 100);
     const chargedMinor = data.chargedAmount == null ? null : Math.round(data.chargedAmount * 100);

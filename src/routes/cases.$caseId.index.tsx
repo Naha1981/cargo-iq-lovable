@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { getCaseWorkspace } from "@/lib/case.functions";
-import { Panel, NatureBadge, ClassTag } from "@/components/ui-kit";
+import { Panel, Stat, NatureBadge, ClassTag } from "@/components/ui-kit";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/cases/$caseId/")({
@@ -25,8 +25,30 @@ function TimelinePage() {
   const t1 = events.length ? Date.parse(events[events.length - 1].timestamp) : t0 + 1;
   const pos = (s: string) => t1 === t0 ? 50 : 6 + ((Date.parse(s) - t0) / (t1 - t0)) * 88;
 
+  const docCount = data.documents.length;
+  const claimCount = data.claims.length;
+  const openCount = data.contradictions.filter((c: any) => c.status === "FLAGGED").length;
+  const verifiedCount = data.claims.filter((c: any) => c.status === "VERIFIED").length;
+  const pendingCount = data.claims.filter((c: any) => c.status === "PENDING").length;
+  const nextAction = docCount === 0
+    ? "Upload documents"
+    : claimCount === 0
+      ? "Extract claims"
+      : openCount > 0
+        ? "Resolve " + openCount + " contradiction" + (openCount === 1 ? "" : "s")
+        : pendingCount > 0
+          ? "Review " + pendingCount + " unverified claim" + (pendingCount === 1 ? "" : "s")
+          : data.packs.length === 0 ? "Generate the evidence pack" : "Review pack";
+
   return (
     <div className="space-y-6">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <Stat label="Documents" value={String(docCount)} />
+        <Stat label="Claims extracted" value={String(claimCount)} />
+        <Stat label="Open contradictions" value={String(openCount)} tone={openCount ? "disputed" : undefined} />
+        <Stat label="Verified claims" value={claimCount ? verifiedCount + " / " + claimCount : "0"} tone="observed" />
+      </div>
+      <div className="rounded border border-primary/40 bg-primary/5 px-4 py-3 text-sm"><span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Next action</span><div className="mt-1 font-medium text-primary">{nextAction}</div></div>
       <Panel title={"Case timeline · " + (events.length ? new Date(t0).toISOString().slice(0,10) + " – " + new Date(t1).toISOString().slice(0,10) : "No events")}>
         {!events.length ? (
           <div className="py-14 text-center text-sm text-muted-foreground">No timeline events yet. Upload records or refresh satellite and marine data.</div>

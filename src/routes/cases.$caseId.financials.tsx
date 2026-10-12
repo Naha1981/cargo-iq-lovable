@@ -35,8 +35,15 @@ function FinPage() {
     (charged === "" || Number(charged) >= 0) && tiers.length &&
     tiers.every((t: any) => Number.isFinite(t.dailyRate) && t.dailyRate >= 0));
 
+  const openContradictions = data.contradictions.filter((c: any) => c.status === "FLAGGED").length;
+  const blocked = openContradictions > 0;
+  const missing = [
+    !start && "start date", !release && "release date", release && start && release < start && "release on or after start",
+    freeDays === "" && "free days", units === "" && "units", !tiers.length && "daily rate",
+  ].filter(Boolean) as string[];
+
   async function calculate() {
-    if (!valid || busy) return;
+    if (!valid || busy || blocked) return;
     setBusy(true); setError("");
     try {
       const row = await calculateCaseDemurrage({ data: {
@@ -46,7 +53,8 @@ function FinPage() {
       } });
       setResult(row);
       await router.invalidate();
-    } catch {
+    } catch (e) {
+      if (e instanceof Error && e.message.startsWith("BLOCKED")) { setError("BLOCKED - resolve open contradictions first."); await router.invalidate(); setBusy(false); return; }
       setError("Could not save the calculation. Check the dates, units and ZAR rate, then try again.");
     } finally { setBusy(false); }
   }
@@ -55,16 +63,25 @@ function FinPage() {
   const chargedAmount = result?.charged_amount_minor == null ? null : Number(result.charged_amount_minor) / 100;
   const recovery = chargedAmount == null || calculated == null ? null : Math.max(0, chargedAmount - calculated);
   const money = (value: number | null) => value == null ? "—" : fmtMoney(value, currency);
+  const calcLabel = blocked ? "BLOCKED" : result ? money(calculated) : "Not calculable";
+  const recoveryLabel = blocked ? "BLOCKED" : result ? money(recovery) : "Not calculable";
 
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Stat label="Charged (ZAR)" value={money(chargedAmount)} tone="disputed" />
-        <Stat label="Calculated (ZAR)" value={money(calculated)} tone="primary" />
-        <Stat label="Variance / recovery (ZAR)" value={money(recovery)} tone="observed" />
-        <Stat label="Rule" value={result?.rule_version ?? "Not calculated"} />
+        <Stat label="Charged (ZAR)" value={blocked ? "BLOCKED" : money(chargedAmount)} tone="disputed" />
+        <Stat label="Calculated (ZAR)" value={calcLabel} tone="primary" />
+        <Stat label="Variance / recovery (ZAR)" value={recoveryLabel} tone="observed" />
+        <Stat label="Rule" value={blocked ? "BLOCKED" : result?.rule_version ?? "Not calculated"} />
       </div>
-      {latest && <p className="text-sm text-muted-foreground">Figures above are the stored audit run. Editing inputs does not change them until a new calculation is saved.</p>}
+      {blocked && (
+        <div role="alert" className="rounded border border-disputed/50 bg-disputed/10 px-4 py-3 text-sm">
+          <div className="font-semibold text-disputed">BLOCKED - resolve open contradictions first</div>
+          <div className="mt-1 text-muted-foreground">{openContradictions} flagged contradiction{openContradictions === 1 ? "" : "s"} must be resolved on the Documents &amp; Contradictions tab before demurrage can be calculated. Earlier figures are hidden until then.</div>
+        </div>
+      )}
+      {!blocked && missing.length > 0 && <p className="text-sm text-muted-foreground">Not calculable yet. Missing: {missing.join(", ")}. Nothing is estimated or assumed.</p>}
+      {latest && !blocked && <p className="text-sm text-muted-foreground">Figures above are the stored audit run. Editing inputs does not change them until a new calculation is saved.</p>}
       {!latest && data.calculations.length > 0 && <p className="text-sm text-muted-foreground">Existing calculations use another currency. They have not been converted to ZAR; enter supported ZAR inputs for a new run.</p>}
       <Panel title="Deterministic commercial rules">
         <div className="grid gap-4 md:grid-cols-5">
@@ -83,9 +100,9 @@ function FinPage() {
           {!tiers.length && <p className="mt-2 text-sm text-muted-foreground">Enter the rate from the contract or invoice. No rate is assumed.</p>}
         </div>
         {error && <p role="alert" className="mt-3 text-sm text-disputed">{error}</p>}
-        <Button disabled={!valid || busy} className="mt-5" onClick={calculate}>{busy ? "Saving…" : "Calculate & persist audit run"}</Button>
+        <Button disabled={!valid || busy || blocked} className="mt-5" onClick={calculate}>{busy ? "Saving…" : blocked ? "Blocked - resolve contradictions" : "Calculate & persist audit run"}</Button>
       </Panel>
-      {result && <Panel title="Stored calculation"><pre className="overflow-auto text-xs">{JSON.stringify(result.result_payload ?? result, null, 2)}</pre></Panel>}
+      {result && !blocked && <Panel title="Stored calculation"><pre className="overflow-auto text-xs">{JSON.stringify(result.result_payload ?? result, null, 2)}</pre></Panel>}
     </div>
   );
 }

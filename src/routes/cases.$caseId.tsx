@@ -21,7 +21,7 @@ export const Route = createFileRoute("/cases/$caseId")({
 
 const tabs = [
   { to: "/cases/$caseId", label: "Timeline", exact: true },
-  { to: "/cases/$caseId/map", label: "God's Eye View" },
+  { to: "/cases/$caseId/map", label: "Harbour Map" },
   { to: "/cases/$caseId/documents", label: "Documents & Contradictions" },
   // CCTV stays off the demo navigation until server encryption is configured.
   { to: "/cases/$caseId/financials", label: "Financials" },

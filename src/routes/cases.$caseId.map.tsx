@@ -30,7 +30,7 @@ function aisTrack(observations: any[]): TrackPoint[] {
 
 export const Route = createFileRoute("/cases/$caseId/map")({
   loader: ({ params }) => getCaseWorkspace({ data: { caseId: params.caseId } }),
-  head: () => ({ meta: [{ title: "God's Eye View — Tactical Investigation | CargoIQ" }] }),
+  head: () => ({ meta: [{ title: "Harbour Evidence Map | CargoIQ" }] }),
   component: MapPage,
 });
 
@@ -109,11 +109,11 @@ function MapPage() {
     <div className="space-y-3">
       <div className="grid gap-2 md:grid-cols-5">
         {[
-          ["CLASSIFICATION", isSample ? "SAMPLE DATA" : "RECORDED OBSERVATIONS // CORROBORATION"],
-          ["UTC MASTER", new Date(time).toISOString().replace("T", " ").slice(0, 19) + "Z"],
-          ["TARGET LOCK", locked ? current.lat.toFixed(5) + " / " + current.lon.toFixed(5) : "OFF"],
-          ["AZIMUTH", current.cog == null ? "—" : Math.round(current.cog) + "°"],
-          ["FOV", "42° · RANGE 35 KM"],
+          ["DATA STATUS", isSample ? "SAMPLE DATA" : "RECORDED OBSERVATIONS · CORROBORATION"],
+          ["TIME (UTC)", new Date(time).toISOString().replace("T", " ").slice(0, 19) + "Z"],
+          ["VESSEL POSITION", locked ? current.lat.toFixed(5) + " / " + current.lon.toFixed(5) : "NOT TRACKING"],
+          ["VESSEL COURSE", current.cog == null ? "—" : Math.round(current.cog) + "°"],
+          ["MAP COVERAGE", "35 KM RADIUS"],
         ].map(([label, value]) => (
           <div key={label} className="rounded border bg-card px-3 py-2 font-mono">
             <div className="text-[9px] tracking-[0.2em] text-muted-foreground">{label}</div>
@@ -124,7 +124,7 @@ function MapPage() {
 
       <div className="overflow-hidden rounded-lg border bg-[#061016]">
         <div className="relative">
-          <svg viewBox="0 0 1000 640" className="block h-[560px] w-full" role="img" aria-label="CargoIQ tactical harbour investigation map">
+          <svg viewBox="0 0 1000 640" className="block h-[380px] w-full md:h-[560px]" role="img" aria-label="CargoIQ harbour evidence map">
             <defs>
               <pattern id="hud-grid" width="40" height="40" patternUnits="userSpaceOnUse">
                 <path d="M40 0H0V40" fill="none" stroke="#d2ff6b" strokeOpacity="0.09" />
@@ -178,14 +178,14 @@ function MapPage() {
             {layers.sar && scenes.filter((s: any) => s.observation_type === "SENTINEL_1_SCENE").map((scene: any, i: number) => (
               <g key={scene.id}>
                 <rect x={680 + i * 50} y={70 + i * 45} width="165" height="110" fill="#5ffbf1" fillOpacity=".04" stroke="#5ffbf1" strokeOpacity=".75" />
-                <text x={687 + i * 50} y={88 + i * 45} fill="#5ffbf1" fontSize="10">S1 SAR · ORBIT {scene.payload?.relativeOrbit ?? "—"}</text>
+                <text x={687 + i * 50} y={88 + i * 45} fill="#5ffbf1" fontSize="10">SATELLITE RADAR · ORBIT {scene.payload?.relativeOrbit ?? "—"}</text>
               </g>
             ))}
 
             {layers.optical && scenes.filter((s: any) => s.observation_type === "SENTINEL_2_SCENE").map((scene: any, i: number) => (
               <g key={scene.id}>
                 <rect x={80 + i * 55} y={395 + i * 35} width="165" height="90" fill="#7dd3fc" fillOpacity=".04" stroke="#7dd3fc" strokeOpacity=".72" />
-                <text x={87 + i * 55} y={413 + i * 35} fill="#7dd3fc" fontSize="10">S2 MSI · CLOUD {Math.round(Number(scene.payload?.cloudPercent ?? 0))}%</text>
+                <text x={87 + i * 55} y={413 + i * 35} fill="#7dd3fc" fontSize="10">SATELLITE OPTICAL · CLOUD {Math.round(Number(scene.payload?.cloudPercent ?? 0))}%</text>
               </g>
             ))}
 
@@ -201,8 +201,8 @@ function MapPage() {
 
             <rect x="3" y="3" width="994" height="634" fill="url(#hud-vignette)" />
             <g fill="#d2ff6b" fontFamily="JetBrains Mono" fontSize="10">
-              <text x="18" y="22">DURBAN HARBOUR · CASE-SCOPED RECON</text>
-              <text x="18" y="625">FOV 42° · RANGE 35 KM · {isSample ? "SAMPLE DATA" : track.length ? "RECORDED OBSERVATIONS" : "AWAITING SENSOR REFRESH"}</text>
+              <text x="18" y="22">DURBAN HARBOUR · CASE EVIDENCE MAP</text>
+              <text x="18" y="625">COVERAGE 35 KM RADIUS · {isSample ? "SAMPLE DATA" : track.length ? "RECORDED OBSERVATIONS" : "AWAITING DATA REFRESH"}</text>
               <text x="930" y="625">N ↑</text>
             </g>
           </svg>
@@ -210,8 +210,8 @@ function MapPage() {
           <div className="pointer-events-none absolute inset-0 opacity-[0.07] [background-image:repeating-linear-gradient(to_bottom,transparent_0,transparent_2px,#d2ff6b_2px,#d2ff6b_3px)]" />
 
           <div className="absolute left-4 top-4 rounded border border-[#d2ff6b]/40 bg-black/65 px-3 py-2 font-mono text-[10px] backdrop-blur">
-            <div className="text-[#d2ff6b]">TARGET {locked ? "LOCKED" : "UNLOCKED"}</div>
-            <div className="mt-1 text-white/70">SOG {current.sog.toFixed(1)} kn</div>
+            <div className="text-[#d2ff6b]">VESSEL {locked ? "TRACKING ON" : "TRACKING OFF"}</div>
+            <div className="mt-1 text-white/70">SPEED {current.sog.toFixed(1)} kn</div>
           </div>
 
           <div className="absolute right-4 top-4 flex max-w-[70%] flex-wrap justify-end gap-1">
@@ -219,9 +219,9 @@ function MapPage() {
               <button
                 key={key}
                 onClick={() => setLayers((value) => ({ ...value, [key]: !enabled }))}
-                className={cn("rounded border border-[#d2ff6b]/35 bg-black/65 px-2 py-1 font-mono text-[9px] uppercase text-[#d2ff6b]", !enabled && "opacity-30")}
+                className={cn("rounded border border-[#d2ff6b]/35 bg-black/65 px-2 py-1 font-mono text-[10px] uppercase text-[#d2ff6b]", !enabled && "opacity-30")}
               >
-                {key}
+                {({ ais: "Vessel track", sar: "Radar", optical: "Optical", weather: "Sea state", infrastructure: "Terminals" } as Record<string, string>)[key] ?? key}
               </button>
             ))}
           </div>
@@ -229,25 +229,25 @@ function MapPage() {
       </div>
 
       <Panel
-        title="Temporal / sensor control"
+        title="Time and data controls"
         action={
           <div className="flex flex-wrap gap-2">
-            <Button variant="ghost" className="py-1 text-xs" onClick={() => setLocked((value) => !value)}>{locked ? "Target locked" : "Target unlocked"}</Button>
+            <Button variant="ghost" className="py-1 text-xs" onClick={() => setLocked((value) => !value)}>{locked ? "Tracking vessel" : "Not tracking"}</Button>
             <Button className="py-1 text-xs" onClick={() => setPlaying((value) => !value)}>{playing ? "Pause" : "Play timeline"}</Button>
-            <Button variant="ghost" className="py-1 text-xs" disabled={refreshing} onClick={refreshSensors}>{refreshing ? "Refreshing…" : "Refresh sensors"}</Button>
+            <Button variant="ghost" className="py-1 text-xs" disabled={refreshing} onClick={refreshSensors}>{refreshing ? "Refreshing…" : "Refresh satellite & marine data"}</Button>
           </div>
         }
       >
         <input type="range" min={initialTime} max={maxTime} step={15 * 60 * 1000} value={time} onChange={(e) => setTime(Number(e.target.value))} className="w-full accent-[#d2ff6b]" aria-label="Investigation timeline" />
         <div className="mt-2 flex justify-between gap-4 font-mono text-[10px] text-muted-foreground">
           <span>{new Date(initialTime).toISOString()}</span>
-          <span>Temporal cursor · observations remain source-attributed</span>
+          <span>Selected time · observations remain source-attributed</span>
           <span>{new Date(maxTime).toISOString()}</span>
         </div>
       </Panel>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <Panel title="Events at cursor">
+        <Panel title="Events at selected time">
           <ul className="space-y-3">
             {nearby.map((e: any) => (
               <li key={e.id} className="text-sm">
@@ -256,11 +256,11 @@ function MapPage() {
                 <div className="text-xs text-muted-foreground">{e.source}</div>
               </li>
             ))}
-            {!nearby.length && <li className="text-sm text-muted-foreground">No events near the temporal cursor.</li>}
+            {!nearby.length && <li className="text-sm text-muted-foreground">No events near the selected time.</li>}
           </ul>
         </Panel>
 
-        <Panel title="Satellite footprints">
+        <Panel title="Satellite coverage">
           <ul className="space-y-3">
             {scenes.slice(0, 8).map((s: any) => (
               <li key={s.id} className="rounded border p-3">
@@ -268,7 +268,7 @@ function MapPage() {
                 <div className="mt-1 text-xs text-muted-foreground">{s.payload?.id ?? s.id} · orbit {s.payload?.relativeOrbit ?? "—"} · cloud {s.payload?.cloudPercent ?? "n/a"}</div>
               </li>
             ))}
-            {!scenes.length && <li className="text-sm text-muted-foreground">No Sentinel observations stored yet. Refresh sensors to query Copernicus.</li>}
+            {!scenes.length && <li className="text-sm text-muted-foreground">No Sentinel observations stored yet. Refresh data to query Copernicus satellites.</li>}
           </ul>
         </Panel>
 

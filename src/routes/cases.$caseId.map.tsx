@@ -124,7 +124,7 @@ function MapPage() {
 
       <div className="overflow-hidden rounded-lg border bg-[#061016]">
         <div className="relative">
-          <svg viewBox="0 0 1000 640" className="block h-[380px] w-full md:h-[560px]" role="img" aria-label="CargoIQ harbour evidence map">
+          <svg viewBox="0 0 1000 640" className="block h-[520px] w-full md:h-[calc(100vh-300px)] md:min-h-[520px]" role="img" aria-label="CargoIQ harbour evidence map">
             <defs>
               <pattern id="hud-grid" width="40" height="40" patternUnits="userSpaceOnUse">
                 <path d="M40 0H0V40" fill="none" stroke="#d2ff6b" strokeOpacity="0.09" />
@@ -202,8 +202,8 @@ function MapPage() {
             <rect x="3" y="3" width="994" height="634" fill="url(#hud-vignette)" />
             <g fill="#d2ff6b" fontFamily="JetBrains Mono" fontSize="10">
               <text x="18" y="22">DURBAN HARBOUR · CASE EVIDENCE MAP</text>
-              <text x="18" y="625">COVERAGE 35 KM RADIUS · {isSample ? "SAMPLE DATA" : track.length ? "RECORDED OBSERVATIONS" : "AWAITING DATA REFRESH"}</text>
-              <text x="930" y="625">N ↑</text>
+              <text x="18" y="40">COVERAGE 35 KM RADIUS · {isSample ? "SAMPLE DATA" : track.length ? "RECORDED OBSERVATIONS" : "AWAITING DATA REFRESH"}</text>
+              <text x="960" y="40">N ↑</text>
             </g>
           </svg>
 
@@ -212,6 +212,30 @@ function MapPage() {
           <div className="absolute left-4 top-4 rounded border border-[#d2ff6b]/40 bg-black/65 px-3 py-2 font-mono text-[10px] backdrop-blur">
             <div className="text-[#d2ff6b]">VESSEL {locked ? "TRACKING ON" : "TRACKING OFF"}</div>
             <div className="mt-1 text-white/70">SPEED {current.sog.toFixed(1)} kn</div>
+          </div>
+
+          <div className="absolute left-4 top-[4.25rem] w-64 max-w-[45%] rounded border border-[#d2ff6b]/40 bg-black/70 px-3 py-2 font-mono text-[10px] backdrop-blur">
+            <div className="flex items-center justify-between text-[#d2ff6b]"><span>EVENTS AT SELECTED TIME</span><span className="text-white/60">{nearby.length}</span></div>
+            <ul className="mt-2 max-h-[34vh] space-y-2 overflow-y-auto pr-1">
+              {nearby.map((e: any) => (
+                <li key={e.id} className="border-t border-white/10 pt-1.5 first:border-t-0 first:pt-0">
+                  <div className="flex items-center justify-between gap-2"><span className="text-white/60">{String(e.timestamp).slice(5, 16).replace("T", " ")}Z</span><NatureBadge n={String(e.nature).toLowerCase() as any} /></div>
+                  <div className="mt-0.5 font-sans text-[11px] leading-snug text-white/90">{e.title}</div>
+                </li>
+              ))}
+              {!nearby.length && <li className="font-sans text-[11px] text-white/60">No events near the selected time.</li>}
+            </ul>
+          </div>
+
+          <div className="absolute inset-x-3 bottom-3 rounded border border-[#d2ff6b]/40 bg-black/75 px-3 py-2 backdrop-blur">
+            <div className="flex flex-wrap items-center gap-2">
+              <Button className="py-1 text-xs" onClick={() => setPlaying((value) => !value)}>{playing ? "Pause" : "Play timeline"}</Button>
+              <Button variant="ghost" className="py-1 text-xs" onClick={() => setLocked((value) => !value)}>{locked ? "Tracking vessel" : "Not tracking"}</Button>
+              <Button variant="ghost" className="py-1 text-xs" disabled={refreshing} onClick={refreshSensors}>{refreshing ? "Refreshing…" : "Refresh satellite & marine data"}</Button>
+              <span className="ml-auto font-mono text-[10px] text-white/70">{new Date(time).toISOString().replace("T", " ").slice(0, 16)}Z</span>
+            </div>
+            <input type="range" min={initialTime} max={maxTime} step={15 * 60 * 1000} value={time} onChange={(e) => setTime(Number(e.target.value))} className="mt-1 w-full accent-[#d2ff6b]" aria-label="Investigation timeline" />
+            <div className="flex justify-between font-mono text-[9px] text-white/50"><span>{new Date(initialTime).toISOString().slice(0, 16)}Z</span><span>{new Date(maxTime).toISOString().slice(0, 16)}Z</span></div>
           </div>
 
           <div className="absolute right-4 top-4 flex max-w-[70%] flex-wrap justify-end gap-1">
@@ -228,38 +252,8 @@ function MapPage() {
         </div>
       </div>
 
-      <Panel
-        title="Time and data controls"
-        action={
-          <div className="flex flex-wrap gap-2">
-            <Button variant="ghost" className="py-1 text-xs" onClick={() => setLocked((value) => !value)}>{locked ? "Tracking vessel" : "Not tracking"}</Button>
-            <Button className="py-1 text-xs" onClick={() => setPlaying((value) => !value)}>{playing ? "Pause" : "Play timeline"}</Button>
-            <Button variant="ghost" className="py-1 text-xs" disabled={refreshing} onClick={refreshSensors}>{refreshing ? "Refreshing…" : "Refresh satellite & marine data"}</Button>
-          </div>
-        }
-      >
-        <input type="range" min={initialTime} max={maxTime} step={15 * 60 * 1000} value={time} onChange={(e) => setTime(Number(e.target.value))} className="w-full accent-[#d2ff6b]" aria-label="Investigation timeline" />
-        <div className="mt-2 flex justify-between gap-4 font-mono text-[10px] text-muted-foreground">
-          <span>{new Date(initialTime).toISOString()}</span>
-          <span>Selected time · observations remain source-attributed</span>
-          <span>{new Date(maxTime).toISOString()}</span>
-        </div>
-      </Panel>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <Panel title="Events at selected time">
-          <ul className="space-y-3">
-            {nearby.map((e: any) => (
-              <li key={e.id} className="text-sm">
-                <div className="flex items-center justify-between"><span className="font-mono text-[10px] text-muted-foreground">{e.timestamp}</span><NatureBadge n={String(e.nature).toLowerCase() as any} /></div>
-                <div className="mt-1">{e.title}</div>
-                <div className="text-xs text-muted-foreground">{e.source}</div>
-              </li>
-            ))}
-            {!nearby.length && <li className="text-sm text-muted-foreground">No events near the selected time.</li>}
-          </ul>
-        </Panel>
-
+      <div className="grid gap-6 lg:grid-cols-2">
         <Panel title="Satellite coverage">
           <ul className="space-y-3">
             {scenes.slice(0, 8).map((s: any) => (

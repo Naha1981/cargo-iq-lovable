@@ -83,7 +83,7 @@ function DocsPage() {
       }>
         {error && <div className="mb-3 rounded border border-disputed/40 bg-disputed/10 p-3 text-xs text-disputed">{error}</div>}
         <ul className="divide-y">
-          {data.documents.map((d) => (
+          {data.documents.map((d: any) => (
             <li key={d.id} className="flex items-start gap-3 px-2 py-3">
               <div className="grid h-10 w-8 shrink-0 place-items-center rounded-sm border bg-panel font-mono text-[9px] text-muted-foreground">{d.file_type.split("/").pop()?.slice(0, 6).toUpperCase()}</div>
               <div className="min-w-0 flex-1">
@@ -100,7 +100,7 @@ function DocsPage() {
       <div className="space-y-6">
         <Panel title={"Extracted claims · " + data.claims.length}>
           <ul className="divide-y">
-            {data.claims.map((c) => (
+            {data.claims.map((c: any) => (
               <li key={c.id} className="grid gap-3 py-3 md:grid-cols-[1fr_auto]">
                 <div>
                   <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
@@ -122,9 +122,9 @@ function DocsPage() {
           </ul>
         </Panel>
 
-        <Panel title={"Contradictions · " + data.contradictions.filter((c) => c.status === "FLAGGED").length + " flagged"}>
+        <Panel title={"Contradictions · " + data.contradictions.filter((c: any) => c.status === "FLAGGED").length + " flagged"}>
           <div className="space-y-3">
-            {data.contradictions.map((c) => (
+            {data.contradictions.map((c: any) => (
               <div key={c.id} className="rounded-md border p-4">
                 <div className="flex items-center justify-between"><span className="font-medium">{c.title}</span><span className={cn("rounded px-2 py-1 text-xs", c.status === "RESOLVED" ? "bg-observed/15 text-observed" : "bg-disputed/15 text-disputed")}>{c.status}</span></div>
                 <p className="mt-2 text-sm text-muted-foreground">{c.description}</p>

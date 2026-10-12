@@ -13,7 +13,7 @@ const idInput = z.object({ caseId: z.string().uuid() });
 export const listCases = createServerFn({ method: "GET" }).middleware([tenantMiddleware]).handler(async ({ context }) => {
   const { data: cases, error } = await context.supabase.from("cases").select("*").order("created_at", { ascending: false });
   if (error) throw error;
-  const ids = (cases ?? []).map((c) => c.id);
+  const ids = (cases ?? []).map((c: any) => c.id);
   const { data: calcs } = ids.length
     ? await context.supabase.from("financial_calculations").select("case_id,calculated_amount_minor,charged_amount_minor,currency,variance_minor").in("case_id", ids).order("created_at", { ascending: false })
     : { data: [] as any[] };
@@ -24,9 +24,9 @@ export const listCases = createServerFn({ method: "GET" }).middleware([tenantMid
   const latestCalc = new Map<string, any>();
   for (const row of calcs ?? []) if (!latestCalc.has(row.case_id)) latestCalc.set(row.case_id, row);
 
-  return (cases ?? []).map((c) => {
+  return (cases ?? []).map((c: any) => {
     const calc = latestCalc.get(c.id);
-    const openContradictions = (contradictions ?? []).filter((x) => x.case_id === c.id && x.status === "FLAGGED").length;
+    const openContradictions = (contradictions ?? []).filter((x: any) => x.case_id === c.id && x.status === "FLAGGED").length;
     const charged = calc?.charged_amount_minor ? Number(calc.charged_amount_minor) / 100 : 0;
     const calculated = calc?.calculated_amount_minor ? Number(calc.calculated_amount_minor) / 100 : 0;
     return { ...c, currency: calc?.currency ?? "ZAR", exposure: charged, recovery: Math.max(0, charged - calculated), contradictions: openContradictions };
@@ -282,7 +282,7 @@ export const generateEvidencePack = createServerFn({ method: "POST" })
     ]);
     for (const x of [c, docs, claims, contradictions, timeline, observations, calculations, existing]) if (x.error) throw x.error;
 
-    const unresolved = (contradictions.data ?? []).filter((x) => x.status === "FLAGGED").length;
+    const unresolved = (contradictions.data ?? []).filter((x: any) => x.status === "FLAGGED").length;
     if (unresolved > 0) throw new Error("Resolve the flagged contradictions before generating an evidence pack.");
 
     const version = ((existing.data?.[0]?.version as number | undefined) ?? 0) + 1;
@@ -291,7 +291,7 @@ export const generateEvidencePack = createServerFn({ method: "POST" })
       version,
       case: c.data,
       documents: docs.data ?? [],
-      verifiedClaims: (claims.data ?? []).filter((x) => x.status === "VERIFIED"),
+      verifiedClaims: (claims.data ?? []).filter((x: any) => x.status === "VERIFIED"),
       claims: claims.data ?? [],
       contradictions: contradictions.data ?? [],
       timeline: timeline.data ?? [],
@@ -336,13 +336,13 @@ export const generateEvidencePack = createServerFn({ method: "POST" })
       "**SHA-256:** " + hash,
       "",
       "## Timeline",
-      ...(timeline.data ?? []).map((e) => "- " + e.timestamp + " — " + e.title + " [" + e.nature + "] — " + e.source),
+      ...(timeline.data ?? []).map((e: any) => "- " + e.timestamp + " — " + e.title + " [" + e.nature + "] — " + e.source),
       "",
       "## Contradictions",
-      ...(contradictions.data ?? []).map((x) => "- " + x.title + ": " + x.description),
+      ...(contradictions.data ?? []).map((x: any) => "- " + x.title + ": " + x.description),
       "",
       "## Financial calculations",
-      ...(calculations.data ?? []).map((x) => "- " + x.calculation_type + " " + (x.currency ?? "") + ": calculated=" + (x.calculated_amount_minor ?? "—") + " minor, charged=" + (x.charged_amount_minor ?? "—") + " minor, variance=" + (x.variance_minor ?? "—")),
+      ...(calculations.data ?? []).map((x: any) => "- " + x.calculation_type + " " + (x.currency ?? "") + ": calculated=" + (x.calculated_amount_minor ?? "—") + " minor, charged=" + (x.charged_amount_minor ?? "—") + " minor, variance=" + (x.variance_minor ?? "—")),
       "",
       "## Limitations",
       "- AIS can contain gaps, spoofing or stale identity data.",

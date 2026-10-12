@@ -45,10 +45,8 @@ function bytesToBase64(bytes: Uint8Array) {
   return btoa(binary);
 }
 
-async function extractWithGemini(bytes: ArrayBuffer, mimeType: string, filename: string) {
-  const key = process.env["LOVABLE_API_KEY"];
-  if (!key) throw new Error("AI_KEY_NOT_CONFIGURED");
-  const prompt = [
+function claimPrompt(filename: string) {
+  return [
     "You are CargoIQ's evidence extraction engine for freight, port and logistics disputes.",
     "Extract only facts anchored to the document. Never invent missing data.",
     "Use evidence_class CUSTOMER_PRIMARY unless clearly CONTRACTUAL or OFFICIAL_PUBLIC.",
@@ -56,15 +54,9 @@ async function extractWithGemini(bytes: ArrayBuffer, mimeType: string, filename:
     "Dates ISO-8601 when confident, else empty string. Confidence 0..1. page_number is the 1-based page the fact appears on.",
     "Filename: " + filename,
   ].join("\n");
-  const isText = /^text\//.test(mimeType) || /\.(csv|txt)$/i.test(filename);
-  const isImage = /^image\//.test(mimeType);
-  const b64 = isText ? "" : bytesToBase64(new Uint8Array(bytes));
-  const content: any[] = [{ type: "input_text", text: prompt }];
-  if (isText) content.push({ type: "input_text", text: "DOCUMENT (page 1):\n" + new TextDecoder().decode(bytes).slice(0, 200000) });
-  else if (isImage) content.push({ type: "input_image", image_url: `data:${mimeType};base64,${b64}` });
-  else content.push({ type: "input_file", filename, file_data: `data:${mimeType || "application/pdf"};base64,${b64}` });
+}
 
-  const schema = {
+const claimSchema = {
     type: "object", additionalProperties: false, required: ["claims"],
     properties: { claims: { type: "array", items: {
       type: "object", additionalProperties: false,
@@ -77,6 +69,94 @@ async function extractWithGemini(bytes: ArrayBuffer, mimeType: string, filename:
       } } } },
   };
 
+export type ClaimAiProvider = { kind: "openai" | "anthropic" | "gateway" | "none"; label: string };
+
+// Server-side only. Keys are read from the environment and never sent to the client.
+export function resolveClaimAiProvider(): ClaimAiProvider {
+  const openai = process.env["OPENAI_API_KEY"];
+  const anthropic = process.env["ANTHROPIC_API_KEY"];
+  const wanted = (process.env["CLAIM_AI_PROVIDER"] ?? "").toLowerCase();
+  if (wanted === "anthropic" && anthropic) return { kind: "anthropic", label: "Using your own Anthropic key" };
+  if (wanted === "openai" && openai) return { kind: "openai", label: "Using your own OpenAI key" };
+  if (!wanted && openai) return { kind: "openai", label: "Using your own OpenAI key" };
+  if (!wanted && anthropic) return { kind: "anthropic", label: "Using your own Anthropic key" };
+  if (process.env["LOVABLE_API_KEY"]) return { kind: "gateway", label: "Using Lovable gateway" };
+  return { kind: "none", label: "No AI key configured" };
+}
+
+async function readError(res: Response, name: string) {
+  const msg = await res.text().catch(() => "");
+  if (res.status === 401) return new Error(name + " rejected the API key (401). Check the key set for this project.");
+  if (res.status === 402 || res.status === 403) return new Error(name + " refused the request (" + res.status + "). Check the key, billing and model access.");
+  if (res.status === 429) return new Error(name + " is rate limited - try again in a minute.");
+  return new Error("AI_" + res.status + " " + msg.slice(0, 200));
+}
+
+async function extractViaOpenAi(bytes: ArrayBuffer, mimeType: string, filename: string) {
+  const key = process.env["OPENAI_API_KEY"]!;
+  const isText = /^text\//.test(mimeType) || /\.(csv|txt)$/i.test(filename);
+  const isImage = /^image\//.test(mimeType);
+  const b64 = isText ? "" : bytesToBase64(new Uint8Array(bytes));
+  const content: any[] = [{ type: "input_text", text: claimPrompt(filename) }];
+  if (isText) content.push({ type: "input_text", text: "DOCUMENT (page 1):\n" + new TextDecoder().decode(bytes).slice(0, 200000) });
+  else if (isImage) content.push({ type: "input_image", image_url: `data:${mimeType};base64,${b64}` });
+  else content.push({ type: "input_file", filename, file_data: `data:${mimeType || "application/pdf"};base64,${b64}` });
+  const res = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: { "content-type": "application/json", Authorization: "Bearer " + key },
+    body: JSON.stringify({
+      model: process.env["CLAIM_AI_MODEL"] || "gpt-4o-mini", store: false,
+      input: [{ role: "user", content }],
+      text: { format: { type: "json_schema", name: "claims", strict: true, schema: claimSchema } },
+    }),
+  });
+  if (!res.ok) throw await readError(res, "OpenAI");
+  const json: any = await res.json();
+  const text = json.output_text ?? (json.output ?? []).flatMap((o: any) => o.content ?? []).filter((c: any) => c.type === "output_text").map((c: any) => c.text).join("");
+  return parseJsonModel(String(text ?? "")).map((c) => ({ ...c, timestamp_claimed: c.timestamp_claimed || undefined }));
+}
+
+async function extractViaAnthropic(bytes: ArrayBuffer, mimeType: string, filename: string) {
+  const key = process.env["ANTHROPIC_API_KEY"]!;
+  const isText = /^text\//.test(mimeType) || /\.(csv|txt)$/i.test(filename);
+  const isImage = /^image\//.test(mimeType);
+  const b64 = isText ? "" : bytesToBase64(new Uint8Array(bytes));
+  const content: any[] = [];
+  if (isText) content.push({ type: "text", text: "DOCUMENT (page 1):\n" + new TextDecoder().decode(bytes).slice(0, 200000) });
+  else if (isImage) content.push({ type: "image", source: { type: "base64", media_type: mimeType, data: b64 } });
+  else content.push({ type: "document", source: { type: "base64", media_type: "application/pdf", data: b64 } });
+  content.push({ type: "text", text: claimPrompt(filename) + "\nReturn ONLY a JSON object of the form {\"claims\": [...]} where each claim has: page_number, claim_text, claim_type, value, evidence_class, nature, confidence, timestamp_claimed. No prose." });
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
+    body: JSON.stringify({ model: process.env["CLAIM_AI_MODEL"] || "claude-3-5-sonnet-latest", max_tokens: 8000, messages: [{ role: "user", content }] }),
+  });
+  if (!res.ok) throw await readError(res, "Anthropic");
+  const json: any = await res.json();
+  const text = (json.content ?? []).filter((c: any) => c.type === "text").map((c: any) => c.text).join("");
+  const start = text.indexOf("{"), end = text.lastIndexOf("}");
+  return parseJsonModel(start >= 0 && end > start ? text.slice(start, end + 1) : text).map((c) => ({ ...c, timestamp_claimed: c.timestamp_claimed || undefined }));
+}
+
+async function extractWithGemini(bytes: ArrayBuffer, mimeType: string, filename: string) {
+  const provider = resolveClaimAiProvider();
+  if (provider.kind === "openai") return extractViaOpenAi(bytes, mimeType, filename);
+  if (provider.kind === "anthropic") return extractViaAnthropic(bytes, mimeType, filename);
+  return extractViaGateway(bytes, mimeType, filename);
+}
+
+async function extractViaGateway(bytes: ArrayBuffer, mimeType: string, filename: string) {
+  const key = process.env["LOVABLE_API_KEY"];
+  if (!key) throw new Error("AI_KEY_NOT_CONFIGURED");
+  const prompt = claimPrompt(filename);
+  const isText = /^text\//.test(mimeType) || /\.(csv|txt)$/i.test(filename);
+  const isImage = /^image\//.test(mimeType);
+  const b64 = isText ? "" : bytesToBase64(new Uint8Array(bytes));
+  const content: any[] = [{ type: "input_text", text: prompt }];
+  if (isText) content.push({ type: "input_text", text: "DOCUMENT (page 1):\n" + new TextDecoder().decode(bytes).slice(0, 200000) });
+  else if (isImage) content.push({ type: "input_image", image_url: `data:${mimeType};base64,${b64}` });
+  else content.push({ type: "input_file", filename, file_data: `data:${mimeType || "application/pdf"};base64,${b64}` });
+
   const res = await fetch("https://ai.gateway.lovable.dev/v1/responses", {
     method: "POST",
     headers: { "content-type": "application/json", "Lovable-API-Key": key, Authorization: `Bearer ${key}`, "X-Lovable-AIG-SDK": "fetch" },
@@ -84,7 +164,7 @@ async function extractWithGemini(bytes: ArrayBuffer, mimeType: string, filename:
       model: "openai/gpt-6-astra", stream: true, store: false,
       reasoning: { effort: "low" },
       input: [{ role: "user", content }],
-      text: { format: { type: "json_schema", name: "claims", strict: true, schema } },
+      text: { format: { type: "json_schema", name: "claims", strict: true, schema: claimSchema } },
     }),
   });
   if (!res.ok || !res.body) {
@@ -222,7 +302,12 @@ export async function extractDocumentClaimsForPath(input: {
   return { claims: inserted, count: inserted.length };
 }
 
-export const extractionHealth = createServerFn({ method: "GET" }).handler(async () => ({
-  configured: Boolean(process.env["LOVABLE_API_KEY"]),
-  model: "openai/gpt-6-astra",
-}));
+export const extractionHealth = createServerFn({ method: "GET" }).handler(async () => {
+  const provider = resolveClaimAiProvider();
+  return {
+    configured: provider.kind !== "none",
+    provider: provider.kind,
+    label: provider.label,
+    model: provider.kind === "gateway" ? "openai/gpt-6-astra" : process.env["CLAIM_AI_MODEL"] || (provider.kind === "anthropic" ? "claude-3-5-sonnet-latest" : "gpt-4o-mini"),
+  };
+});

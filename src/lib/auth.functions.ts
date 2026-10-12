@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getAuthed } from "@/lib/supabase/server";
+import { resolveClaimAiProvider } from "@/lib/extraction.functions";
 
 export const getCurrentUser = createServerFn({ method: "GET" }).handler(async () => {
   const { supabase, user } = await getAuthed();
@@ -34,7 +35,8 @@ export const runDiagnostics = createServerFn({ method: "GET" }).handler(async ()
   const checks: { name: string; ok: boolean; detail: string; fix?: string }[] = [];
   const url = process.env["SUPABASE_URL"];
   checks.push({ name: "Backend connection settings", ok: Boolean(url && process.env["SUPABASE_PUBLISHABLE_KEY"]), detail: url ? "Connection details found." : "Connection details missing.", fix: "Reconnect Lovable Cloud for this project." });
-  checks.push({ name: "AI document reading", ok: Boolean(process.env["LOVABLE_API_KEY"]), detail: process.env["LOVABLE_API_KEY"] ? "AI key present." : "AI key missing.", fix: "Ask the assistant to add the Lovable AI key." });
+  const ai = resolveClaimAiProvider();
+  checks.push({ name: "AI document reading", ok: ai.kind !== "none", detail: ai.kind === "none" ? "AI key missing." : ai.label + ".", fix: "Add OPENAI_API_KEY or ANTHROPIC_API_KEY as a project secret, or ask the assistant to add the Lovable AI key." });
   const { supabase, user } = await getAuthed();
   const { error: dbErr } = await supabase.from("tenants").select("id", { head: true, count: "exact" });
   checks.push({ name: "Database ready", ok: !dbErr, detail: dbErr ? dbErr.message : "Tables reachable.", fix: "Ask the assistant to re-apply the database setup." });

@@ -74,6 +74,9 @@ function ErrorComponent({ error, reset }: ErrorComponentProps) {
   );
 }
 
+// Runs before first paint: dark is the default; only an explicit stored "light" choice switches it.
+const THEME_INIT = `try{if(localStorage.getItem("cargoiq-theme")==="light"){document.documentElement.classList.add("light")}}catch(e){}`;
+
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
     meta: [
@@ -87,6 +90,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
+    scripts: [{ children: THEME_INIT }],
     links: [
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" },
@@ -105,7 +109,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <HeadContent />
       </head>

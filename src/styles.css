@@ -67,6 +67,37 @@
   --land: oklch(0.28 0.012 120);
 }
 
+/* Light theme. Dark (the console look) is the :root default above; .light is applied on <html>. */
+:root { color-scheme: dark; }
+:root.light {
+  color-scheme: light;
+  --background: oklch(0.975 0.004 240);
+  --foreground: oklch(0.22 0.02 240);
+  --card: oklch(0.995 0.002 240);
+  --card-foreground: oklch(0.22 0.02 240);
+  --panel: oklch(0.955 0.006 240);
+  --primary: oklch(0.56 0.15 62);
+  --primary-foreground: oklch(0.99 0.004 80);
+  --secondary: oklch(0.935 0.007 240);
+  --secondary-foreground: oklch(0.25 0.02 240);
+  --muted: oklch(0.945 0.006 240);
+  --muted-foreground: oklch(0.45 0.02 240);
+  --accent: oklch(0.92 0.012 240);
+  --accent-foreground: oklch(0.22 0.02 240);
+  --destructive: oklch(0.55 0.21 25);
+  --destructive-foreground: oklch(0.99 0 0);
+  --border: oklch(0.87 0.009 240);
+  --input: oklch(0.87 0.009 240);
+  --ring: oklch(0.56 0.15 62);
+  --observed: oklch(0.46 0.11 175);
+  --reported: oklch(0.48 0.15 250);
+  --derived: oklch(0.5 0.14 62);
+  --inferred: oklch(0.48 0.03 240);
+  --disputed: oklch(0.5 0.2 25);
+  --water: oklch(0.9 0.04 235);
+  --land: oklch(0.93 0.015 120);
+}
+
 @layer base {
   * { border-color: var(--color-border); }
   body {

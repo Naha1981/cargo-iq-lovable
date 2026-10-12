@@ -225,7 +225,7 @@ export const calculateCaseDemurrage = createServerFn({ method: "POST" })
     release: z.string(),
     freeDays: z.number().nonnegative(),
     units: z.number().positive(),
-    currency: z.string().length(3),
+    currency: z.literal("ZAR"),
     chargedAmount: z.number().nonnegative().optional(),
     tieredRates: z.array(z.object({ fromDay: z.number().int().positive(), toDay: z.number().int().positive().optional(), dailyRate: z.number().nonnegative() })).min(1),
     ruleVersion: z.string().min(1),
@@ -283,7 +283,7 @@ export const generateEvidencePack = createServerFn({ method: "POST" })
     for (const x of [c, docs, claims, contradictions, timeline, observations, calculations, existing]) if (x.error) throw x.error;
 
     const unresolved = (contradictions.data ?? []).filter((x) => x.status === "FLAGGED").length;
-    if (unresolved > 0) throw new Error("UNRESOLVED_CONTRADICTIONS");
+    if (unresolved > 0) throw new Error("Resolve the flagged contradictions before generating an evidence pack.");
 
     const version = ((existing.data?.[0]?.version as number | undefined) ?? 0) + 1;
     const payload = {
@@ -365,7 +365,7 @@ export const approveEvidencePack = createServerFn({ method: "POST" })
       .eq("status", "FLAGGED")
       .limit(1);
     if (contradictionError) throw contradictionError;
-    if (flagged?.length) throw new Error("UNRESOLVED_CONTRADICTIONS");
+    if (flagged?.length) throw new Error("Resolve the flagged contradictions before generating an evidence pack.");
 
     const { data: pack, error } = await context.supabase.from("evidence_packs").update({
       status: "APPROVED",
@@ -386,3 +386,4 @@ export const approveEvidencePack = createServerFn({ method: "POST" })
 
     return pack;
   });
+

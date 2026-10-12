@@ -24,7 +24,9 @@ function PackPage() {
       setMessage("Evidence pack v" + result.pack.version + " generated. SHA-256: " + result.hash);
       await router.invalidate();
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Could not generate evidence pack.");
+      setMessage(err instanceof Error && err.message.includes("UNRESOLVED_CONTRADICTIONS")
+        ? "Resolve the flagged contradictions before generating an evidence pack."
+        : err instanceof Error ? err.message : "Could not generate evidence pack.");
     } finally { setBusy(false); }
   }
 
@@ -91,3 +93,4 @@ function PackPage() {
     </div>
   );
 }
+

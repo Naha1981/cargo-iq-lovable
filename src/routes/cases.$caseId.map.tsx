@@ -39,6 +39,7 @@ function MapPage() {
   const data = Route.useLoaderData();
   const router = useRouter();
 
+  const isSample = data.documents.some((document: any) => document.file_path?.startsWith("demo/"));
   const track = aisTrack(data.observations);
   const scenes = data.observations.filter((x: any) => String(x.observation_type).includes("SENTINEL"));
   const marine = data.observations.filter((x: any) => x.observation_type === "MARINE_WEATHER");
@@ -108,7 +109,7 @@ function MapPage() {
     <div className="space-y-3">
       <div className="grid gap-2 md:grid-cols-5">
         {[
-          ["CLASSIFICATION", "AUTHENTICATED // LIVE SENSOR DATA"],
+          ["CLASSIFICATION", isSample ? "SAMPLE DATA" : "RECORDED OBSERVATIONS // CORROBORATION"],
           ["UTC MASTER", new Date(time).toISOString().replace("T", " ").slice(0, 19) + "Z"],
           ["TARGET LOCK", locked ? current.lat.toFixed(5) + " / " + current.lon.toFixed(5) : "OFF"],
           ["AZIMUTH", current.cog == null ? "—" : Math.round(current.cog) + "°"],
@@ -201,7 +202,7 @@ function MapPage() {
             <rect x="3" y="3" width="994" height="634" fill="url(#hud-vignette)" />
             <g fill="#d2ff6b" fontFamily="JetBrains Mono" fontSize="10">
               <text x="18" y="22">DURBAN HARBOUR · CASE-SCOPED RECON</text>
-              <text x="18" y="625">FOV 42° · RANGE 35 KM · SOURCES {track.length ? "CONNECTED" : "AWAITING SENSOR REFRESH"}</text>
+              <text x="18" y="625">FOV 42° · RANGE 35 KM · {isSample ? "SAMPLE DATA" : track.length ? "RECORDED OBSERVATIONS" : "AWAITING SENSOR REFRESH"}</text>
               <text x="930" y="625">N ↑</text>
             </g>
           </svg>
@@ -284,3 +285,4 @@ function MapPage() {
     </div>
   );
 }
+

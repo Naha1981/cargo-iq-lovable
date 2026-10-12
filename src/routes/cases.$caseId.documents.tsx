@@ -41,7 +41,10 @@ function DocsPage() {
       }
       await router.invalidate();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed.");
+      const message = err instanceof Error ? err.message : "Upload failed.";
+      setError(/failed to fetch|network|load failed/i.test(message)
+        ? "The file could not reach private document storage. Check your connection and try again. If it keeps failing, ask the workspace owner to check the case-documents bucket and tenant upload policy in Lovable Cloud."
+        : message);
     } finally {
       setBusy(false);
     }
@@ -135,3 +138,4 @@ function DocsPage() {
     </div>
   );
 }
+

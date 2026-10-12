@@ -76,3 +76,9 @@
     -webkit-font-smoothing: antialiased;
   }
 }
+
+
+/* Keep the public demo free of the editor badge. */
+#lovable-badge {
+  display: none !important;
+}

@@ -10,78 +10,82 @@ export const Route = createFileRoute("/cases/$caseId/financials")({
   component: FinPage,
 });
 
-const defaultTiers = [
-  { fromDay: 1, toDay: 5, dailyRate: 175 },
-  { fromDay: 6, toDay: 10, dailyRate: 220 },
-  { fromDay: 11, dailyRate: 280 },
-];
-
 function FinPage() {
   const data = Route.useLoaderData();
   const { caseId } = Route.useParams();
   const router = useRouter();
-  const latest = data.calculations[0] as any;
-  const [start, setStart] = useState("2026-08-05");
-  const [release, setRelease] = useState("2026-08-15");
-  const [freeDays, setFree] = useState(5);
-  const [units, setUnits] = useState(12);
-  const [charged, setCharged] = useState(23100);
+  // Do not relabel historic non-ZAR amounts or invent inputs for a new case.
+  const latest = data.calculations.find((row: any) => row.currency === "ZAR") as any;
+  const input = latest?.input_payload ?? {};
+  const storedTiers = Array.isArray(input.tieredRates) ? input.tieredRates : null;
+  const [start, setStart] = useState<string>(input.start?.slice(0, 10) ?? "");
+  const [release, setRelease] = useState<string>(input.release?.slice(0, 10) ?? "");
+  const [freeDays, setFree] = useState<string>(input.freeDays == null ? "" : String(input.freeDays));
+  const [units, setUnits] = useState<string>(input.units == null ? "" : String(input.units));
+  const [charged, setCharged] = useState<string>(latest?.charged_amount_minor == null ? "" : String(Number(latest.charged_amount_minor) / 100));
+  const [dailyRate, setDailyRate] = useState<string>(input.dailyRate == null ? "" : String(input.dailyRate));
   const [result, setResult] = useState<any>(latest ?? null);
-  const currency = latest?.currency ?? "USD";
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const currency = "ZAR";
+  // The displayed rule is the exact rule sent to the calculator.
+  const tiers = storedTiers ?? (dailyRate === "" ? [] : [{ fromDay: 1, dailyRate: Number(dailyRate) }]);
+  const valid = Boolean(start && release && release >= start && freeDays !== "" && units !== "" &&
+    Number.isInteger(Number(freeDays)) && Number(freeDays) >= 0 && Number(units) > 0 &&
+    (charged === "" || Number(charged) >= 0) && tiers.length &&
+    tiers.every((t: any) => Number.isFinite(t.dailyRate) && t.dailyRate >= 0));
 
   async function calculate() {
-    const row = await calculateCaseDemurrage({
-      data: {
-        caseId,
-        start,
-        release,
-        freeDays,
-        units,
-        chargedAmount: charged,
-        currency,
-        tieredRates: defaultTiers,
-        ruleVersion: "DEMURRAGE-SA-2026-v1",
-      },
-    });
-    setResult(row);
-    await router.invalidate();
+    if (!valid || busy) return;
+    setBusy(true); setError("");
+    try {
+      const row = await calculateCaseDemurrage({ data: {
+        caseId, start, release, freeDays: Number(freeDays), units: Number(units),
+        chargedAmount: charged === "" ? undefined : Number(charged), currency,
+        tieredRates: tiers, ruleVersion: latest?.rule_version ?? "DEMURRAGE-SA-ZAR-v1",
+      } });
+      setResult(row);
+      await router.invalidate();
+    } catch {
+      setError("Could not save the calculation. Check the dates, units and ZAR rate, then try again.");
+    } finally { setBusy(false); }
   }
 
-  const calculated = result ? Number(result.calculated_amount_minor) / 100 : 0;
-  const chargedAmount = result ? Number(result.charged_amount_minor ?? 0) / 100 : charged;
-  const recovery = Math.max(0, chargedAmount - calculated);
+  const calculated = result ? Number(result.calculated_amount_minor) / 100 : null;
+  const chargedAmount = result?.charged_amount_minor == null ? null : Number(result.charged_amount_minor) / 100;
+  const recovery = chargedAmount == null || calculated == null ? null : Math.max(0, chargedAmount - calculated);
+  const money = (value: number | null) => value == null ? "—" : fmtMoney(value, currency);
 
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Stat label="Charged" value={fmtMoney(chargedAmount, currency)} tone="disputed" />
-        <Stat label="Calculated" value={fmtMoney(calculated, currency)} tone="primary" />
-        <Stat label="Variance / recovery" value={fmtMoney(recovery, currency)} tone="observed" />
-        <Stat label="Rule" value="DEMURRAGE-SA-2026" />
+        <Stat label="Charged (ZAR)" value={money(chargedAmount)} tone="disputed" />
+        <Stat label="Calculated (ZAR)" value={money(calculated)} tone="primary" />
+        <Stat label="Variance / recovery (ZAR)" value={money(recovery)} tone="observed" />
+        <Stat label="Rule" value={result?.rule_version ?? "Not calculated"} />
       </div>
-
+      {latest && <p className="text-sm text-muted-foreground">Figures above are the stored audit run. Editing inputs does not change them until a new calculation is saved.</p>}
+      {!latest && data.calculations.length > 0 && <p className="text-sm text-muted-foreground">Existing calculations use another currency. They have not been converted to ZAR; enter supported ZAR inputs for a new run.</p>}
       <Panel title="Deterministic commercial rules">
         <div className="grid gap-4 md:grid-cols-5">
           <label className="text-sm">Start<input type="date" value={start} onChange={(e) => setStart(e.target.value)} className="mt-1 w-full rounded border bg-background px-2 py-2" /></label>
           <label className="text-sm">Release<input type="date" value={release} onChange={(e) => setRelease(e.target.value)} className="mt-1 w-full rounded border bg-background px-2 py-2" /></label>
-          <label className="text-sm">Free days<input type="number" value={freeDays} onChange={(e) => setFree(Number(e.target.value))} className="mt-1 w-full rounded border bg-background px-2 py-2" /></label>
-          <label className="text-sm">Units<input type="number" value={units} onChange={(e) => setUnits(Number(e.target.value))} className="mt-1 w-full rounded border bg-background px-2 py-2" /></label>
-          <label className="text-sm">Charged amount<input type="number" value={charged} onChange={(e) => setCharged(Number(e.target.value))} className="mt-1 w-full rounded border bg-background px-2 py-2" /></label>
+          <label className="text-sm">Free days<input type="number" min="0" step="1" value={freeDays} onChange={(e) => setFree(e.target.value)} className="mt-1 w-full rounded border bg-background px-2 py-2" /></label>
+          <label className="text-sm">Units<input type="number" min="1" value={units} onChange={(e) => setUnits(e.target.value)} className="mt-1 w-full rounded border bg-background px-2 py-2" /></label>
+          <label className="text-sm">Charged amount (ZAR)<input type="number" min="0" value={charged} onChange={(e) => setCharged(e.target.value)} className="mt-1 w-full rounded border bg-background px-2 py-2" /></label>
         </div>
-
+        {!storedTiers && <label className="mt-4 block text-sm">Daily rate per unit (ZAR)<input type="number" min="0" value={dailyRate} onChange={(e) => setDailyRate(e.target.value)} className="mt-1 w-full rounded border bg-background px-2 py-2" /></label>}
         <div className="mt-5 overflow-x-auto">
           <table className="w-full text-sm">
-            <thead><tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground"><th className="py-2">Tier</th><th className="py-2">Days</th><th className="py-2">Rate</th></tr></thead>
-            <tbody>{defaultTiers.map((t, i) => <tr key={i} className="border-b"><td className="py-2">Tier {i + 1}</td><td className="py-2">{t.fromDay}–{t.toDay ?? "∞"}</td><td className="py-2 font-mono">{currency} {t.dailyRate}</td></tr>)}</tbody>
+            <thead><tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground"><th className="py-2">Tier</th><th className="py-2">Chargeable days</th><th className="py-2">Rate per unit</th></tr></thead>
+            <tbody>{tiers.map((t: any, i: number) => <tr key={i} className="border-b"><td className="py-2">Tier {i + 1}</td><td className="py-2">{t.fromDay}–{t.toDay ?? "∞"}</td><td className="py-2 font-mono">{fmtMoney(t.dailyRate, currency)} / day</td></tr>)}</tbody>
           </table>
+          {!tiers.length && <p className="mt-2 text-sm text-muted-foreground">Enter the rate from the contract or invoice. No rate is assumed.</p>}
         </div>
-
-        <Button className="mt-5" onClick={calculate}>Calculate & persist audit run</Button>
+        {error && <p role="alert" className="mt-3 text-sm text-disputed">{error}</p>}
+        <Button disabled={!valid || busy} className="mt-5" onClick={calculate}>{busy ? "Saving…" : "Calculate & persist audit run"}</Button>
       </Panel>
-
-      {result && <Panel title="Stored calculation">
-        <pre className="overflow-auto text-xs">{JSON.stringify(result.result_payload ?? result, null, 2)}</pre>
-      </Panel>}
+      {result && <Panel title="Stored calculation"><pre className="overflow-auto text-xs">{JSON.stringify(result.result_payload ?? result, null, 2)}</pre></Panel>}
     </div>
   );
 }

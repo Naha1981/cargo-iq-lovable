@@ -42,9 +42,9 @@ function Index() {
     [cases, q],
   );
 
-  const usd = cases.filter((c) => c.currency === "USD");
-  const charged = usd.reduce((sum, c) => sum + c.exposure, 0);
-  const recovery = usd.reduce((sum, c) => sum + c.recovery, 0);
+  const zar = cases.filter((c) => c.currency === "ZAR");
+  const charged = zar.reduce((sum, c) => sum + c.exposure, 0);
+  const recovery = zar.reduce((sum, c) => sum + c.recovery, 0);
 
   if (!session.user) {
     return (
@@ -79,8 +79,8 @@ function Index() {
         <div className="mt-8 grid grid-cols-2 gap-3 md:grid-cols-4">
           <Stat label="Open cases" value={cases.filter((c) => c.status !== "CLOSED").length} />
           <Stat label="Contradictions" value={cases.reduce((a, c) => a + c.contradictions, 0)} tone="disputed" />
-          <Stat label="Exposure (USD)" value={fmtMoney(charged, "USD")} />
-          <Stat label="Recoverable (USD)" value={fmtMoney(recovery, "USD")} tone="observed" />
+          <Stat label="Exposure (ZAR)" value={fmtMoney(charged, "ZAR")} />
+          <Stat label="Recoverable (ZAR)" value={fmtMoney(recovery, "ZAR")} tone="observed" />
         </div>
 
         <div className="mt-10 flex items-center justify-between gap-4">
@@ -125,3 +125,4 @@ function Index() {
     </div>
   );
 }
+

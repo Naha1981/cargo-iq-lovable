@@ -34,7 +34,7 @@ function Index() {
   const { session, cases } = Route.useLoaderData();
   const [q, setQ] = useState("");
   const rows = useMemo(
-    () => cases.filter((c) =>
+    () => cases.filter((c: any) =>
       (c.reference_no + (c.vessel_name ?? "") + (c.container_no ?? "") + (c.port_code ?? ""))
         .toLowerCase()
         .includes(q.toLowerCase())
@@ -42,9 +42,9 @@ function Index() {
     [cases, q],
   );
 
-  const zar = cases.filter((c) => c.currency === "ZAR");
-  const charged = zar.reduce((sum, c) => sum + c.exposure, 0);
-  const recovery = zar.reduce((sum, c) => sum + c.recovery, 0);
+  const zar = cases.filter((c: any) => c.currency === "ZAR");
+  const charged = zar.reduce((sum: number, c: any) => sum + c.exposure, 0);
+  const recovery = zar.reduce((sum: number, c: any) => sum + c.recovery, 0);
 
   if (!session.user) {
     return (
@@ -77,8 +77,8 @@ function Index() {
         </div>
 
         <div className="mt-8 grid grid-cols-2 gap-3 md:grid-cols-4">
-          <Stat label="Open cases" value={cases.filter((c) => c.status !== "CLOSED").length} />
-          <Stat label="Contradictions" value={cases.reduce((a, c) => a + c.contradictions, 0)} tone="disputed" />
+          <Stat label="Open cases" value={cases.filter((c: any) => c.status !== "CLOSED").length} />
+          <Stat label="Contradictions" value={cases.reduce((a: number, c: any) => a + c.contradictions, 0)} tone="disputed" />
           <Stat label="Exposure (ZAR)" value={fmtMoney(charged, "ZAR")} />
           <Stat label="Recoverable (ZAR)" value={fmtMoney(recovery, "ZAR")} tone="observed" />
         </div>
@@ -104,7 +104,7 @@ function Index() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((c) => (
+              {rows.map((c: any) => (
                 <tr key={c.id} className="border-t bg-card transition-colors hover:bg-accent">
                   <td className="px-4 py-3">
                     <Link to="/cases/$caseId" params={{ caseId: c.id }} className="block">

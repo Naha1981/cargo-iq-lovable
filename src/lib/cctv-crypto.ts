@@ -17,7 +17,7 @@ export async function sha256Hex(input: string | ArrayBuffer): Promise<string> {
 
 async function deriveAesKey(masterSecret: string) {
   const raw = await sha256Bytes(masterSecret);
-  return crypto.subtle.importKey("raw", raw, "AES-GCM", false, ["encrypt", "decrypt"]);
+  return crypto.subtle.importKey("raw", raw as BufferSource, "AES-GCM", false, ["encrypt", "decrypt"]);
 }
 
 export async function encryptSecret(secret: string, masterSecret: string): Promise<string> {

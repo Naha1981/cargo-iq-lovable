@@ -20,7 +20,7 @@ function TimelinePage() {
     if (!selectedId && data.timeline[0]) setSelectedId(data.timeline[0].id);
   }, [data.timeline, selectedId]);
 
-  const selected = events.find((e) => e.id === selectedId) ?? events[0];
+  const selected = events.find((e: any) => e.id === selectedId) ?? events[0];
   const t0 = events.length ? Date.parse(events[0].timestamp) : Date.now();
   const t1 = events.length ? Date.parse(events[events.length - 1].timestamp) : t0 + 1;
   const pos = (s: string) => t1 === t0 ? 50 : ((Date.parse(s) - t0) / (t1 - t0)) * 100;
@@ -33,7 +33,7 @@ function TimelinePage() {
         ) : (
           <div className="relative h-40">
             <div className="absolute left-0 right-0 top-1/2 h-px bg-border" />
-            {events.map((e, i) => (
+            {events.map((e: any, i: number) => (
               <button
                 key={e.id}
                 onClick={() => setSelectedId(e.id)}
@@ -56,7 +56,7 @@ function TimelinePage() {
       <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
         <Panel title={"Event ledger · " + events.length}>
           <ol className="divide-y">
-            {events.map((e) => (
+            {events.map((e: any) => (
               <li key={e.id}>
                 <button
                   onClick={() => setSelectedId(e.id)}

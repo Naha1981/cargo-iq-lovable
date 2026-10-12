@@ -1,0 +1,37 @@
+import { describe, expect, it } from "vitest";
+import { buildEvidencePackPdf } from "@/lib/pack-pdf";
+
+const pack = {
+  version: 2, status: "DRAFT", sha256_hash: "a".repeat(64), generated_at: "2026-10-12T10:00:00Z", approved_by: null,
+  pack_payload: {
+    generatedAt: "2026-10-12T10:00:00Z",
+    case: { reference_no: "CIQ-001", vessel_name: "MSC Test", container_no: "MSKU1234567", port_code: "ZADUR", counterparty: "Carrier (Pty) Ltd" },
+    documents: [{ id: "d1", name: "Invoice.pdf", source_party: "Carrier", uploaded_at: "2026-10-01T08:00:00Z", sha256_hash: "b".repeat(64) }],
+    timeline: [{ timestamp: "2026-10-02T08:00:00Z", title: "Container released", nature: "OBSERVED", source: "Invoice.pdf" }],
+    claims: [{ id: "c1", document_id: "d1", page_number: 2, claim_text: "Released 2 Oct – “gate-out” (café)", status: "VERIFIED", nature: "REPORTED", confidence: 0.9 }],
+    contradictions: [{ title: "Gate time differs", description: "Two sources", status: "RESOLVED", resolution_note: "Terminal log wins" }],
+    financialCalculations: [{ calculation_type: "DEMURRAGE", currency: "ZAR", calculated_amount_minor: 1234500, charged_amount_minor: 1500000, variance_minor: 265500, rule_version: "v1", input_payload: { freeDays: 3, units: 2 } }],
+    externalObservations: [],
+  },
+};
+
+describe("evidence pack pdf", () => {
+  it("builds a valid, deterministic PDF", () => {
+    const a = buildEvidencePackPdf(pack);
+    const b = buildEvidencePackPdf(pack);
+    const head = String.fromCharCode(...a.slice(0, 8));
+    expect(head).toBe("%PDF-1.4");
+    expect(Buffer.from(a).equals(Buffer.from(b))).toBe(true);
+    expect(Buffer.from(a).toString("latin1")).toContain("%%EOF");
+  });
+  it("handles many claims across pages", () => {
+    const many = { ...pack, pack_payload: { ...pack.pack_payload, claims: Array.from({ length: 120 }, (_, i) => ({ ...pack.pack_payload.claims[0], id: "c" + i, claim_text: "Claim " + i + " " + "word ".repeat(40) })) } };
+    const out = Buffer.from(buildEvidencePackPdf(many)).toString("latin1");
+    expect((out.match(/\/Type \/Page /g) ?? []).length).toBeGreaterThan(2);
+  });
+});
+
+import { writeFileSync } from "node:fs";
+it.skipIf(!process.env.PDF_OUT)("writes a sample", () => {
+  writeFileSync(process.env.PDF_OUT!, buildEvidencePackPdf({ ...pack, status: "APPROVED", approved_by: "user-123" }));
+});

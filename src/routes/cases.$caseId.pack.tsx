@@ -2,6 +2,7 @@ import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { Button, Panel } from "@/components/ui-kit";
 import { approveEvidencePack, generateEvidencePack, getCaseWorkspace } from "@/lib/case.functions";
+import { buildEvidencePackPdf } from "@/lib/pack-pdf";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/cases/$caseId/pack")({
@@ -47,6 +48,18 @@ function PackPage() {
     a.href = url; a.download = caseId + "-evidence-pack-v" + pack.version + ".json"; a.click(); URL.revokeObjectURL(url);
   }
 
+  function exportPdf(pack: any) {
+    try {
+      const bytes = buildEvidencePackPdf(pack);
+      const blob = new Blob([bytes as unknown as BlobPart], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = caseId + "-evidence-pack-v" + pack.version + ".pdf"; a.click(); URL.revokeObjectURL(url);
+    } catch (err) {
+      setMessage(err instanceof Error ? "Could not build the PDF: " + err.message : "Could not build the PDF.");
+    }
+  }
+
   function exportSummary(pack: any) {
     const timeline = (pack.pack_payload.timeline ?? []).map((x: any) => x.timestamp + " — " + x.title).join("\n");
     const summary = "CargoIQ Evidence Pack v" + pack.version + "\nSHA-256: " + pack.sha256_hash + "\nStatus: " + pack.status + "\n\n" + timeline;
@@ -70,6 +83,7 @@ function PackPage() {
                   <div className="mt-1 font-mono text-xs text-muted-foreground">{new Date(p.generated_at).toISOString()}</div>
                 </div>
                 <div className="flex gap-2">
+                  <Button variant="ghost" className="py-1 text-xs" onClick={() => exportPdf(p)}>PDF</Button>
                   <Button variant="ghost" className="py-1 text-xs" onClick={() => exportJson(p)}>JSON</Button>
                   <Button variant="ghost" className="py-1 text-xs" onClick={() => exportSummary(p)}>Summary</Button>
                   {p.status === "DRAFT" && <Button className="py-1 text-xs" onClick={() => approve(p.id)}>Approve</Button>}

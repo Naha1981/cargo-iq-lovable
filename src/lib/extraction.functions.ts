@@ -120,8 +120,10 @@ function timestampConflict(a: ClaimDraft, b: ClaimDraft) {
   if (!a.timestamp_claimed || !b.timestamp_claimed) return null;
   const delta = Math.abs(Date.parse(a.timestamp_claimed) - Date.parse(b.timestamp_claimed));
   if (!Number.isFinite(delta) || delta < 60 * 60 * 1000) return null;
-  const sameTheme = (a.claim_type && b.claim_type && a.claim_type === b.claim_type) || /available|release|gate|berth|discharge|free/i.test(a.claim_text + " " + b.claim_text);
-  return sameTheme ? "Conflicting timestamps differ by " + Math.round(delta / 3600000) + " hour(s)." : null;
+  // Only the SAME fact (same claim type) with different times is a conflict.
+  // Different event types (e.g. container_release vs container_collection) are sequential and expected to differ.
+  const sameFact = !!a.claim_type && a.claim_type === b.claim_type && a.claim_type !== "TEXT_RECORD";
+  return sameFact ? "Conflicting timestamps differ by " + Math.round(delta / 3600000) + " hour(s)." : null;
 }
 
 export async function extractDocumentClaimsForPath(input: {

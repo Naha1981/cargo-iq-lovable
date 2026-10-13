@@ -1,19 +1,19 @@
+import { Route as CaseRoute } from "./cases.$caseId";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { Button, Panel } from "@/components/ui-kit";
-import { approveEvidencePack, generateEvidencePack, getCaseWorkspace } from "@/lib/case.functions";
+import { approveEvidencePack, generateEvidencePack } from "@/lib/case.functions";
 import { buildEvidencePackPdf } from "@/lib/pack-pdf";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/cases/$caseId/pack")({
-  loader: ({ params }) => getCaseWorkspace({ data: { caseId: params.caseId } }),
   head: () => ({ meta: [{ title: "Evidence pack | CargoIQ" }] }),
   component: PackPage,
 });
 
 function PackPage() {
   const { caseId } = Route.useParams();
-  const data = Route.useLoaderData();
+  const data = CaseRoute.useLoaderData();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");

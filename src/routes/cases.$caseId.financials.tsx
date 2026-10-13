@@ -1,17 +1,17 @@
+import { Route as CaseRoute } from "./cases.$caseId";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { Button, Panel, Stat } from "@/components/ui-kit";
-import { calculateCaseDemurrage, getCaseWorkspace } from "@/lib/case.functions";
+import { calculateCaseDemurrage } from "@/lib/case.functions";
 import { fmtMoney } from "@/lib/case-data";
 
 export const Route = createFileRoute("/cases/$caseId/financials")({
-  loader: ({ params }) => getCaseWorkspace({ data: { caseId: params.caseId } }),
   head: () => ({ meta: [{ title: "Financial exposure | CargoIQ" }] }),
   component: FinPage,
 });
 
 function FinPage() {
-  const data = Route.useLoaderData();
+  const data = CaseRoute.useLoaderData();
   const { caseId } = Route.useParams();
   const router = useRouter();
   // Do not relabel historic non-ZAR amounts or invent inputs for a new case.

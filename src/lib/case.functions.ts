@@ -74,7 +74,8 @@ export const createCase = createServerFn({ method: "POST" })
 
 export const getCaseWorkspace = createServerFn({ method: "GET" }).validator(idInput).middleware([tenantMiddleware]).handler(async ({ data, context }) => {
   const db = context.supabase;
-  const [documents, claims, contradictions, timeline, observations, calcs, packs] = await Promise.all([
+  const [caseRow, documents, claims, contradictions, timeline, observations, calcs, packs] = await Promise.all([
+    db.from("cases").select("*").eq("id", data.caseId).maybeSingle(),
     db.from("documents").select("*").eq("case_id", data.caseId).order("uploaded_at", { ascending: false }),
     db.from("extracted_claims").select("*").eq("case_id", data.caseId).order("created_at", { ascending: true }),
     db.from("contradictions").select("*").eq("case_id", data.caseId).order("created_at", { ascending: false }),
@@ -83,9 +84,10 @@ export const getCaseWorkspace = createServerFn({ method: "GET" }).validator(idIn
     db.from("financial_calculations").select("*").eq("case_id", data.caseId).order("created_at", { ascending: false }),
     db.from("evidence_packs").select("id,version,sha256_hash,status,approved_by,generated_at,pack_payload").eq("case_id", data.caseId).order("version", { ascending: false }),
   ]);
-  for (const item of [documents, claims, contradictions, timeline, observations, calcs, packs]) if (item.error) throw item.error;
+  for (const item of [caseRow, documents, claims, contradictions, timeline, observations, calcs, packs]) if (item.error) throw item.error;
   return {
     tenantId: context.tenantId,
+    case: caseRow.data,
     documents: documents.data ?? [],
     claims: claims.data ?? [],
     contradictions: contradictions.data ?? [],

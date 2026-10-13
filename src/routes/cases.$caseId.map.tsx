@@ -1,7 +1,8 @@
+import { Route as CaseRoute } from "./cases.$caseId";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Button, NatureBadge, Panel } from "@/components/ui-kit";
-import { corroborateCase, getCaseWorkspace } from "@/lib/case.functions";
+import { corroborateCase } from "@/lib/case.functions";
 import { cn } from "@/lib/utils";
 
 type TrackPoint = { at: string; lat: number; lon: number; sog: number; cog: number | null };
@@ -29,14 +30,13 @@ function aisTrack(observations: any[]): TrackPoint[] {
 }
 
 export const Route = createFileRoute("/cases/$caseId/map")({
-  loader: ({ params }) => getCaseWorkspace({ data: { caseId: params.caseId } }),
   head: () => ({ meta: [{ title: "Harbour Evidence Map | CargoIQ" }] }),
   component: MapPage,
 });
 
 function MapPage() {
   const { caseId } = Route.useParams();
-  const data = Route.useLoaderData();
+  const data = CaseRoute.useLoaderData();
   const router = useRouter();
 
   const isSample = data.documents.some((document: any) => document.file_path?.startsWith("demo/"));

@@ -26,3 +26,25 @@ describe("claim AI provider selection", () => {
     expect(resolveClaimAiProvider().kind).toBe("anthropic");
   });
 });
+
+
+describe("explicit provider configuration", () => {
+  it("does not fall back to a billed gateway when an explicitly selected own key is missing", () => {
+    for (const provider of ["openai", "anthropic"]) {
+      clear(); process.env["CLAIM_AI_PROVIDER"] = provider; process.env["LOVABLE_API_KEY"] = "gateway-key";
+      expect(() => resolveClaimAiProvider()).toThrow("not configured");
+    }
+  });
+  it("honors an explicit gateway even when an own key exists", () => {
+    clear(); process.env["CLAIM_AI_PROVIDER"] = "gateway"; process.env["OPENAI_API_KEY"] = "own-key"; process.env["LOVABLE_API_KEY"] = "gateway-key";
+    expect(resolveClaimAiProvider().kind).toBe("gateway");
+  });
+  it("rejects unknown provider names instead of silently switching providers", () => {
+    clear(); process.env["CLAIM_AI_PROVIDER"] = "typo"; process.env["LOVABLE_API_KEY"] = "gateway-key";
+    expect(() => resolveClaimAiProvider()).toThrow("Unknown CLAIM_AI_PROVIDER");
+  });
+  it("reports a missing explicit gateway key", () => {
+    clear(); process.env["CLAIM_AI_PROVIDER"] = "gateway";
+    expect(() => resolveClaimAiProvider()).toThrow("LOVABLE_API_KEY is not configured");
+  });
+});

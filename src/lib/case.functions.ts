@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { tenantMiddleware } from "@/lib/auth-middleware";
 import { sha256Hex, stableCanonical } from "@/lib/hash";
+import { caseRecovery } from "@/lib/recovery-gate";
 import { calculateDemurrage } from "@/lib/investigation-engine";
 import { buildAisBoundingBox, fetchAisSnapshot } from "@/lib/adapters/ais-adapter";
 import { querySentinelScenes } from "@/lib/adapters/satellite-adapter";
@@ -29,7 +30,7 @@ export const listCases = createServerFn({ method: "GET" }).middleware([tenantMid
     const openContradictions = (contradictions ?? []).filter((x: any) => x.case_id === c.id && x.status === "FLAGGED").length;
     const charged = calc?.charged_amount_minor ? Number(calc.charged_amount_minor) / 100 : 0;
     const calculated = calc?.calculated_amount_minor ? Number(calc.calculated_amount_minor) / 100 : 0;
-    return { ...c, currency: calc?.currency ?? "ZAR", exposure: charged, recovery: Math.max(0, charged - calculated), contradictions: openContradictions };
+    return { ...c, currency: calc?.currency ?? "ZAR", exposure: charged, recovery: caseRecovery(charged, calculated, openContradictions), contradictions: openContradictions };
   });
 });
 

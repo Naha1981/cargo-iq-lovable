@@ -84,18 +84,18 @@ function Index() {
           <Stat label="Recoverable (ZAR)" value={recoveryBlocked ? "BLOCKED" : fmtMoney(recovery, "ZAR")} tone={recoveryBlocked ? "disputed" : "observed"} />
         </div>
 
-        <div className="mt-10 flex items-center justify-between gap-4">
+        <div className="mt-10 flex flex-wrap items-center justify-between gap-4">
           <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground">Case register</h2>
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search reference, vessel, container…"
-            className="w-72 rounded-md border bg-card px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-ring"
+            className="w-full sm:w-72 rounded-md border bg-card px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-ring"
           />
         </div>
 
-        <div className="mt-3 overflow-hidden rounded-lg border">
-          <table className="w-full text-sm">
+        <div className="mt-3 overflow-x-auto rounded-lg border">
+          <table className="w-full min-w-[600px] text-sm">
             <thead className="bg-panel text-left text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
               <tr>
                 <th className="px-4 py-3 font-medium">Case</th>

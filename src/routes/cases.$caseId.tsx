@@ -52,7 +52,7 @@ function CaseLayout() {
             </div>
           </div>
 
-          <nav className="mt-5 flex gap-1 overflow-x-auto">
+          <nav aria-label="Investigation pages" className="mt-5 grid grid-cols-2 gap-1 pb-2 sm:flex sm:flex-wrap sm:pb-0">
             {tabs.map((t) => (
               <Link
                 key={t.to}
@@ -60,7 +60,7 @@ function CaseLayout() {
                 to={t.to}
                 params={{ caseId: c.id }}
                 activeOptions={{ exact: "exact" in t }}
-                className="whitespace-nowrap border-b-2 border-transparent px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground"
+                className="rounded-sm border-b-2 border-transparent px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground sm:whitespace-nowrap"
                 activeProps={{ className: "!border-primary !text-foreground" }}
               >
                 {t.label}

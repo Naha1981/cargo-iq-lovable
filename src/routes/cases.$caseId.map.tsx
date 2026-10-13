@@ -107,7 +107,7 @@ function MapPage() {
 
   return (
     <div className="space-y-3">
-      <div className="grid gap-2 md:grid-cols-5">
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
         {[
           ["DATA STATUS", isSample ? "SAMPLE DATA" : "RECORDED OBSERVATIONS · CORROBORATION"],
           ["TIME (UTC)", new Date(time).toISOString().replace("T", " ").slice(0, 19) + "Z"],
@@ -115,7 +115,7 @@ function MapPage() {
           ["VESSEL COURSE", current.cog == null ? "—" : Math.round(current.cog) + "°"],
           ["MAP COVERAGE", "35 KM RADIUS"],
         ].map(([label, value]) => (
-          <div key={label} className="rounded border bg-card px-3 py-2 font-mono">
+          <div key={label} className={cn("min-w-0 rounded border bg-card px-3 py-2 font-mono", label === "DATA STATUS" && "col-span-2 md:col-span-1")}>
             <div className="text-[9px] tracking-[0.2em] text-muted-foreground">{label}</div>
             <div className="mt-1 truncate text-[11px] text-primary">{value}</div>
           </div>
@@ -124,7 +124,7 @@ function MapPage() {
 
       <div className="overflow-hidden rounded-lg border bg-[#061016]">
         <div className="relative">
-          <svg viewBox="0 0 1000 640" className="block h-[480px] w-full md:h-[calc(100vh-380px)] md:min-h-[340px]" role="img" aria-label="CargoIQ harbour evidence map">
+          <svg viewBox="0 0 1000 640" className="block h-auto aspect-[1000/640] md:aspect-auto w-full md:h-[calc(100vh-380px)] md:min-h-[340px]" role="img" aria-label="CargoIQ harbour evidence map">
             <defs>
               <pattern id="hud-grid" width="40" height="40" patternUnits="userSpaceOnUse">
                 <path d="M40 0H0V40" fill="none" stroke="#d2ff6b" strokeOpacity="0.09" />
@@ -208,16 +208,16 @@ function MapPage() {
 
           <div className="pointer-events-none absolute inset-0 opacity-[0.07] [background-image:repeating-linear-gradient(to_bottom,transparent_0,transparent_2px,#d2ff6b_2px,#d2ff6b_3px)]" />
 
-          <div className="pointer-events-none absolute left-1/2 top-2 -translate-x-1/2 font-mono text-[10px] tracking-wider text-[#d2ff6b]/80">DURBAN HARBOUR · CASE EVIDENCE MAP</div>
+          <div className="pointer-events-none hidden md:block absolute left-1/2 top-2 -translate-x-1/2 font-mono text-[10px] tracking-wider text-[#d2ff6b]/80">DURBAN HARBOUR · CASE EVIDENCE MAP</div>
 
-          <div className="absolute left-4 top-8 rounded border border-[#d2ff6b]/40 bg-black/65 px-3 py-2 font-mono text-[10px] backdrop-blur">
+          <div className="relative mx-3 mt-3 md:absolute md:mx-0 md:mt-0 md:left-4 md:top-8 rounded border border-[#d2ff6b]/40 bg-black/65 px-3 py-2 font-mono text-[10px] backdrop-blur">
             <div className="text-[#d2ff6b]">VESSEL {locked ? "TRACKING ON" : "TRACKING OFF"}</div>
             <div className="mt-1 text-white/70">SPEED {current.sog.toFixed(1)} kn</div>
           </div>
 
-          <div className="absolute left-4 top-[5.75rem] w-64 max-w-[45%] rounded border border-[#d2ff6b]/40 bg-black/70 px-3 py-2 font-mono text-[10px] backdrop-blur">
-            <div className="flex items-center justify-between text-[#d2ff6b]"><span>EVENTS AT SELECTED TIME</span><span className="text-white/60">{nearby.length}</span></div>
-            <ul style={{ maxHeight: "clamp(64px, calc(100vh - 640px), 34vh)" }} className="mt-2 space-y-2 overflow-y-auto pr-1">
+          <div className="relative mx-3 mt-3 md:absolute md:mx-0 md:mt-0 md:left-4 md:top-[5.75rem] md:w-64 md:max-w-[45%] rounded border border-[#d2ff6b]/40 bg-black/70 px-3 py-2 font-mono text-[10px] backdrop-blur">
+            <div className="flex items-center justify-between text-[#d2ff6b]"><span>EVENTS WITHIN 24H OF PLAYBACK</span><span className="text-white/60">{nearby.length}</span></div>
+            <ul className="mt-2 max-h-44 space-y-2 overflow-y-auto pr-1 md:max-h-[clamp(64px,calc(100vh-640px),34vh)]">
               {nearby.map((e: any) => (
                 <li key={e.id} className="border-t border-white/10 pt-1.5 first:border-t-0 first:pt-0">
                   <div className="flex items-center justify-between gap-2"><span className="text-white/60">{String(e.timestamp).slice(5, 16).replace("T", " ")}Z</span><NatureBadge n={String(e.nature).toLowerCase() as any} /></div>
@@ -228,7 +228,7 @@ function MapPage() {
             </ul>
           </div>
 
-          <div className="absolute inset-x-3 bottom-3 rounded border border-[#d2ff6b]/40 bg-black/75 px-3 py-2 backdrop-blur">
+          <div className="relative mx-3 my-3 md:absolute md:mx-0 md:my-0 md:inset-x-3 md:bottom-3 rounded border border-[#d2ff6b]/40 bg-black/75 px-3 py-2 backdrop-blur">
             <div className="flex flex-wrap items-center gap-2">
               <Button className="py-1 text-xs" onClick={() => setPlaying((value) => !value)}>{playing ? "Pause" : "Play timeline"}</Button>
               <Button variant="ghost" className="py-1 text-xs" onClick={() => setLocked((value) => !value)}>{locked ? "Tracking vessel" : "Not tracking"}</Button>
@@ -239,7 +239,7 @@ function MapPage() {
             <div className="flex justify-between font-mono text-[9px] text-white/50"><span>{new Date(initialTime).toISOString().slice(0, 16)}Z</span><span>{new Date(maxTime).toISOString().slice(0, 16)}Z</span></div>
           </div>
 
-          <div className="absolute right-4 top-8 flex max-w-[60%] flex-wrap justify-end gap-1">
+          <div className="relative mx-3 mb-3 flex flex-wrap gap-1 md:absolute md:mx-0 md:mb-0 md:right-4 md:top-8 md:max-w-[60%] md:justify-end">
             {Object.entries(layers).map(([key, enabled]) => (
               <button
                 key={key}

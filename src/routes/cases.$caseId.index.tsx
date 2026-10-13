@@ -52,7 +52,19 @@ function TimelinePage() {
         {!events.length ? (
           <div className="py-14 text-center text-sm text-muted-foreground">No timeline events yet. Upload records or refresh satellite and marine data.</div>
         ) : (
-          <div className="relative h-56">
+          <>
+          <ol aria-label="Timeline events" className="space-y-2 sm:hidden">
+            {events.map((e: any) => (
+              <li key={e.id}>
+                <button onClick={() => setSelectedId(e.id)} className={cn("w-full rounded border px-3 py-3 text-left", e.id === selected?.id && "border-primary bg-accent")}>
+                  <span className="block font-mono text-xs text-muted-foreground">{new Date(e.timestamp).toISOString().slice(0,16).replace("T", " ")}Z</span>
+                  <span className="mt-1 block text-sm">{e.title}</span>
+                  <span className="mt-2 block"><NatureBadge n={String(e.nature).toLowerCase() as any} /></span>
+                </button>
+              </li>
+            ))}
+          </ol>
+          <div className="relative hidden h-56 sm:block">
             <div className="absolute left-0 right-0 top-1/2 h-px bg-border" />
             {events.map((e: any, i: number) => (
               <button
@@ -71,6 +83,7 @@ function TimelinePage() {
               </button>
             ))}
           </div>
+          </>
         )}
       </Panel>
 

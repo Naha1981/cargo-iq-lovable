@@ -76,6 +76,13 @@ export function resolveClaimAiProvider(): ClaimAiProvider {
   const openai = process.env["OPENAI_API_KEY"];
   const anthropic = process.env["ANTHROPIC_API_KEY"];
   const wanted = (process.env["CLAIM_AI_PROVIDER"] ?? "").toLowerCase();
+  if (wanted && !["openai", "anthropic", "gateway"].includes(wanted)) throw new Error("Unknown CLAIM_AI_PROVIDER. Choose openai, anthropic, or gateway.");
+  if (wanted === "openai" && !openai) throw new Error("CLAIM_AI_PROVIDER is openai but OPENAI_API_KEY is not configured.");
+  if (wanted === "anthropic" && !anthropic) throw new Error("CLAIM_AI_PROVIDER is anthropic but ANTHROPIC_API_KEY is not configured.");
+  if (wanted === "gateway") {
+    if (!process.env["LOVABLE_API_KEY"]) throw new Error("CLAIM_AI_PROVIDER is gateway but LOVABLE_API_KEY is not configured.");
+    return { kind: "gateway", label: "Using Lovable gateway" };
+  }
   if (wanted === "anthropic" && anthropic) return { kind: "anthropic", label: "Using your own Anthropic key" };
   if (wanted === "openai" && openai) return { kind: "openai", label: "Using your own OpenAI key" };
   if (!wanted && openai) return { kind: "openai", label: "Using your own OpenAI key" };

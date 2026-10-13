@@ -1,20 +1,27 @@
 import { createFileRoute, Link, Outlet, notFound, redirect } from "@tanstack/react-router";
 import { AppHeader } from "@/components/ui-kit";
-import { getCurrentUser } from "@/lib/auth.functions";
-import { getCase } from "@/lib/case.functions";
+import { getCaseWorkspace } from "@/lib/case.functions";
 
 export const Route = createFileRoute("/cases/$caseId")({
   ssr: false,
-  beforeLoad: async () => {
-    const session = await getCurrentUser();
-    if (!session.user) throw redirect({ to: "/auth" });
-  },
+  // Router-owned, browser-local snapshot. No shared server cache or skipped tenant checks.
+  staleTime: 30_000,
+  preloadStaleTime: 30_000,
   loader: async ({ params }) => {
-    const c = await getCase({ data: { caseId: params.caseId } });
-    if (!c) throw notFound();
-    return c;
+    let data;
+    try {
+      data = await getCaseWorkspace({ data: { caseId: params.caseId } });
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("UNAUTHENTICATED")) throw redirect({ to: "/auth" });
+      throw error;
+    }
+    if (!data.case) throw notFound();
+    return data;
   },
-  head: ({ loaderData }) => ({ meta: loaderData ? [{ title: loaderData.reference_no + " | CargoIQ" }] : [{ title: "Case | CargoIQ" }] }),
+  pendingMs: 150,
+  pendingMinMs: 0,
+  pendingComponent: () => <div role="status" className="p-10 text-sm text-muted-foreground">Loading investigation...</div>,
+  head: ({ loaderData }) => ({ meta: loaderData ? [{ title: loaderData.case.reference_no + " | CargoIQ" }] : [{ title: "Case | CargoIQ" }] }),
   notFoundComponent: () => <div className="p-10 text-center">Case not found. <Link to="/" className="text-primary">Back</Link></div>,
   component: CaseLayout,
 });
@@ -29,7 +36,7 @@ const tabs = [
 ] as const;
 
 function CaseLayout() {
-  const c = Route.useLoaderData();
+  const c = Route.useLoaderData().case;
 
   return (
     <div className="min-h-screen">
@@ -49,6 +56,7 @@ function CaseLayout() {
             {tabs.map((t) => (
               <Link
                 key={t.to}
+                preload="intent"
                 to={t.to}
                 params={{ caseId: c.id }}
                 activeOptions={{ exact: "exact" in t }}

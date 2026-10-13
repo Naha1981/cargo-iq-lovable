@@ -1,19 +1,19 @@
+import { Route as CaseRoute } from "./cases.$caseId";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import { Button, ClassTag, NatureBadge, Panel } from "@/components/ui-kit";
-import { getCaseWorkspace, registerDocument, resolveContradiction, reviewClaim, runDocumentExtraction } from "@/lib/case.functions";
+import { registerDocument, resolveContradiction, reviewClaim, runDocumentExtraction } from "@/lib/case.functions";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/cases/$caseId/documents")({
-  loader: ({ params }) => getCaseWorkspace({ data: { caseId: params.caseId } }),
   head: () => ({ meta: [{ title: "Documents & contradictions | CargoIQ" }] }),
   component: DocsPage,
 });
 
 function DocsPage() {
   const { caseId } = Route.useParams();
-  const data = Route.useLoaderData();
+  const data = CaseRoute.useLoaderData();
   const router = useRouter();
   const file = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);

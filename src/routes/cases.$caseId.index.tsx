@@ -1,17 +1,16 @@
+import { Route as CaseRoute } from "./cases.$caseId";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { getCaseWorkspace } from "@/lib/case.functions";
 import { Panel, Stat, NatureBadge, ClassTag } from "@/components/ui-kit";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/cases/$caseId/")({
-  loader: ({ params }) => getCaseWorkspace({ data: { caseId: params.caseId } }),
   head: () => ({ meta: [{ title: "Investigation timeline | CargoIQ" }] }),
   component: TimelinePage,
 });
 
 function TimelinePage() {
-  const data = Route.useLoaderData();
+  const data = CaseRoute.useLoaderData();
   const [events, setEvents] = useState(data.timeline);
   const [selectedId, setSelectedId] = useState(data.timeline[0]?.id ?? "");
 

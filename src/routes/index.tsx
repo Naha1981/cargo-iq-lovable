@@ -44,7 +44,8 @@ function Index() {
 
   const zar = cases.filter((c: any) => c.currency === "ZAR");
   const charged = zar.reduce((sum: number, c: any) => sum + c.exposure, 0);
-  const recovery = zar.reduce((sum: number, c: any) => sum + c.recovery, 0);
+  const recoveryBlocked = zar.some((c: any) => c.contradictions > 0);
+  const recovery = zar.reduce((sum: number, c: any) => sum + (c.recovery ?? 0), 0);
 
   if (!session.user) {
     return (
@@ -80,7 +81,7 @@ function Index() {
           <Stat label="Open cases" value={cases.filter((c: any) => c.status !== "CLOSED").length} />
           <Stat label="Contradictions" value={cases.reduce((a: number, c: any) => a + c.contradictions, 0)} tone="disputed" />
           <Stat label="Exposure (ZAR)" value={fmtMoney(charged, "ZAR")} />
-          <Stat label="Recoverable (ZAR)" value={fmtMoney(recovery, "ZAR")} tone="observed" />
+          <Stat label="Recoverable (ZAR)" value={recoveryBlocked ? "BLOCKED" : fmtMoney(recovery, "ZAR")} tone={recoveryBlocked ? "disputed" : "observed"} />
         </div>
 
         <div className="mt-10 flex items-center justify-between gap-4">
@@ -114,7 +115,7 @@ function Index() {
                   </td>
                   <td className="px-4 py-3"><span className={cn("rounded px-2 py-1 text-xs", statusCls[c.status] ?? "bg-secondary")}>{c.status}</span></td>
                   <td className="px-4 py-3 text-right font-mono">{fmtMoney(c.exposure, c.currency)}</td>
-                  <td className="px-4 py-3 text-right font-mono text-observed">{fmtMoney(c.recovery, c.currency)}</td>
+                  <td className="px-4 py-3 text-right font-mono text-observed">{c.contradictions > 0 ? "BLOCKED" : fmtMoney(c.recovery ?? 0, c.currency)}</td>
                 </tr>
               ))}
               {!rows.length && <tr><td colSpan={4} className="px-4 py-10 text-center text-sm text-muted-foreground">No investigations yet. Create the first case to begin.</td></tr>}

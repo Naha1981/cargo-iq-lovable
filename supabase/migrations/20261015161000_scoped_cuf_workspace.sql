@@ -37,6 +37,7 @@ CREATE OR REPLACE FUNCTION public.cuf_set_member(w uuid,u uuid,s text) RETURNS v
 BEGIN
  IF auth.uid() IS NULL OR NOT EXISTS(SELECT 1 FROM public.cuf_workspaces WHERE id=w AND owner_id=auth.uid()) OR s NOT IN ('ACTIVE','REVOKED') THEN RAISE EXCEPTION 'Workspace owner required'; END IF;
  IF u=auth.uid() THEN RAISE EXCEPTION 'Cannot revoke workspace owner'; END IF;
+ PERFORM pg_advisory_xact_lock(hashtextextended('cuf-workspace:'||w::text,0));
  UPDATE public.cuf_members SET status=s WHERE workspace_id=w AND user_id=u;IF NOT FOUND THEN RAISE EXCEPTION 'Member request missing'; END IF;
  IF s='REVOKED' THEN
   DELETE FROM public.cuf_field_grants WHERE contribution_id IN(SELECT id FROM public.cuf_contributions WHERE workspace_id=w) AND (recipient_id=u OR contribution_id IN(SELECT id FROM public.cuf_contributions WHERE workspace_id=w AND author_id=u));
@@ -56,7 +57,9 @@ CREATE OR REPLACE FUNCTION public.cuf_grant(c uuid,u uuid,f text[]) RETURNS void
 DECLARE w uuid;k text;projected jsonb;
 BEGIN
  SELECT workspace_id INTO w FROM public.cuf_contributions WHERE id=c AND author_id=auth.uid();
- IF w IS NULL OR NOT public.cuf_active(w) OR NOT EXISTS(SELECT 1 FROM public.cuf_members WHERE workspace_id=w AND user_id=u AND status='ACTIVE') OR u=auth.uid() THEN RAISE EXCEPTION 'Author and active recipient required'; END IF;
+ IF w IS NULL THEN RAISE EXCEPTION 'Author required'; END IF;
+ PERFORM pg_advisory_xact_lock(hashtextextended('cuf-workspace:'||w::text,0));
+ IF NOT public.cuf_active(w) OR NOT EXISTS(SELECT 1 FROM public.cuf_members WHERE workspace_id=w AND user_id=u AND status='ACTIVE') OR u=auth.uid() THEN RAISE EXCEPTION 'Author and active recipient required'; END IF;
  IF f IS NULL OR cardinality(f)<1 OR cardinality(f)>8 THEN RAISE EXCEPTION 'Select explicit fields'; END IF;
  FOREACH k IN ARRAY f LOOP IF k IS NULL OR k NOT IN ('event_reference','event_type','timestamp','count','unit','source_excerpt','source_reference','limitations') THEN RAISE EXCEPTION 'Unsupported field grant'; END IF;END LOOP;
  SELECT coalesce(jsonb_object_agg(e.key,e.value),'{}'::jsonb) INTO projected FROM public.cuf_contributions x,LATERAL jsonb_each(x.payload) e WHERE x.id=c AND e.key=ANY(f);
@@ -66,7 +69,9 @@ END $$;
 CREATE OR REPLACE FUNCTION public.cuf_revoke(c uuid,u uuid) RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
 DECLARE w uuid;
 BEGIN
- SELECT workspace_id INTO w FROM public.cuf_contributions WHERE id=c AND author_id=auth.uid();IF w IS NULL OR NOT public.cuf_active(w) THEN RAISE EXCEPTION 'Active author required'; END IF;
+ SELECT workspace_id INTO w FROM public.cuf_contributions WHERE id=c AND author_id=auth.uid();IF w IS NULL THEN RAISE EXCEPTION 'Author required'; END IF;
+ PERFORM pg_advisory_xact_lock(hashtextextended('cuf-workspace:'||w::text,0));
+ IF NOT public.cuf_active(w) THEN RAISE EXCEPTION 'Active author required'; END IF;
  DELETE FROM public.cuf_field_grants WHERE contribution_id=c AND recipient_id=u;
  INSERT INTO public.cuf_share_audit(workspace_id,actor_id,action,payload) VALUES(w,auth.uid(),'FIELD_GRANT_REVOKED',jsonb_build_object('contribution_id',c,'recipient_id',u));
 END $$;

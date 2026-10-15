@@ -97,10 +97,10 @@ export function ThemeToggle() {
   );
 }
 
-export function AppHeader() {
-  // Public no-auth routes (e.g. /demo/*) show no auth controls.
+export function AppHeader({ public: isPublicPage = false }: { public?: boolean }) {
+  // Public no-auth surfaces (e.g. /demo/*, signed-out landing) show no auth controls.
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const isPublicRoute = pathname.startsWith("/demo");
+  const isPublicRoute = isPublicPage || pathname.startsWith("/demo");
   async function logout() {
     const supabase = createClient();
     await supabase.auth.signOut();

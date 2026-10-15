@@ -1,3 +1,4 @@
+import { CargoIqOffer } from "@/components/CargoIqOffer";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { AppHeader, Stat } from "@/components/ui-kit";
@@ -50,18 +51,8 @@ function Index() {
   if (!session.user) {
     return (
       <div className="min-h-screen bg-background">
-        <AppHeader />
-        <main className="mx-auto max-w-[1100px] px-6 py-20">
-          <div className="max-w-3xl">
-            <p className="font-mono text-xs uppercase tracking-[0.2em] text-primary">Evidence & Dispute Intelligence</p>
-            <h1 className="mt-3 text-4xl font-semibold tracking-tight md:text-6xl">Reconstruct what happened. Prove what can be proven.</h1>
-            <p className="mt-5 max-w-2xl text-lg text-muted-foreground">
-              CargoIQ joins freight documents, vessel movements, satellite observations, weather context and deterministic commercial rules into a human-reviewed investigation.
-            </p>
-            <a href="/demo/cuf" className="mt-6 inline-flex rounded-md border px-4 py-2 text-sm font-semibold">Open synthetic CUF demo (no sign-in)</a>
-            <Link to="/auth" className="mt-8 inline-flex rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Enter CargoIQ</Link>
-          </div>
-        </main>
+        <AppHeader public />
+        <main><CargoIqOffer /></main>
       </div>
     );
   }
@@ -69,11 +60,14 @@ function Index() {
   return (
     <div className="min-h-screen">
       <AppHeader />
+      {cases.length === 0 && <CargoIqOffer firstRun />}
       <main className="mx-auto max-w-[1400px] px-6 py-10">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="font-mono text-xs uppercase tracking-[0.2em] text-primary">Investigations</p>
-            <h1 className="mt-2 max-w-3xl text-3xl font-semibold tracking-tight md:text-4xl">What actually happened — and what can be defensibly proven.</h1>
+            {cases.length === 0
+              ? <h2 className="mt-2 max-w-3xl text-3xl font-semibold tracking-tight md:text-4xl">What actually happened — and what can be defensibly proven.</h2>
+              : <h1 className="mt-2 max-w-3xl text-3xl font-semibold tracking-tight md:text-4xl">What actually happened — and what can be defensibly proven.</h1>}
           </div>
           <Link to="/new-case" className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">+ New investigation</Link>
         </div>

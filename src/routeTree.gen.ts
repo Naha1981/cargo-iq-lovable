@@ -17,6 +17,7 @@ import { Route as CasesCaseIdRouteImport } from './routes/cases.$caseId'
 import { Route as DemoCufRouteImport } from './routes/demo.cuf'
 import { Route as ApiCctvIngestRouteImport } from './routes/api/cctv/ingest'
 import { Route as CasesCaseIdIndexRouteImport } from './routes/cases.$caseId.index'
+import { Route as CasesCaseIdAppointmentsRouteImport } from './routes/cases.$caseId.appointments'
 import { Route as CasesCaseIdCctvRouteImport } from './routes/cases.$caseId.cctv'
 import { Route as CasesCaseIdDocumentsRouteImport } from './routes/cases.$caseId.documents'
 import { Route as CasesCaseIdFinancialsRouteImport } from './routes/cases.$caseId.financials'
@@ -63,6 +64,11 @@ const CasesCaseIdIndexRoute = CasesCaseIdIndexRouteImport.update({
   path: '/',
   getParentRoute: () => CasesCaseIdRoute,
 } as any)
+const CasesCaseIdAppointmentsRoute = CasesCaseIdAppointmentsRouteImport.update({
+  id: '/appointments',
+  path: '/appointments',
+  getParentRoute: () => CasesCaseIdRoute,
+} as any)
 const CasesCaseIdCctvRoute = CasesCaseIdCctvRouteImport.update({
   id: '/cctv',
   path: '/cctv',
@@ -97,6 +103,7 @@ export interface FileRoutesByFullPath {
   '/cases/$caseId': typeof CasesCaseIdRouteWithChildren
   '/demo/cuf': typeof DemoCufRoute
   '/api/cctv/ingest': typeof ApiCctvIngestRoute
+  '/cases/$caseId/appointments': typeof CasesCaseIdAppointmentsRoute
   '/cases/$caseId/cctv': typeof CasesCaseIdCctvRoute
   '/cases/$caseId/documents': typeof CasesCaseIdDocumentsRoute
   '/cases/$caseId/financials': typeof CasesCaseIdFinancialsRoute
@@ -111,6 +118,7 @@ export interface FileRoutesByTo {
   '/new-case': typeof NewCaseRoute
   '/demo/cuf': typeof DemoCufRoute
   '/api/cctv/ingest': typeof ApiCctvIngestRoute
+  '/cases/$caseId/appointments': typeof CasesCaseIdAppointmentsRoute
   '/cases/$caseId/cctv': typeof CasesCaseIdCctvRoute
   '/cases/$caseId/documents': typeof CasesCaseIdDocumentsRoute
   '/cases/$caseId/financials': typeof CasesCaseIdFinancialsRoute
@@ -127,6 +135,7 @@ export interface FileRoutesById {
   '/cases/$caseId': typeof CasesCaseIdRouteWithChildren
   '/demo/cuf': typeof DemoCufRoute
   '/api/cctv/ingest': typeof ApiCctvIngestRoute
+  '/cases/$caseId/appointments': typeof CasesCaseIdAppointmentsRoute
   '/cases/$caseId/cctv': typeof CasesCaseIdCctvRoute
   '/cases/$caseId/documents': typeof CasesCaseIdDocumentsRoute
   '/cases/$caseId/financials': typeof CasesCaseIdFinancialsRoute
@@ -144,6 +153,7 @@ export interface FileRouteTypes {
     | '/cases/$caseId'
     | '/demo/cuf'
     | '/api/cctv/ingest'
+    | '/cases/$caseId/appointments'
     | '/cases/$caseId/cctv'
     | '/cases/$caseId/documents'
     | '/cases/$caseId/financials'
@@ -158,6 +168,7 @@ export interface FileRouteTypes {
     | '/new-case'
     | '/demo/cuf'
     | '/api/cctv/ingest'
+    | '/cases/$caseId/appointments'
     | '/cases/$caseId/cctv'
     | '/cases/$caseId/documents'
     | '/cases/$caseId/financials'
@@ -173,6 +184,7 @@ export interface FileRouteTypes {
     | '/cases/$caseId'
     | '/demo/cuf'
     | '/api/cctv/ingest'
+    | '/cases/$caseId/appointments'
     | '/cases/$caseId/cctv'
     | '/cases/$caseId/documents'
     | '/cases/$caseId/financials'
@@ -249,6 +261,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CasesCaseIdIndexRouteImport
       parentRoute: typeof CasesCaseIdRoute
     }
+    '/cases/$caseId/appointments': {
+      id: '/cases/$caseId/appointments'
+      path: '/appointments'
+      fullPath: '/cases/$caseId/appointments'
+      preLoaderRoute: typeof CasesCaseIdAppointmentsRouteImport
+      parentRoute: typeof CasesCaseIdRoute
+    }
     '/cases/$caseId/cctv': {
       id: '/cases/$caseId/cctv'
       path: '/cctv'
@@ -288,6 +307,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface CasesCaseIdRouteChildren {
+  CasesCaseIdAppointmentsRoute: typeof CasesCaseIdAppointmentsRoute
   CasesCaseIdCctvRoute: typeof CasesCaseIdCctvRoute
   CasesCaseIdDocumentsRoute: typeof CasesCaseIdDocumentsRoute
   CasesCaseIdFinancialsRoute: typeof CasesCaseIdFinancialsRoute
@@ -297,6 +317,7 @@ interface CasesCaseIdRouteChildren {
 }
 
 const CasesCaseIdRouteChildren: CasesCaseIdRouteChildren = {
+  CasesCaseIdAppointmentsRoute: CasesCaseIdAppointmentsRoute,
   CasesCaseIdCctvRoute: CasesCaseIdCctvRoute,
   CasesCaseIdDocumentsRoute: CasesCaseIdDocumentsRoute,
   CasesCaseIdFinancialsRoute: CasesCaseIdFinancialsRoute,

@@ -14,6 +14,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as DiagnosticsRouteImport } from './routes/diagnostics'
 import { Route as NewCaseRouteImport } from './routes/new-case'
 import { Route as CasesCaseIdRouteImport } from './routes/cases.$caseId'
+import { Route as DemoCufRouteImport } from './routes/demo.cuf'
 import { Route as ApiCctvIngestRouteImport } from './routes/api/cctv/ingest'
 import { Route as CasesCaseIdIndexRouteImport } from './routes/cases.$caseId.index'
 import { Route as CasesCaseIdCctvRouteImport } from './routes/cases.$caseId.cctv'
@@ -45,6 +46,11 @@ const NewCaseRoute = NewCaseRouteImport.update({
 const CasesCaseIdRoute = CasesCaseIdRouteImport.update({
   id: '/cases/$caseId',
   path: '/cases/$caseId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DemoCufRoute = DemoCufRouteImport.update({
+  id: '/demo/cuf',
+  path: '/demo/cuf',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiCctvIngestRoute = ApiCctvIngestRouteImport.update({
@@ -89,6 +95,7 @@ export interface FileRoutesByFullPath {
   '/diagnostics': typeof DiagnosticsRoute
   '/new-case': typeof NewCaseRoute
   '/cases/$caseId': typeof CasesCaseIdRouteWithChildren
+  '/demo/cuf': typeof DemoCufRoute
   '/api/cctv/ingest': typeof ApiCctvIngestRoute
   '/cases/$caseId/cctv': typeof CasesCaseIdCctvRoute
   '/cases/$caseId/documents': typeof CasesCaseIdDocumentsRoute
@@ -102,6 +109,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/diagnostics': typeof DiagnosticsRoute
   '/new-case': typeof NewCaseRoute
+  '/demo/cuf': typeof DemoCufRoute
   '/api/cctv/ingest': typeof ApiCctvIngestRoute
   '/cases/$caseId/cctv': typeof CasesCaseIdCctvRoute
   '/cases/$caseId/documents': typeof CasesCaseIdDocumentsRoute
@@ -117,6 +125,7 @@ export interface FileRoutesById {
   '/diagnostics': typeof DiagnosticsRoute
   '/new-case': typeof NewCaseRoute
   '/cases/$caseId': typeof CasesCaseIdRouteWithChildren
+  '/demo/cuf': typeof DemoCufRoute
   '/api/cctv/ingest': typeof ApiCctvIngestRoute
   '/cases/$caseId/cctv': typeof CasesCaseIdCctvRoute
   '/cases/$caseId/documents': typeof CasesCaseIdDocumentsRoute
@@ -133,6 +142,7 @@ export interface FileRouteTypes {
     | '/diagnostics'
     | '/new-case'
     | '/cases/$caseId'
+    | '/demo/cuf'
     | '/api/cctv/ingest'
     | '/cases/$caseId/cctv'
     | '/cases/$caseId/documents'
@@ -146,6 +156,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/diagnostics'
     | '/new-case'
+    | '/demo/cuf'
     | '/api/cctv/ingest'
     | '/cases/$caseId/cctv'
     | '/cases/$caseId/documents'
@@ -160,6 +171,7 @@ export interface FileRouteTypes {
     | '/diagnostics'
     | '/new-case'
     | '/cases/$caseId'
+    | '/demo/cuf'
     | '/api/cctv/ingest'
     | '/cases/$caseId/cctv'
     | '/cases/$caseId/documents'
@@ -175,6 +187,7 @@ export interface RootRouteChildren {
   DiagnosticsRoute: typeof DiagnosticsRoute
   NewCaseRoute: typeof NewCaseRoute
   CasesCaseIdRoute: typeof CasesCaseIdRouteWithChildren
+  DemoCufRoute: typeof DemoCufRoute
   ApiCctvIngestRoute: typeof ApiCctvIngestRoute
 }
 
@@ -213,6 +226,13 @@ declare module '@tanstack/react-router' {
       path: '/cases/$caseId'
       fullPath: '/cases/$caseId'
       preLoaderRoute: typeof CasesCaseIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/demo/cuf': {
+      id: '/demo/cuf'
+      path: '/demo/cuf'
+      fullPath: '/demo/cuf'
+      preLoaderRoute: typeof DemoCufRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/cctv/ingest': {
@@ -295,6 +315,7 @@ const rootRouteChildren: RootRouteChildren = {
   DiagnosticsRoute: DiagnosticsRoute,
   NewCaseRoute: NewCaseRoute,
   CasesCaseIdRoute: CasesCaseIdRouteWithChildren,
+  DemoCufRoute: DemoCufRoute,
   ApiCctvIngestRoute: ApiCctvIngestRoute,
 }
 export const routeTree = rootRouteImport

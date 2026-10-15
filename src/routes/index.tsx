@@ -58,6 +58,7 @@ function Index() {
             <p className="mt-5 max-w-2xl text-lg text-muted-foreground">
               CargoIQ joins freight documents, vessel movements, satellite observations, weather context and deterministic commercial rules into a human-reviewed investigation.
             </p>
+            <a href="/demo/cuf" className="mt-6 inline-flex rounded-md border px-4 py-2 text-sm font-semibold">Open synthetic CUF demo (no sign-in)</a>
             <Link to="/auth" className="mt-8 inline-flex rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Enter CargoIQ</Link>
           </div>
         </main>
@@ -77,6 +78,7 @@ function Index() {
           <Link to="/new-case" className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">+ New investigation</Link>
         </div>
 
+        <a href="/demo/cuf" className="mt-6 inline-flex rounded-md border px-4 py-2 text-sm font-semibold">Open synthetic CUF demo (fictional records)</a>
         <div className="mt-8 grid grid-cols-2 gap-3 md:grid-cols-4">
           <Stat label="Open cases" value={cases.filter((c: any) => c.status !== "CLOSED").length} />
           <Stat label="Contradictions" value={cases.reduce((a: number, c: any) => a + c.contradictions, 0)} tone="disputed" />

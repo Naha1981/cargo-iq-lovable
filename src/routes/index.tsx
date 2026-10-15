@@ -72,7 +72,7 @@ function Index() {
           <Link to="/new-case" className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">+ New investigation</Link>
         </div>
 
-        <a href="/demo/cuf" className="mt-6 inline-flex rounded-md border px-4 py-2 text-sm font-semibold">Open synthetic CUF demo (fictional records)</a>
+        <a href="/demo/cuf" className="mt-6 inline-flex rounded-md border px-4 py-2 text-sm font-semibold">Open the interactive sample</a>
         <div className="mt-8 grid grid-cols-2 gap-3 md:grid-cols-4">
           <Stat label="Open cases" value={cases.filter((c: any) => c.status !== "CLOSED").length} />
           <Stat label="Contradictions" value={cases.reduce((a: number, c: any) => a + c.contradictions, 0)} tone="disputed" />

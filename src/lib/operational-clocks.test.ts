@@ -8,3 +8,5 @@ describe("three clock separation",()=>{
  it("preserves appointment lead/lag instead of pretending every value is late",()=>{const x=compareClocks([r("APPOINTMENT_START","2026-10-14T18:00:00Z"),r("GATE_IN","2026-10-14T17:00:00Z")])[0];expect(x.results[2].hours).toBe(-1)});
  it("rejects unknown timezone",()=>{expect(clockInput.safeParse({}).success).toBe(false)});
 });
+
+it("accepts evidenced source reconciliation only for the full reviewed snapshot",()=>{const rows=[{...r("GATE_IN","2026-10-14T18:00:00Z"),id:"a"},{...r("GATE_IN","2026-10-14T19:00:00Z"),id:"b"},r("GATE_OUT","2026-10-14T20:00:00Z")];const d={id:"decision",physical_reference:"TRUCK-SYN-01",kind:"GATE_IN",version:1,selected_clock_id:"a",considered_clock_ids:["a","b"]};expect(compareClocks(rows,[d])[0].results[1].hours).toBe(2);expect(compareClocks([...rows,{...r("GATE_IN","2026-10-14T19:30:00Z"),id:"c"}],[d])[0].results[1].status).toBe("CONFLICTING")});

@@ -1,8 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
-import { resolvePortCenter } from "@/lib/port-centers";
 import { z } from "zod";
 import { tenantMiddleware } from "@/lib/auth-middleware";
 import { sha256Hex, stableCanonical } from "@/lib/hash";
+import { resolvePortCenter } from "@/lib/port-centers";
 import { caseRecovery } from "@/lib/recovery-gate";
 import { calculateDemurrage } from "@/lib/investigation-engine";
 import { buildAisBoundingBox, fetchAisSnapshot } from "@/lib/adapters/ais-adapter";
@@ -164,14 +164,17 @@ export const reviewClaim = createServerFn({ method: "POST" })
   });
 
 export const resolveContradiction = createServerFn({ method: "POST" })
-  .validator(z.object({ contradictionId: z.string().uuid(), caseId: z.string().uuid() }))
+  .validator(z.object({ contradictionId: z.string().uuid(), caseId: z.string().uuid(),
+    explanation: z.string().trim().min(10).max(4000),
+    supportingDocumentId: z.string().uuid(), evidenceReference: z.string().trim().min(3).max(1000) }))
   .middleware([tenantMiddleware])
   .handler(async ({ data, context }) => {
+    // Database trigger validates same-case evidence and records the audit atomically.
     const { data: row, error } = await context.supabase.from("contradictions").update({
-      status: "RESOLVED",
-      resolved_by: context.user.id,
-      resolved_at: new Date().toISOString(),
-    }).eq("id", data.contradictionId).eq("case_id", data.caseId).select("*").single();
+      status: "RESOLVED", resolution_note: data.explanation,
+      resolution_document_id: data.supportingDocumentId,
+      resolution_evidence_reference: data.evidenceReference,
+    }).eq("id", data.contradictionId).eq("case_id", data.caseId).eq("status", "FLAGGED").select("*").single();
     if (error) throw error;
     return row;
   });

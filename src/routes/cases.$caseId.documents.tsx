@@ -16,9 +16,14 @@ function DocsPage() {
   const data = CaseRoute.useLoaderData();
   const router = useRouter();
   const file = useRef<HTMLInputElement>(null);
+  const [sourceParty, setSourceParty] = useState("");
+  const [resolutionDrafts, setResolutionDrafts] = useState<Record<string, { explanation: string; documentId: string; reference: string }>>({});
+  function draft(id: string) { return resolutionDrafts[id] ?? { explanation: "", documentId: "", reference: "" }; }
+  function editDraft(id: string, key: "explanation" | "documentId" | "reference", value: string) {
+    setResolutionDrafts(prev => ({ ...prev, [id]: { ...(prev[id] ?? { explanation: "", documentId: "", reference: "" }), [key]: value } }));
+  }
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [sourceParty, setSourceParty] = useState("");
   const supabase = createClient();
 
   async function onUpload(files: FileList | null) {
@@ -72,8 +77,14 @@ function DocsPage() {
   }
 
   async function resolve(id: string) {
-    await resolveContradiction({ data: { contradictionId: id, caseId } });
-    await router.invalidate();
+    const value = draft(id);
+    setBusy(true); setError("");
+    try {
+      await resolveContradiction({ data: { contradictionId: id, caseId, explanation: value.explanation,
+        supportingDocumentId: value.documentId, evidenceReference: value.reference } });
+      await router.invalidate();
+    } catch (err) { setError(err instanceof Error ? err.message : "Resolution failed; the conflict remains open."); }
+    finally { setBusy(false); }
   }
 
   return (
@@ -136,7 +147,13 @@ function DocsPage() {
               <div key={c.id} className="rounded-md border p-4">
                 <div className="flex items-center justify-between"><span className="font-medium">{c.title}</span><span className={cn("rounded px-2 py-1 text-xs", c.status === "RESOLVED" ? "bg-observed/15 text-observed" : "bg-disputed/15 text-disputed")}>{c.status}</span></div>
                 <p className="mt-2 text-sm text-muted-foreground">{c.description}</p>
-                {c.status === "FLAGGED" && <Button variant="ghost" className="mt-3 py-1 text-xs" onClick={() => resolve(c.id)}>Mark resolved</Button>}
+                {c.status === "FLAGGED" && <div className="mt-4 space-y-3">
+                  <label className="block text-sm">Resolution explanation<textarea value={draft(c.id).explanation} onChange={e=>editDraft(c.id,"explanation",e.target.value)} minLength={10} maxLength={4000} className="mt-1 min-h-24 w-full rounded border bg-background p-2" placeholder="Explain how the competing records were reconciled and what remains uncertain." /></label>
+                  <label className="block text-sm">Supporting case document<select value={draft(c.id).documentId} onChange={e=>editDraft(c.id,"documentId",e.target.value)} className="mt-1 w-full rounded border bg-background p-2"><option value="">Select source evidence</option>{data.documents.map((d:any)=><option key={d.id} value={d.id}>{d.name} ({d.source_party || "source not recorded"})</option>)}</select></label>
+                  <label className="block text-sm">Evidence location / reference<input value={draft(c.id).reference} onChange={e=>editDraft(c.id,"reference",e.target.value)} maxLength={1000} className="mt-1 w-full rounded border bg-background p-2" placeholder="Page, row, event ID or section supporting the decision" /></label>
+                  <Button disabled={busy || draft(c.id).explanation.trim().length<10 || !draft(c.id).documentId || draft(c.id).reference.trim().length<3} variant="ghost" className="py-1 text-xs" onClick={() => resolve(c.id)}>Save evidenced resolution</Button>
+                </div>}
+                {c.status === "RESOLVED" && <div className="mt-3 text-sm"><p>{c.resolution_note || "Legacy resolution: no explanation captured."}</p><p className="mt-1 text-xs text-muted-foreground">Evidence: {data.documents.find((d:any)=>d.id===c.resolution_document_id)?.name || c.resolution_document_id || "Not recorded"} · {c.resolution_evidence_reference || "No reference recorded"}</p></div>}
               </div>
             ))}
             {!data.contradictions.length && <p className="py-8 text-center text-sm text-muted-foreground">No contradictions have been detected.</p>}

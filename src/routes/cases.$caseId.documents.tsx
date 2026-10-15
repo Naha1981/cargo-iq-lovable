@@ -18,10 +18,12 @@ function DocsPage() {
   const file = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [sourceParty, setSourceParty] = useState("");
   const supabase = createClient();
 
   async function onUpload(files: FileList | null) {
     if (!files?.length) return;
+    if (sourceParty.trim().length < 2) { setError("Enter the organization that supplied these records before uploading."); return; }
     setBusy(true);
     setError("");
     try {
@@ -36,6 +38,7 @@ function DocsPage() {
             filePath: path,
             name: item.name,
             fileType: item.type || "application/octet-stream",
+            sourceParty: sourceParty.trim(),
           },
         });
       }
@@ -82,12 +85,17 @@ function DocsPage() {
         </>
       }>
         {error && <div className="mb-3 rounded border border-disputed/40 bg-disputed/10 p-3 text-xs text-disputed">{error}</div>}
+        <label className="mb-4 block text-sm">Source organization for this upload
+          <input value={sourceParty} maxLength={200} onChange={e=>setSourceParty(e.target.value)} placeholder="Organization that supplied the record" className="mt-2 w-full rounded border bg-background p-2 text-sm" />
+          <span className="mt-1 block text-xs text-muted-foreground">Applies to every file in this selection. Upload different organizations separately.</span>
+        </label>
         <ul className="divide-y">
           {data.documents.map((d: any) => (
             <li key={d.id} className="flex items-start gap-3 px-2 py-3">
               <div className="grid h-10 w-8 shrink-0 place-items-center rounded-sm border bg-panel font-mono text-[9px] text-muted-foreground">{d.file_type.split("/").pop()?.slice(0, 6).toUpperCase()}</div>
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-medium">{d.name}</div>
+                <div className="mt-1 text-xs text-muted-foreground">Source: {d.source_party || "Not recorded (legacy upload)"}</div>
                 <div className="mt-1 text-xs text-muted-foreground">{d.sha256_hash.slice(0, 12)}… · {d.evidence_class}</div>
                 <Button disabled={busy} variant="ghost" className="mt-2 py-1 text-xs" onClick={() => extract(d.id)}>Extract claims</Button>
               </div>

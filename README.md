@@ -72,7 +72,16 @@ See:
 
 ## Lovable Cloud setup
 
-Apply the SQL migrations under supabase/migrations/.
+Database deployment order (review the target database first; do not replay CREATE TABLE migrations against an existing initialized database):
+
+1. Core schema/auth/RLS/storage: `drizzle/migrations/0000_cargoiq_core.sql`.
+2. Storage upload policies: `drizzle/migrations/0001_case_documents_policies.sql`.
+3. CCTV extension: `supabase/migrations/20261005190000_cctv_evidence.sql`.
+4. Evidenced resolutions: `supabase/migrations/20261015141000_evidenced_resolution.sql`.
+
+These are currently split migration histories. `supabase db push` alone does not discover the core Drizzle files. For a new environment, use the reviewed SQL files in the order above through the database SQL runner and record each applied migration. For an existing environment, inspect migration history and schema and apply only missing changes. Do not duplicate the core schema into Supabase history without an explicit baselining plan. The Drizzle schema.ts is intentionally blank; the SQL migration is the current core schema source.
+
+Deploy migration 4 before the new resolution UI/server code. If its trigger or audit insert fails, resolution must remain blocked. Test this against staging before publishing; a source merge is not evidence of a successful database deployment.
 
 Required client variables:
 
@@ -81,8 +90,11 @@ Required client variables:
 
 Optional server variables:
 
-- GEMINI_API_KEY
-- GEMINI_MODEL
+- CLAIM_AI_PROVIDER (`gateway`, `openai`, or `anthropic`; set explicitly to avoid implicit key priority)
+- LOVABLE_API_KEY (server-only, for `gateway`; uses existing Lovable gateway access/credits)
+- OPENAI_API_KEY (server-only, for `openai`)
+- ANTHROPIC_API_KEY (server-only, for `anthropic`)
+- CLAIM_AI_MODEL (OpenAI/Anthropic override only; gateway currently uses `openai/gpt-6-astra` in code)
 - AISSTREAM_API_KEY
 - AIS_PUBLIC_HTTP_URL
 - SUPABASE_SERVICE_ROLE_KEY (server only)
@@ -95,7 +107,7 @@ The SQL migration creates tenant-scoped tables, Auth onboarding, RLS, private ca
 Documents are stored under:
 case-documents/{tenant_id}/{case_id}/{filename}
 
-The server downloads the private object, computes SHA-256 and stores immutable metadata. Extraction can use Gemini for structured PDF evidence or a deterministic CSV/TXT fallback. Claims and timestamped timeline events are persisted for human review.
+The server downloads the private object, computes SHA-256 and stores immutable metadata. Extraction selects OpenAI, Anthropic or the Lovable gateway. With no explicit provider it prefers an available OpenAI key, then Anthropic, then Lovable; set `CLAIM_AI_PROVIDER=gateway` to retain Lovable when other keys exist. GEMINI_API_KEY/GEMINI_MODEL are not read by the current extractor. AI requests can consume provider funds or Lovable credits; configuration is not spending approval. PDF AI extraction requires the chosen provider key. CSV/TXT fallback creates text records and does not prove timestamp-conflict detection. Claims and timestamped timeline events are persisted for human review.
 
 ## God’s Eye View
 
@@ -132,3 +144,11 @@ CargoIQ is pilot-ready when:
 10. an investigator approves a frozen pack.
 
 The 50-client production gate additionally requires provider/licence review, backups, observability, billing and repeatable onboarding.
+
+## Review provenance and corroboration limits
+
+Uploads require the source organization, stored as documents.source_party. A multi-file selection uses one organization; upload different organizations separately. Legacy uploads may have no recorded source.
+
+New contradiction resolutions require an explanation (10-4000 characters), a document belonging to the same case and tenant, and a page/row/event/section reference (3-1000 characters). The database trigger sets the authenticated resolver/time and appends CONTRADICTION_RESOLVED with that evidence in the same transaction. This records the human decision; it does not verify the explanation is true. Legacy resolutions remain visible as legacy, not retroactively evidenced.
+
+Corroboration currently supports verified approximate centers for ZADUR/Durban, ZACPT/Cape Town and ZARCB/Richards Bay. Unknown/missing ports fail before external queries. Add a verified center before supporting another port. Query centers are not berth locations. The separate schematic map still contains Durban-specific projection/labels; this patch does not make that map port-neutral or 3D.

@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { resolvePortCenter } from "@/lib/port-centers";
 import { z } from "zod";
 import { tenantMiddleware } from "@/lib/auth-middleware";
 import { sha256Hex, stableCanonical } from "@/lib/hash";
@@ -105,7 +106,7 @@ export const registerDocument = createServerFn({ method: "POST" })
     filePath: z.string().min(5),
     name: z.string().min(1),
     fileType: z.string().min(1),
-    sourceParty: z.string().optional(),
+    sourceParty: z.string().trim().min(2).max(200),
   }))
   .middleware([tenantMiddleware])
   .handler(async ({ data, context }) => {
@@ -182,7 +183,7 @@ export const corroborateCase = createServerFn({ method: "POST" })
     const { data: row, error } = await context.supabase.from("cases").select("vessel_name,port_code").eq("id", data.caseId).single();
     if (error || !row) throw error ?? new Error("CASE_NOT_FOUND");
 
-    const center: [number, number] = row.port_code === "ZADUR" || row.port_code === "DURBAN" ? [-29.8833, 31.05] : [-29.8833, 31.05];
+    const center = resolvePortCenter(row.port_code);
     const bbox = buildAisBoundingBox(center, 35);
     const [ais, scenes, weather] = await Promise.all([
       fetchAisSnapshot({ vesselName: row.vessel_name ?? undefined, bbox }),

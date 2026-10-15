@@ -1,5 +1,5 @@
 import { z } from "zod";
-export const clockKinds=["QUEUE_ARRIVAL","APPOINTMENT_START","APPOINTMENT_END","GATE_IN","GATE_OUT"] as const;
+export const clockKinds=["QUEUE_ARRIVAL","APPOINTMENT_START","APPOINTMENT_END","GATE_IN","GATE_OUT","VESSEL_WINDOW_START","FIRST_BOX_OFF","LAST_BOX_ON"] as const;
 const zoned=z.string().datetime({offset:true}).refine(v=>/([+-]\d\d:\d\d|Z)$/.test(v),"Include UTC Z or an explicit offset");
 export const clockInput=z.object({caseId:z.string().uuid(),physicalReference:z.string().trim().min(3).max(200),kind:z.enum(clockKinds),timestamp:zoned,
  timeZone:z.string().min(1).max(100).refine(v=>{try{new Intl.DateTimeFormat("en",{timeZone:v});return true}catch{return false}},"Use an IANA timezone"),

@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { demoRecords, findTimestampConflicts, gateDurations } from "./cuf-demo";
-describe("synthetic CUF demo", () => {
+describe("sample demo", () => {
   it("keeps all fifteen records explicitly synthetic", () => {
     expect(demoRecords).toHaveLength(15);
-    expect(demoRecords.every(r=>r.synthetic_notice.startsWith("SYNTHETIC DEMO ONLY"))).toBe(true);
+    expect(demoRecords.every(r=>r.synthetic_notice === "Sample data - fictional records")).toBe(true);
   });
   it("flags one same-event timestamp conflict, not count or clock definition differences", () => {
     const conflicts=findTimestampConflicts(demoRecords);

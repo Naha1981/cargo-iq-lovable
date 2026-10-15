@@ -10,6 +10,7 @@ type ClaimDraft = {
   nature: "OBSERVED" | "REPORTED" | "DERIVED" | "INFERRED";
   confidence?: number;
   timestamp_claimed?: string;
+  event_reference?: string;
 };
 
 function inferClass(name: string) {
@@ -28,6 +29,7 @@ function parseJsonModel(text: string): ClaimDraft[] {
     page_number: Number.isFinite(Number(row.page_number)) ? Number(row.page_number) : undefined,
     claim_text: String(row.claim_text ?? "").trim(),
     claim_type: row.claim_type ? String(row.claim_type) : undefined,
+    event_reference: row.event_reference ? String(row.event_reference).trim() : undefined,
     normalized_value: row.normalized_value ?? row.value ?? null,
     evidence_class: String(row.evidence_class ?? "CUSTOMER_PRIMARY"),
     nature: ["OBSERVED","REPORTED","DERIVED","INFERRED"].includes(row.nature) ? row.nature : "REPORTED",
@@ -52,6 +54,7 @@ function claimPrompt(filename: string) {
     "Use evidence_class CUSTOMER_PRIMARY unless clearly CONTRACTUAL or OFFICIAL_PUBLIC.",
     "Use OBSERVED for explicit facts, REPORTED for a party assertion, DERIVED only for arithmetic shown, INFERRED only where inference is explicit.",
     "Dates ISO-8601 when confident, else empty string. Confidence 0..1. page_number is the 1-based page the fact appears on.",
+    "event_reference: only an explicit unique operation or visit ID in the source, else empty. A reusable vehicle/container ID alone does not identify one event. Never invent a cross-document identity.",
     "Filename: " + filename,
   ].join("\n");
 }
@@ -60,12 +63,12 @@ const claimSchema = {
     type: "object", additionalProperties: false, required: ["claims"],
     properties: { claims: { type: "array", items: {
       type: "object", additionalProperties: false,
-      required: ["page_number", "claim_text", "claim_type", "value", "evidence_class", "nature", "confidence", "timestamp_claimed"],
+      required: ["page_number", "claim_text", "claim_type", "value", "evidence_class", "nature", "confidence", "timestamp_claimed", "event_reference"],
       properties: {
         page_number: { type: "integer" }, claim_text: { type: "string" }, claim_type: { type: "string" }, value: { type: "string" },
         evidence_class: { type: "string", enum: ["CUSTOMER_PRIMARY", "CONTRACTUAL", "OFFICIAL_PUBLIC"] },
         nature: { type: "string", enum: ["OBSERVED", "REPORTED", "DERIVED", "INFERRED"] },
-        confidence: { type: "number" }, timestamp_claimed: { type: "string" },
+        confidence: { type: "number" }, timestamp_claimed: { type: "string" }, event_reference: { type: "string" },
       } } } },
   };
 
@@ -209,7 +212,8 @@ function timestampConflict(a: ClaimDraft, b: ClaimDraft) {
   if (!Number.isFinite(delta) || delta < 60 * 60 * 1000) return null;
   // Only the SAME fact (same claim type) with different times is a conflict.
   // Different event types (e.g. container_release vs container_collection) are sequential and expected to differ.
-  const sameFact = !!a.claim_type && a.claim_type === b.claim_type && a.claim_type !== "TEXT_RECORD";
+  const sameEvent = !!a.event_reference && a.event_reference === b.event_reference;
+  const sameFact = sameEvent && !!a.claim_type && a.claim_type === b.claim_type && a.claim_type !== "TEXT_RECORD";
   return sameFact ? "Conflicting timestamps differ by " + Math.round(delta / 3600000) + " hour(s)." : null;
 }
 
@@ -256,7 +260,7 @@ export async function extractDocumentClaimsForPath(input: {
       page_number: claim.page_number ?? null,
       claim_text: claim.claim_text,
       claim_type: claim.claim_type ?? null,
-      normalized_value: claim.normalized_value ?? null,
+      normalized_value: claim.event_reference ? { source_value: claim.normalized_value ?? null, event_reference: claim.event_reference } : claim.normalized_value ?? null,
       evidence_class: claim.evidence_class || inferClass(doc.name),
       nature: claim.nature,
       status: "PENDING",

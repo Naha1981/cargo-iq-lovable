@@ -23,6 +23,7 @@ import { Route as CasesCaseIdDocumentsRouteImport } from './routes/cases.$caseId
 import { Route as CasesCaseIdFinancialsRouteImport } from './routes/cases.$caseId.financials'
 import { Route as CasesCaseIdKpisRouteImport } from './routes/cases.$caseId.kpis'
 import { Route as CasesCaseIdMapRouteImport } from './routes/cases.$caseId.map'
+import { Route as CasesCaseIdMatchesRouteImport } from './routes/cases.$caseId.matches'
 import { Route as CasesCaseIdPackRouteImport } from './routes/cases.$caseId.pack'
 
 const IndexRoute = IndexRouteImport.update({
@@ -95,6 +96,11 @@ const CasesCaseIdMapRoute = CasesCaseIdMapRouteImport.update({
   path: '/map',
   getParentRoute: () => CasesCaseIdRoute,
 } as any)
+const CasesCaseIdMatchesRoute = CasesCaseIdMatchesRouteImport.update({
+  id: '/matches',
+  path: '/matches',
+  getParentRoute: () => CasesCaseIdRoute,
+} as any)
 const CasesCaseIdPackRoute = CasesCaseIdPackRouteImport.update({
   id: '/pack',
   path: '/pack',
@@ -115,6 +121,7 @@ export interface FileRoutesByFullPath {
   '/cases/$caseId/financials': typeof CasesCaseIdFinancialsRoute
   '/cases/$caseId/kpis': typeof CasesCaseIdKpisRoute
   '/cases/$caseId/map': typeof CasesCaseIdMapRoute
+  '/cases/$caseId/matches': typeof CasesCaseIdMatchesRoute
   '/cases/$caseId/pack': typeof CasesCaseIdPackRoute
   '/cases/$caseId/': typeof CasesCaseIdIndexRoute
 }
@@ -131,6 +138,7 @@ export interface FileRoutesByTo {
   '/cases/$caseId/financials': typeof CasesCaseIdFinancialsRoute
   '/cases/$caseId/kpis': typeof CasesCaseIdKpisRoute
   '/cases/$caseId/map': typeof CasesCaseIdMapRoute
+  '/cases/$caseId/matches': typeof CasesCaseIdMatchesRoute
   '/cases/$caseId/pack': typeof CasesCaseIdPackRoute
   '/cases/$caseId': typeof CasesCaseIdIndexRoute
 }
@@ -149,6 +157,7 @@ export interface FileRoutesById {
   '/cases/$caseId/financials': typeof CasesCaseIdFinancialsRoute
   '/cases/$caseId/kpis': typeof CasesCaseIdKpisRoute
   '/cases/$caseId/map': typeof CasesCaseIdMapRoute
+  '/cases/$caseId/matches': typeof CasesCaseIdMatchesRoute
   '/cases/$caseId/pack': typeof CasesCaseIdPackRoute
   '/cases/$caseId/': typeof CasesCaseIdIndexRoute
 }
@@ -168,6 +177,7 @@ export interface FileRouteTypes {
     | '/cases/$caseId/financials'
     | '/cases/$caseId/kpis'
     | '/cases/$caseId/map'
+    | '/cases/$caseId/matches'
     | '/cases/$caseId/pack'
     | '/cases/$caseId/'
   fileRoutesByTo: FileRoutesByTo
@@ -184,6 +194,7 @@ export interface FileRouteTypes {
     | '/cases/$caseId/financials'
     | '/cases/$caseId/kpis'
     | '/cases/$caseId/map'
+    | '/cases/$caseId/matches'
     | '/cases/$caseId/pack'
     | '/cases/$caseId'
   id:
@@ -201,6 +212,7 @@ export interface FileRouteTypes {
     | '/cases/$caseId/financials'
     | '/cases/$caseId/kpis'
     | '/cases/$caseId/map'
+    | '/cases/$caseId/matches'
     | '/cases/$caseId/pack'
     | '/cases/$caseId/'
   fileRoutesById: FileRoutesById
@@ -315,6 +327,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CasesCaseIdMapRouteImport
       parentRoute: typeof CasesCaseIdRoute
     }
+    '/cases/$caseId/matches': {
+      id: '/cases/$caseId/matches'
+      path: '/matches'
+      fullPath: '/cases/$caseId/matches'
+      preLoaderRoute: typeof CasesCaseIdMatchesRouteImport
+      parentRoute: typeof CasesCaseIdRoute
+    }
     '/cases/$caseId/pack': {
       id: '/cases/$caseId/pack'
       path: '/pack'
@@ -332,6 +351,7 @@ interface CasesCaseIdRouteChildren {
   CasesCaseIdFinancialsRoute: typeof CasesCaseIdFinancialsRoute
   CasesCaseIdKpisRoute: typeof CasesCaseIdKpisRoute
   CasesCaseIdMapRoute: typeof CasesCaseIdMapRoute
+  CasesCaseIdMatchesRoute: typeof CasesCaseIdMatchesRoute
   CasesCaseIdPackRoute: typeof CasesCaseIdPackRoute
   CasesCaseIdIndexRoute: typeof CasesCaseIdIndexRoute
 }
@@ -343,6 +363,7 @@ const CasesCaseIdRouteChildren: CasesCaseIdRouteChildren = {
   CasesCaseIdFinancialsRoute: CasesCaseIdFinancialsRoute,
   CasesCaseIdKpisRoute: CasesCaseIdKpisRoute,
   CasesCaseIdMapRoute: CasesCaseIdMapRoute,
+  CasesCaseIdMatchesRoute: CasesCaseIdMatchesRoute,
   CasesCaseIdPackRoute: CasesCaseIdPackRoute,
   CasesCaseIdIndexRoute: CasesCaseIdIndexRoute,
 }

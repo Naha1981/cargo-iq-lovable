@@ -281,7 +281,7 @@ export const generateEvidencePack = createServerFn({ method: "POST" })
   .middleware([tenantMiddleware])
   .handler(async ({ data, context }) => {
     const db = context.supabase;
-    const [c, docs, claims, contradictions, timeline, observations, calculations, existing, definitions] = await Promise.all([
+    const [c, docs, claims, contradictions, timeline, observations, calculations, existing, definitions, clocks, attributions, kpis, matches, reviews, gaps] = await Promise.all([
       db.from("cases").select("*").eq("id", data.caseId).single(),
       db.from("documents").select("*").eq("case_id", data.caseId).order("uploaded_at", { ascending: true }),
       db.from("extracted_claims").select("*").eq("case_id", data.caseId).order("created_at", { ascending: true }),
@@ -291,8 +291,14 @@ export const generateEvidencePack = createServerFn({ method: "POST" })
       db.from("financial_calculations").select("*").eq("case_id", data.caseId).order("created_at", { ascending: true }),
       db.from("evidence_packs").select("version,status").eq("case_id", data.caseId).order("version", { ascending: false }),
       db.from("operational_definitions").select("*").eq("case_id", data.caseId).order("created_at", { ascending: true }),
+      db.from("operational_clocks").select("*").eq("case_id", data.caseId).order("created_at", { ascending: true }),
+      db.from("appointment_attributions").select("*").eq("case_id", data.caseId).order("created_at", { ascending: true }),
+      db.from("kpi_definitions").select("*").eq("case_id", data.caseId).order("created_at", { ascending: true }),
+      db.from("cross_party_matches").select("*").eq("case_id", data.caseId).order("created_at", { ascending: true }),
+      db.from("cross_party_match_reviews").select("*").eq("case_id", data.caseId).order("created_at", { ascending: true }),
+      db.from("evidence_gap_entries").select("*").eq("case_id", data.caseId).order("created_at", { ascending: true }),
     ]);
-    for (const x of [c, docs, claims, contradictions, timeline, observations, calculations, existing, definitions]) if (x.error) throw x.error;
+    for (const x of [c, docs, claims, contradictions, timeline, observations, calculations, existing, definitions, clocks, attributions, kpis, matches, reviews, gaps]) if (x.error) throw x.error;
 
     const unresolved = (contradictions.data ?? []).filter((x: any) => x.status === "FLAGGED").length;
     if (unresolved > 0) throw new Error("Resolve the flagged contradictions before generating an evidence pack.");
@@ -304,6 +310,12 @@ export const generateEvidencePack = createServerFn({ method: "POST" })
       case: c.data,
       documents: docs.data ?? [],
       operationalDefinitions: definitions.data ?? [],
+      operationalClocks: clocks.data ?? [],
+      appointmentAttributions: attributions.data ?? [],
+      kpiDefinitions: kpis.data ?? [],
+      crossPartyMatches: matches.data ?? [],
+      crossPartyMatchReviews: reviews.data ?? [],
+      evidenceGapHistory: gaps.data ?? [],
       verifiedClaims: (claims.data ?? []).filter((x: any) => x.status === "VERIFIED"),
       claims: claims.data ?? [],
       contradictions: contradictions.data ?? [],
@@ -353,6 +365,22 @@ export const generateEvidencePack = createServerFn({ method: "POST" })
       "",
       "## Operational definitions",
       ...(definitions.data ?? []).map((x: any) => "- " + x.party + " / " + x.metric + " v" + x.version + ": " + x.unit + " [" + x.acceptance + "] - " + x.rule + " (source " + x.source_document_id + ", " + x.source_reference + ")"),
+      "",
+      "## Clock evidence and appointment attribution",
+      ...(clocks.data ?? []).map((x: any) => "- " + x.physical_reference + " " + x.kind + ": " + x.timestamp_original + " (" + x.time_zone + ") - source " + x.source_party + ", " + x.source_document_id + ", " + x.source_reference),
+      ...(attributions.data ?? []).map((x: any) => "- Appointment source " + x.appointment_clock_id + ": claimant " + x.claimant + ", target " + x.claim_target + ", assertion " + x.assertion + " - evidence " + x.source_document_id + ", " + x.source_reference),
+      "",
+      "## KPI definitions and benchmarks",
+      ...(kpis.data ?? []).map((x: any) => "- " + x.party + " / " + x.name + " v" + x.version + ": " + x.start_kind + " to " + x.end_kind + " [" + x.acceptance + "] - scope " + x.physical_reference + ", benchmark " + (x.benchmark_hours ?? "not supplied") + "h; " + x.benchmark_basis),
+      "",
+      "## Cross-party physical-event matches",
+      ...(matches.data ?? []).map((x: any) => "- " + x.event_reference + ": " + x.result + ", claims " + x.claim_a_id + " / " + x.claim_b_id + ", rationale " + x.rationale),
+      "",
+      "## Match review history (retractions and reaffirmations)",
+      ...(reviews.data ?? []).map((x: any) => "- match " + x.match_id + " v" + x.version + ": " + x.status + " - " + x.explanation + " (evidence " + x.source_document_id + ", " + x.source_reference + ")"),
+      "",
+      "## Required evidence and gaps (history, not proof of non-occurrence)",
+      ...(gaps.data ?? []).map((x: any) => "- " + x.physical_reference + " / " + x.required_event + " v" + x.version + ": " + x.status + " - " + x.explanation),
       "",
 
       "## Contradictions",

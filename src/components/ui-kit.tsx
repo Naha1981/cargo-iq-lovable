@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Link } from "@tanstack/react-router";
+import { Link, useRouterState } from "@tanstack/react-router";
 import { cn } from "@/lib/utils";
 import { NATURE_LABEL, type Nature } from "@/lib/case-data";
 import { createClient } from "@/lib/supabase/client";
@@ -98,6 +98,9 @@ export function ThemeToggle() {
 }
 
 export function AppHeader() {
+  // Public no-auth routes (e.g. /demo/*) show no auth controls.
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const isPublicRoute = pathname.startsWith("/demo");
   async function logout() {
     const supabase = createClient();
     await supabase.auth.signOut();
@@ -114,7 +117,9 @@ export function AppHeader() {
         </Link>
         <div className="flex items-center gap-3 text-xs text-muted-foreground">
           <ThemeToggle />
-          <button onClick={logout} className="rounded border bg-secondary px-2 py-1 text-xs hover:bg-accent">Sign out</button>
+          {!isPublicRoute && (
+            <button onClick={logout} className="rounded border bg-secondary px-2 py-1 text-xs hover:bg-accent">Sign out</button>
+          )}
         </div>
       </div>
     </header>

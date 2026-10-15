@@ -213,6 +213,33 @@ function timestampConflict(a: ClaimDraft, b: ClaimDraft) {
   return sameFact ? "Conflicting timestamps differ by " + Math.round(delta / 3600000) + " hour(s)." : null;
 }
 
+
+export function normalizeClaimKey(text: string): string {
+  return text.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+// A CSV header line names columns; it is not evidence. Drop claims that repeat it verbatim.
+export function csvHeaderLine(bytes: ArrayBuffer, fileType: string, filename: string): string | null {
+  const isCsv = fileType === "text/csv" || /\.csv$/i.test(filename);
+  if (!isCsv) return null;
+  const first = new TextDecoder().decode(bytes).split(/\r?\n/)[0]?.trim() ?? "";
+  return first || null;
+}
+
+// Keep only claims that are new for (case, document): dedupe inside the batch and against stored rows.
+export function filterNewClaims<T extends { claim_text: string }>(claims: T[], existingTexts: string[], headerLine?: string | null): T[] {
+  const headerKey = headerLine ? normalizeClaimKey(headerLine) : null;
+  const seen = new Set<string>(existingTexts.map(normalizeClaimKey));
+  const out: T[] = [];
+  for (const claim of claims) {
+    const key = normalizeClaimKey(claim.claim_text);
+    if (!key || key === headerKey || seen.has(key)) continue;
+    seen.add(key);
+    out.push(claim);
+  }
+  return out;
+}
+
 export async function extractDocumentClaimsForPath(input: {
   documentId: string;
   caseId: string;
@@ -246,6 +273,17 @@ export async function extractDocumentClaimsForPath(input: {
   }
 
   if (!claims.length) throw new Error("NO_CLAIMS_EXTRACTED");
+
+  // Re-running extraction on a document must not duplicate claims.
+  const header = csvHeaderLine(bytes, doc.file_type, doc.name);
+  const { data: existingRows, error: existingError } = await input.supabase
+    .from("extracted_claims").select("claim_text")
+    .eq("case_id", input.caseId).eq("document_id", input.documentId);
+  if (existingError) throw existingError;
+  claims = filterNewClaims(claims, (existingRows ?? []).map((r: any) => String(r.claim_text ?? "")), header);
+  if (!claims.length) {
+    return { claims: [], count: 0, skippedDuplicates: true };
+  }
 
   const inserted: any[] = [];
   for (const claim of claims) {

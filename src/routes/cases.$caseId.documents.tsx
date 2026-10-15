@@ -19,6 +19,7 @@ function DocsPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [sourceParty, setSourceParty] = useState("");
+  const [decisions, setDecisions] = useState<Record<string, "VERIFIED" | "DISPUTED">>({});
   const supabase = createClient();
 
   async function onUpload(files: FileList | null) {
@@ -67,8 +68,15 @@ function DocsPage() {
   }
 
   async function review(claimId: string, decision: "VERIFIED" | "DISPUTED") {
-    await reviewClaim({ data: { claimId, caseId, decision } });
-    await router.invalidate();
+    // Optimistic: show the decision in place immediately; roll back if the write fails.
+    setDecisions((prev) => ({ ...prev, [claimId]: decision }));
+    try {
+      await reviewClaim({ data: { claimId, caseId, decision } });
+      await router.invalidate();
+    } catch (err) {
+      setDecisions((prev) => { const next = { ...prev }; delete next[claimId]; return next; });
+      setError(err instanceof Error ? err.message : "Could not record the review decision.");
+    }
   }
 
   async function resolve(id: string) {
@@ -108,7 +116,9 @@ function DocsPage() {
       <div className="space-y-6">
         <Panel title={"Extracted claims · " + data.claims.length}>
           <ul className="divide-y">
-            {data.claims.map((c: any) => (
+            {data.claims.map((c: any) => {
+              const status: string = decisions[c.id] ?? c.status;
+              return (
               <li key={c.id} className="grid gap-3 py-3 md:grid-cols-[1fr_auto]">
                 <div>
                   <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
@@ -116,16 +126,20 @@ function DocsPage() {
                     <NatureBadge n={String(c.nature).toLowerCase() as any} />
                     <ClassTag c={c.evidence_class} />
                     <span className="font-mono">conf {Math.round(Number(c.confidence ?? 0) * 100)}%</span>
+                    {status !== "PENDING" && (
+                      <span className={cn("rounded px-2 py-0.5 text-xs font-medium", status === "VERIFIED" ? "bg-observed/15 text-observed" : "bg-disputed/15 text-disputed")}>{status}</span>
+                    )}
                   </div>
                   <div className="mt-1 text-sm">{c.claim_text}</div>
                   {c.timestamp_claimed && <div className="mt-1 font-mono text-xs text-primary">{c.timestamp_claimed} UTC</div>}
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={() => review(c.id, "VERIFIED")} className={cn("rounded border px-2.5 py-1 text-xs", c.status === "VERIFIED" ? "border-observed bg-observed/15 text-observed" : "hover:bg-accent")}>Verify</button>
-                  <button onClick={() => review(c.id, "DISPUTED")} className={cn("rounded border px-2.5 py-1 text-xs", c.status === "DISPUTED" ? "border-disputed bg-disputed/15 text-disputed" : "hover:bg-accent")}>Dispute</button>
+                  <button onClick={() => review(c.id, "VERIFIED")} className={cn("rounded border px-2.5 py-1 text-xs", status === "VERIFIED" ? "border-observed bg-observed/15 text-observed" : "hover:bg-accent")}>{status === "VERIFIED" ? "Verified" : "Verify"}</button>
+                  <button onClick={() => review(c.id, "DISPUTED")} className={cn("rounded border px-2.5 py-1 text-xs", status === "DISPUTED" ? "border-disputed bg-disputed/15 text-disputed" : "hover:bg-accent")}>{status === "DISPUTED" ? "Disputed" : "Dispute"}</button>
                 </div>
               </li>
-            ))}
+              );
+            })}
             {!data.claims.length && <li className="py-10 text-center text-sm text-muted-foreground">Extraction claims will appear here for human review.</li>}
           </ul>
         </Panel>

@@ -153,6 +153,7 @@ export function buildEvidencePackPdf(pack: any): Uint8Array {
     if (x.description) d.text(x.description, { indent: 14 });
     d.text("Resolution: " + (x.resolution_note ? x.resolution_note : x.status === "RESOLVED" ? "Resolved (no note recorded)" : "UNRESOLVED") +
       (x.resolved_at ? "  |  Resolved " + stamp(x.resolved_at) : ""), { indent: 14, size: 8.5 });
+    if (x.resolution_document_id || x.resolution_evidence_reference) d.text("Resolution evidence: " + (docName.get(x.resolution_document_id) ?? x.resolution_document_id ?? "n/a") + ", " + (x.resolution_evidence_reference ?? "n/a"), {indent:14,size:8});
   });
 
   const calcs: any[] = p.financialCalculations ?? [];
@@ -176,7 +177,27 @@ export function buildEvidencePackPdf(pack: any): Uint8Array {
     if (obs.length > 40) d.text("... and " + (obs.length - 40) + " more in the JSON export.", { indent: 14, size: 8, gray: 0.35 });
   }
 
-  d.heading((obs.length ? "8" : "7") + ". Integrity and approval");
+  const operationalSections: [string, string, (x: any) => string][] = [
+    ["operationalDefinitions", "Operational counting definitions (all versions)", (x) => x.party + " / " + x.metric + " v" + x.version + " [" + x.acceptance + "]\nUnit: " + x.unit + "\nRule: " + x.rule + "\nOriginal: " + x.original_source_text + "\nEffective: " + x.effective_from + " to " + (x.effective_to ?? "open-ended") + "\nAcceptance basis: " + x.acceptance_basis],
+    ["operationalClocks", "Separate source clocks", (x) => x.physical_reference + " / " + x.kind + "\nOriginal time: " + x.timestamp_original + " (" + x.time_zone + ")\nSource organization: " + x.source_party + "\nLocation/event basis: " + x.location_basis + (x.appointment_issuer ? "\nAppointment issuer: " + x.appointment_issuer + "; ref " + x.appointment_reference + "\nParties: " + x.appointment_parties + "\nTerms: " + x.appointment_terms : "")],
+    ["appointmentAttributions", "Appointment-to-claim attribution (not liability)", (x) => "Appointment clock " + x.appointment_clock_id + "\nClaimant: " + x.claimant + "; target: " + x.claim_target + "\nAssertion: " + x.assertion + "\nTerms reference: " + x.terms_reference],
+    ["kpiDefinitions", "Per-party KPI definitions (no universal benchmark)", (x) => x.party + " / " + x.name + " v" + x.version + " [" + x.acceptance + "]\nScope: " + x.physical_reference + "\nClock: " + x.start_kind + " to " + x.end_kind + "\nDefinition: " + x.definition + "\nBenchmark hours: " + (x.benchmark_hours ?? "not supplied") + "\nBenchmark basis: " + x.benchmark_basis],
+    ["crossPartyMatches", "Human-confirmed physical-event matches", (x) => x.event_reference + " [" + x.result + "]\nSource claims: " + x.claim_a_id + " / " + x.claim_b_id + "\nIdentity rationale: " + x.rationale],
+    ["eventIdentityReviews", "Event-identity corrections (history retained)", (x) => "Match " + x.match_id + " v" + x.version + " [" + x.status + "]\nEvidence explanation: " + x.explanation],
+    ["clockReconciliations", "Evidenced clock reconciliation decisions", (x) => x.physical_reference + " / " + x.kind + " v" + x.version + "\nSelected clock: " + x.selected_clock_id + "\nConsidered source IDs: " + (x.considered_clock_ids ?? []).join(", ") + "\nEvidence explanation: " + x.explanation],
+    ["evidenceGapHistory", "Required evidence and gaps (not proof of non-occurrence)", (x) => x.physical_reference + " / " + x.required_event + " v" + x.version + " [" + x.status + "]\nRequirement basis: " + x.requirement_basis + "\nExplanation: " + x.explanation + "\nSource documents: " + (x.document_ids ?? []).map((id: string) => docName.get(id) ?? id).join(", ") + "\nEvidence reference: " + x.evidence_reference],
+  ];
+  for (const [key, title, describe] of operationalSections) {
+    const records: any[] = p[key] ?? [];
+    if (!records.length) continue;
+    d.heading(title + " (" + records.length + ")");
+    for (const x of records) {
+      d.text(describe(x), {indent:4});
+      if (x.source_document_id) d.text("Source: " + (docName.get(x.source_document_id) ?? x.source_document_id) + ", " + (x.source_reference ?? "n/a"), {indent:14,size:8,gray:0.35});
+      d.gap(6);
+    }
+  }
+  d.heading("Integrity and approval");
   d.text("SHA-256 of the canonical pack payload:", { indent: 4 });
   d.text(String(pack.sha256_hash ?? "n/a"), { indent: 4, bold: true, size: 9 });
   d.text("The JSON export of this same pack version carries the full payload this hash was calculated over.", { indent: 4, size: 8.5, gray: 0.35 });

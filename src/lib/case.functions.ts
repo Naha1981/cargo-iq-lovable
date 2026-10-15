@@ -11,6 +11,15 @@ import { fetchPortConditions } from "@/lib/adapters/weather-port-adapter";
 import { extractDocumentClaimsForPath } from "@/lib/extraction.functions";
 
 const idInput = z.object({ caseId: z.string().uuid() });
+async function clockBlocked(db: any, caseId: string): Promise<boolean> {
+  const { data, error } = await db.rpc("has_unresolved_operational_clocks", { _case_id: caseId });
+  if (error) throw error;
+  return Boolean(data);
+}
+async function assertClockGate(db: any, caseId: string) {
+  if (await clockBlocked(db, caseId)) throw new Error("BLOCKED: reconcile conflicting operational clock evidence first.");
+}
+
 
 export const listCases = createServerFn({ method: "GET" }).middleware([tenantMiddleware]).handler(async ({ context }) => {
   const { data: cases, error } = await context.supabase.from("cases").select("*").order("created_at", { ascending: false });
@@ -26,13 +35,14 @@ export const listCases = createServerFn({ method: "GET" }).middleware([tenantMid
   const latestCalc = new Map<string, any>();
   for (const row of calcs ?? []) if (!latestCalc.has(row.case_id)) latestCalc.set(row.case_id, row);
 
-  return (cases ?? []).map((c: any) => {
+  return Promise.all((cases ?? []).map(async (c: any) => {
     const calc = latestCalc.get(c.id);
     const openContradictions = (contradictions ?? []).filter((x: any) => x.case_id === c.id && x.status === "FLAGGED").length;
+    const unresolvedClocks = await clockBlocked(context.supabase, c.id);
     const charged = calc?.charged_amount_minor ? Number(calc.charged_amount_minor) / 100 : 0;
     const calculated = calc?.calculated_amount_minor ? Number(calc.calculated_amount_minor) / 100 : 0;
-    return { ...c, currency: calc?.currency ?? "ZAR", exposure: charged, recovery: caseRecovery(charged, calculated, openContradictions), contradictions: openContradictions };
-  });
+    return { ...c, currency: calc?.currency ?? "ZAR", exposure: charged, recovery: caseRecovery(charged, calculated, openContradictions + (unresolvedClocks ? 1 : 0)), contradictions: openContradictions, clockConflicts: unresolvedClocks };
+  }));
 });
 
 export const getCase = createServerFn({ method: "GET" }).validator(idInput).middleware([tenantMiddleware]).handler(async ({ data, context }) => {
@@ -89,6 +99,7 @@ export const getCaseWorkspace = createServerFn({ method: "GET" }).validator(idIn
   for (const item of [caseRow, documents, claims, contradictions, timeline, observations, calcs, packs]) if (item.error) throw item.error;
   return {
     tenantId: context.tenantId,
+    clockBlocked: await clockBlocked(db, data.caseId),
     case: caseRow.data,
     documents: documents.data ?? [],
     claims: claims.data ?? [],
@@ -243,6 +254,7 @@ export const calculateCaseDemurrage = createServerFn({ method: "POST" })
       .from("contradictions").select("id").eq("case_id", data.caseId).eq("status", "FLAGGED").limit(1);
     if (flaggedError) throw flaggedError;
     if (flaggedRows?.length) throw new Error("BLOCKED: resolve open contradictions first.");
+    await assertClockGate(context.supabase, data.caseId);
     const result = calculateDemurrage(data);
     const calculatedMinor = Math.round(result.total * 100);
     const chargedMinor = data.chargedAmount == null ? null : Math.round(data.chargedAmount * 100);
@@ -281,7 +293,7 @@ export const generateEvidencePack = createServerFn({ method: "POST" })
   .middleware([tenantMiddleware])
   .handler(async ({ data, context }) => {
     const db = context.supabase;
-    const [c, docs, claims, contradictions, timeline, observations, calculations, existing, definitions, clocks, attributions, kpis, matches, reviews, gaps] = await Promise.all([
+    const [c, docs, claims, contradictions, timeline, observations, calculations, existing, definitions, clocks, attributions, kpis, matches, gaps, identityReviews, clockDecisions] = await Promise.all([
       db.from("cases").select("*").eq("id", data.caseId).single(),
       db.from("documents").select("*").eq("case_id", data.caseId).order("uploaded_at", { ascending: true }),
       db.from("extracted_claims").select("*").eq("case_id", data.caseId).order("created_at", { ascending: true }),
@@ -295,13 +307,15 @@ export const generateEvidencePack = createServerFn({ method: "POST" })
       db.from("appointment_attributions").select("*").eq("case_id", data.caseId).order("created_at", { ascending: true }),
       db.from("kpi_definitions").select("*").eq("case_id", data.caseId).order("created_at", { ascending: true }),
       db.from("cross_party_matches").select("*").eq("case_id", data.caseId).order("created_at", { ascending: true }),
-      db.from("cross_party_match_reviews").select("*").eq("case_id", data.caseId).order("created_at", { ascending: true }),
       db.from("evidence_gap_entries").select("*").eq("case_id", data.caseId).order("created_at", { ascending: true }),
+      db.from("cross_party_match_reviews").select("*").eq("case_id", data.caseId).order("created_at", { ascending: true }),
+      db.from("clock_reconciliations").select("*").eq("case_id", data.caseId).order("created_at", { ascending: true }),
     ]);
-    for (const x of [c, docs, claims, contradictions, timeline, observations, calculations, existing, definitions, clocks, attributions, kpis, matches, reviews, gaps]) if (x.error) throw x.error;
+    for (const x of [c, docs, claims, contradictions, timeline, observations, calculations, existing, definitions, clocks, attributions, kpis, matches, gaps, identityReviews, clockDecisions]) if (x.error) throw x.error;
 
     const unresolved = (contradictions.data ?? []).filter((x: any) => x.status === "FLAGGED").length;
     if (unresolved > 0) throw new Error("Resolve the flagged contradictions before generating an evidence pack.");
+    await assertClockGate(db, data.caseId);
 
     const version = ((existing.data?.[0]?.version as number | undefined) ?? 0) + 1;
     const payload = {
@@ -314,8 +328,9 @@ export const generateEvidencePack = createServerFn({ method: "POST" })
       appointmentAttributions: attributions.data ?? [],
       kpiDefinitions: kpis.data ?? [],
       crossPartyMatches: matches.data ?? [],
-      crossPartyMatchReviews: reviews.data ?? [],
       evidenceGapHistory: gaps.data ?? [],
+      eventIdentityReviews: identityReviews.data ?? [],
+      clockReconciliations: clockDecisions.data ?? [],
       verifiedClaims: (claims.data ?? []).filter((x: any) => x.status === "VERIFIED"),
       claims: claims.data ?? [],
       contradictions: contradictions.data ?? [],
@@ -377,9 +392,9 @@ export const generateEvidencePack = createServerFn({ method: "POST" })
       ...(matches.data ?? []).map((x: any) => "- " + x.event_reference + ": " + x.result + ", claims " + x.claim_a_id + " / " + x.claim_b_id + ", rationale " + x.rationale),
       "",
       "## Match review history (retractions and reaffirmations)",
-      ...(reviews.data ?? []).map((x: any) => "- match " + x.match_id + " v" + x.version + ": " + x.status + " - " + x.explanation + " (evidence " + x.source_document_id + ", " + x.source_reference + ")"),
       "",
       "## Required evidence and gaps (history, not proof of non-occurrence)",
+      ...(identityReviews.data ?? []).map((x: any) => "- match " + x.match_id + " v" + x.version + ": " + x.status + " - " + x.explanation + " (evidence " + x.source_document_id + ", " + x.source_reference + ")"),
       ...(gaps.data ?? []).map((x: any) => "- " + x.physical_reference + " / " + x.required_event + " v" + x.version + ": " + x.status + " - " + x.explanation),
       "",
 
@@ -411,6 +426,7 @@ export const approveEvidencePack = createServerFn({ method: "POST" })
       .limit(1);
     if (contradictionError) throw contradictionError;
     if (flagged?.length) throw new Error("Resolve the flagged contradictions before generating an evidence pack.");
+    await assertClockGate(context.supabase, data.caseId);
 
     const { data: pack, error } = await context.supabase.from("evidence_packs").update({
       status: "APPROVED",

@@ -15,6 +15,7 @@ function PackPage() {
   const { caseId } = Route.useParams();
   const data = CaseRoute.useLoaderData();
   const router = useRouter();
+  const evidenceBlocked = data.clockBlocked || data.contradictions.some((c: any) => c.status === "FLAGGED");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -71,7 +72,8 @@ function PackPage() {
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
-      <Panel title="Versions" action={<Button disabled={busy} onClick={generate}>Generate frozen snapshot</Button>}>
+      <Panel title="Versions" action={<Button disabled={busy || evidenceBlocked} onClick={generate}>Generate frozen snapshot</Button>}>
+        {evidenceBlocked && <p role="alert" className="mb-4 rounded border border-disputed/50 p-3 text-sm">Blocked by unresolved clock evidence or flagged contradictions. Reconcile sources before freezing or approving a new pack. Existing frozen snapshots remain historical.</p>}
         {message && <div className="mb-4 rounded border border-primary/30 bg-primary/5 p-3 text-xs text-muted-foreground">{message}</div>}
         <ul className="space-y-3">
           {data.packs.map((p: any) => (
@@ -86,7 +88,7 @@ function PackPage() {
                   <Button variant="ghost" className="py-1 text-xs" onClick={() => exportPdf(p)}>PDF</Button>
                   <Button variant="ghost" className="py-1 text-xs" onClick={() => exportJson(p)}>JSON</Button>
                   <Button variant="ghost" className="py-1 text-xs" onClick={() => exportSummary(p)}>Summary</Button>
-                  {p.status === "DRAFT" && <Button className="py-1 text-xs" onClick={() => approve(p.id)}>Approve</Button>}
+                  {p.status === "DRAFT" && <Button disabled={busy || evidenceBlocked} className="py-1 text-xs" onClick={() => approve(p.id)}>Approve</Button>}
                 </div>
               </div>
               <div className="mt-3 break-all rounded bg-panel px-3 py-2 font-mono text-[11px] text-muted-foreground"><span className="text-foreground">SHA-256</span> {p.sha256_hash}</div>

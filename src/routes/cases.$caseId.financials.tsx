@@ -36,7 +36,7 @@ function FinPage() {
     tiers.every((t: any) => Number.isFinite(t.dailyRate) && t.dailyRate >= 0));
 
   const openContradictions = data.contradictions.filter((c: any) => c.status === "FLAGGED").length;
-  const blocked = openContradictions > 0;
+  const blocked = openContradictions > 0 || data.clockBlocked;
   const missing = [
     !start && "start date", !release && "release date", release && start && release < start && "release on or after start",
     freeDays === "" && "free days", units === "" && "units", !tiers.length && "daily rate",
@@ -54,7 +54,7 @@ function FinPage() {
       setResult(row);
       await router.invalidate();
     } catch (e) {
-      if (e instanceof Error && e.message.startsWith("BLOCKED")) { setError("BLOCKED - resolve open contradictions first."); await router.invalidate(); setBusy(false); return; }
+      if (e instanceof Error && e.message.startsWith("BLOCKED")) { setError("BLOCKED - reconcile unresolved evidence first."); await router.invalidate(); setBusy(false); return; }
       setError("Could not save the calculation. Check the dates, units and ZAR rate, then try again.");
     } finally { setBusy(false); }
   }
@@ -76,8 +76,8 @@ function FinPage() {
       </div>
       {blocked && (
         <div role="alert" className="rounded border border-disputed/50 bg-disputed/10 px-4 py-3 text-sm">
-          <div className="font-semibold text-disputed">BLOCKED - resolve open contradictions first</div>
-          <div className="mt-1 text-muted-foreground">{openContradictions} flagged contradiction{openContradictions === 1 ? "" : "s"} must be resolved on the Documents &amp; Contradictions tab before demurrage can be calculated. Earlier figures are hidden until then.</div>
+          <div className="font-semibold text-disputed">BLOCKED - reconcile unresolved evidence first</div>
+          <div className="mt-1 text-muted-foreground">{data.clockBlocked ? "Competing operational source clocks must be reconciled with supporting evidence in Operational review. " : ""}{openContradictions > 0 ? `${openContradictions} flagged contradiction(s) must also be resolved with evidence. ` : ""}Earlier figures stay hidden until all evidence gates pass.</div>
         </div>
       )}
       {!blocked && missing.length > 0 && <p className="text-sm text-muted-foreground">Not calculable yet. Missing: {missing.join(", ")}. Nothing is estimated or assumed.</p>}

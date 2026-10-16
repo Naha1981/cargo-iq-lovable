@@ -61,6 +61,7 @@ export const createCase = createServerFn({ method: "POST" })
   }))
   .middleware([tenantMiddleware])
   .handler(async ({ data, context }) => {
+    if (!["admin", "investigator"].includes(context.role)) throw new Error("Investigator access required");
     const { data: row, error } = await context.supabase.from("cases").insert({
       tenant_id: context.tenantId,
       reference_no: data.referenceNo,
@@ -121,6 +122,7 @@ export const registerDocument = createServerFn({ method: "POST" })
   }))
   .middleware([tenantMiddleware])
   .handler(async ({ data, context }) => {
+    if (!["admin", "investigator"].includes(context.role)) throw new Error("Investigator access required");
     const expectedPrefix = context.tenantId + "/" + data.caseId + "/";
     if (!data.filePath.startsWith(expectedPrefix)) throw new Error("INVALID_STORAGE_PATH");
 
@@ -145,17 +147,21 @@ export const registerDocument = createServerFn({ method: "POST" })
 export const runDocumentExtraction = createServerFn({ method: "POST" })
   .validator(z.object({ documentId: z.string().uuid(), caseId: z.string().uuid() }))
   .middleware([tenantMiddleware])
-  .handler(({ data, context }) => extractDocumentClaimsForPath({
-    ...data,
-    tenantId: context.tenantId,
-    supabase: context.supabase,
-    userId: context.user.id,
-  }));
+  .handler(async ({ data, context }) => {
+    if (!["admin", "investigator"].includes(context.role)) throw new Error("Investigator access required");
+    return extractDocumentClaimsForPath({
+      ...data,
+      tenantId: context.tenantId,
+      supabase: context.supabase,
+      userId: context.user.id,
+    });
+  });
 
 export const reviewClaim = createServerFn({ method: "POST" })
   .validator(z.object({ claimId: z.string().uuid(), caseId: z.string().uuid(), decision: z.enum(["VERIFIED","DISPUTED"]) }))
   .middleware([tenantMiddleware])
   .handler(async ({ data, context }) => {
+    if (!["admin", "investigator"].includes(context.role)) throw new Error("Investigator access required");
     const { data: row, error } = await context.supabase.from("extracted_claims").update({
       status: data.decision,
       updated_at: new Date().toISOString(),
@@ -180,6 +186,7 @@ export const resolveContradiction = createServerFn({ method: "POST" })
     supportingDocumentId: z.string().uuid(), evidenceReference: z.string().trim().min(3).max(1000) }))
   .middleware([tenantMiddleware])
   .handler(async ({ data, context }) => {
+    if (!["admin", "investigator"].includes(context.role)) throw new Error("Investigator access required");
     // Database trigger validates same-case evidence and records the audit atomically.
     const { data: row, error } = await context.supabase.from("contradictions").update({
       status: "RESOLVED", resolution_note: data.explanation,
@@ -194,6 +201,7 @@ export const corroborateCase = createServerFn({ method: "POST" })
   .validator(z.object({ caseId: z.string().uuid(), start: z.string(), end: z.string() }))
   .middleware([tenantMiddleware])
   .handler(async ({ data, context }) => {
+    if (!["admin", "investigator"].includes(context.role)) throw new Error("Investigator access required");
     const { data: row, error } = await context.supabase.from("cases").select("vessel_name,port_code").eq("id", data.caseId).single();
     if (error || !row) throw error ?? new Error("CASE_NOT_FOUND");
 
@@ -250,6 +258,7 @@ export const calculateCaseDemurrage = createServerFn({ method: "POST" })
   }))
   .middleware([tenantMiddleware])
   .handler(async ({ data, context }) => {
+    if (!["admin", "investigator"].includes(context.role)) throw new Error("Investigator access required");
     const { data: flaggedRows, error: flaggedError } = await context.supabase
       .from("contradictions").select("id").eq("case_id", data.caseId).eq("status", "FLAGGED").limit(1);
     if (flaggedError) throw flaggedError;
@@ -292,6 +301,7 @@ export const generateEvidencePack = createServerFn({ method: "POST" })
   .validator(idInput)
   .middleware([tenantMiddleware])
   .handler(async ({ data, context }) => {
+    if (!["admin", "investigator"].includes(context.role)) throw new Error("Investigator access required");
     const db = context.supabase;
     const [c, docs, claims, contradictions, timeline, observations, calculations, existing, definitions, clocks, attributions, kpis, matches, gaps, identityReviews, clockDecisions] = await Promise.all([
       db.from("cases").select("*").eq("id", data.caseId).single(),
@@ -340,31 +350,14 @@ export const generateEvidencePack = createServerFn({ method: "POST" })
       approvals: [],
       truthRule: "Public and independent observations are corroboration unless the source directly proves the event. Inference remains inference until human review.",
     };
-    const hash = await sha256Hex(stableCanonical(payload));
-
-    if (existing.data?.[0]) {
-      await db.from("evidence_packs").update({ status: "SUPERSEDED" }).eq("case_id", data.caseId).eq("status", "DRAFT");
-    }
-
-    const { data: pack, error } = await db.from("evidence_packs").insert({
-      tenant_id: context.tenantId,
-      case_id: data.caseId,
-      version,
-      pack_payload: payload,
-      sha256_hash: hash,
-      status: "DRAFT",
-    }).select("*").single();
-    if (error) throw error;
-
-    await db.from("audit_log").insert({
-      tenant_id: context.tenantId,
-      case_id: data.caseId,
-      actor_user_id: context.user.id,
-      action: "EVIDENCE_PACK_GENERATED",
-      entity_type: "evidence_pack",
-      entity_id: pack.id,
-      payload: { version, sha256_hash: hash },
+    const { data: packResult, error: persistError } = await db.rpc("persist_evidence_pack_atomic", {
+      _case_id: data.caseId,
+      _canonical: stableCanonical(payload),
     });
+    if (persistError) throw persistError;
+    const pack = Array.isArray(packResult) ? packResult[0] : packResult;
+    if (!pack?.id) throw new Error("Atomic evidence-pack persistence returned no pack.");
+    const hash = pack.sha256_hash as string;
 
     const summary = [
       "# CargoIQ Investigation " + (c.data?.reference_no ?? ""),
@@ -421,6 +414,7 @@ export const approveEvidencePack = createServerFn({ method: "POST" })
   .validator(z.object({ caseId: z.string().uuid(), packId: z.string().uuid() }))
   .middleware([tenantMiddleware])
   .handler(async ({ data, context }) => {
+    if (!["admin", "investigator"].includes(context.role)) throw new Error("Investigator access required");
     const { data: flagged, error: contradictionError } = await context.supabase
       .from("contradictions")
       .select("id")
@@ -431,22 +425,13 @@ export const approveEvidencePack = createServerFn({ method: "POST" })
     if (flagged?.length) throw new Error("Resolve the flagged contradictions before generating an evidence pack.");
     await assertClockGate(context.supabase, data.caseId);
 
-    const { data: pack, error } = await context.supabase.from("evidence_packs").update({
-      status: "APPROVED",
-      approved_by: context.user.id,
-    }).eq("id", data.packId).eq("case_id", data.caseId).eq("status", "DRAFT").select("*").single();
-    if (error) throw error;
-
-    await context.supabase.from("cases").update({ status: "APPROVED" }).eq("id", data.caseId);
-    await context.supabase.from("audit_log").insert({
-      tenant_id: context.tenantId,
-      case_id: data.caseId,
-      actor_user_id: context.user.id,
-      action: "EVIDENCE_PACK_APPROVED",
-      entity_type: "evidence_pack",
-      entity_id: data.packId,
-      payload: {},
+    const { data: packResult, error } = await context.supabase.rpc("approve_evidence_pack_atomic", {
+      _case_id: data.caseId,
+      _pack_id: data.packId,
     });
+    if (error) throw error;
+    const pack = Array.isArray(packResult) ? packResult[0] : packResult;
+    if (!pack?.id) throw new Error("Atomic evidence-pack approval returned no pack.");
 
     return pack;
   });

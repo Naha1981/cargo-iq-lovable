@@ -66,6 +66,7 @@ class Doc {
   private ensure(h: number) {
     if (this.y - h < BOTTOM) { this.pages.push({ ops: [], rules: [] }); this.y = PAGE_H - TOP; }
   }
+  reserve(h: number) { this.ensure(h); }
   gap(h: number) { this.y -= h; }
   rule() { this.ensure(8); this.page().rules.push({ y: this.y }); this.y -= 8; }
   text(t: string, o: { size?: number; bold?: boolean; indent?: number; gray?: number; keep?: boolean } = {}) {
@@ -197,6 +198,8 @@ export function buildEvidencePackPdf(pack: any): Uint8Array {
       d.gap(6);
     }
   }
+  // Keep approval lines and limitations together instead of orphaning the caveat.
+  d.reserve(245);
   d.heading("Integrity and approval");
   d.text("SHA-256 of the canonical pack payload:", { indent: 4 });
   d.text(String(pack.sha256_hash ?? "n/a"), { indent: 4, bold: true, size: 9 });

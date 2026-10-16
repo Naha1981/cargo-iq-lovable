@@ -12,6 +12,14 @@ ALTER TABLE public.appointment_lifecycle ADD COLUMN import_id uuid REFERENCES pu
 ALTER TABLE public.authorised_imports ENABLE ROW LEVEL SECURITY;
 GRANT SELECT ON public.authorised_imports TO authenticated;GRANT ALL ON public.authorised_imports TO service_role;
 CREATE POLICY tenant_read ON public.authorised_imports FOR SELECT TO authenticated USING(public.is_tenant_member(tenant_id));
+CREATE FUNCTION public.guard_import_link() RETURNS trigger LANGUAGE plpgsql SECURITY INVOKER SET search_path=public AS $$
+BEGIN
+ IF NEW.import_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM public.authorised_imports i WHERE i.id=NEW.import_id AND i.tenant_id=NEW.tenant_id AND i.case_id=NEW.case_id AND i.source_document_id=NEW.source_document_id AND i.source_party=NEW.party AND i.dataset=CASE TG_TABLE_NAME WHEN 'count_source_records' THEN 'COUNTS' ELSE 'APPOINTMENTS' END) THEN RAISE EXCEPTION 'Import link does not match this source row';END IF;
+ RETURN NEW;
+END $$;
+CREATE TRIGGER guard_import_link BEFORE INSERT ON public.count_source_records FOR EACH ROW EXECUTE FUNCTION public.guard_import_link();
+CREATE TRIGGER guard_import_link BEFORE INSERT ON public.appointment_lifecycle FOR EACH ROW EXECUTE FUNCTION public.guard_import_link();
+REVOKE ALL ON FUNCTION public.guard_import_link() FROM PUBLIC;
 CREATE FUNCTION public.reject_import_mutation() RETURNS trigger LANGUAGE plpgsql AS $$BEGIN RAISE EXCEPTION 'Import provenance is immutable';END $$;
 CREATE TRIGGER reject_import_mutation BEFORE UPDATE OR DELETE ON public.authorised_imports FOR EACH ROW EXECUTE FUNCTION public.reject_import_mutation();
 CREATE TRIGGER a0_pack_source_case_lock BEFORE INSERT OR UPDATE OR DELETE ON public.authorised_imports FOR EACH ROW EXECUTE FUNCTION public.lock_pack_source_case();
@@ -50,7 +58,7 @@ BEGIN
  v_headers:=CASE p_dataset WHEN 'COUNTS' THEN '["physicalReference","metric","basis","quantity","occurredAt","containers20","containers40","gateKind","sourceReference","limitations"]'::jsonb WHEN 'APPOINTMENTS' THEN '["appointmentReference","physicalReference","recordType","issuer","startAt","endAt","occurredAt","claimTarget","outcome","explanation","termsReference","sourceReference"]'::jsonb ELSE NULL END;
  IF v_headers IS NULL OR v_csv->0 IS DISTINCT FROM v_headers OR jsonb_array_length(v_csv)<>jsonb_array_length(p_rows)+1 THEN RAISE EXCEPTION 'CSV schema or row count differs from mapping';END IF;
  v_count:=jsonb_array_length(p_rows);IF v_count<1 OR v_count>500 THEN RAISE EXCEPTION 'Export requires 1 to 500 validated source rows';END IF;
- PERFORM pg_advisory_xact_lock(hashtextextended('cargoiq-pack-source:'||p_case_id::text,0));
+ PERFORM pg_advisory_xact_lock(hashtextextended('case-evidence:'||p_case_id::text,0));
  v_hash:=encode(sha256(convert_to(p_raw_csv,'UTF8')),'hex');
  INSERT INTO public.authorised_imports(tenant_id,case_id,source_document_id,source_party,dataset,authorization_basis,exported_at,raw_csv,raw_sha256,row_count,created_by) VALUES(v_tenant,p_case_id,p_source_document_id,p_source_party,p_dataset,p_authorization_basis,p_exported_at,p_raw_csv,v_hash,v_count,auth.uid()) RETURNING id INTO v_id;
  FOR r IN SELECT value FROM jsonb_array_elements(p_rows) LOOP

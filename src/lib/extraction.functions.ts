@@ -1,3 +1,4 @@
+import { readPdfLines } from "./pdf-text";
 import { assertDocumentSize, isPlainDocument, plainTextClaims, PDF_AI_UNAVAILABLE } from "./extraction-policy";
 import { createServerFn } from "@tanstack/react-start";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -113,7 +114,7 @@ async function extractViaOpenAi(bytes: ArrayBuffer, mimeType: string, filename: 
   else if (isImage) content.push({ type: "input_image", image_url: `data:${mimeType};base64,${b64}` });
   else content.push({ type: "input_file", filename, file_data: `data:${mimeType || "application/pdf"};base64,${b64}` });
   const res = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
+    method: "POST", signal: AbortSignal.timeout(45000),
     headers: { "content-type": "application/json", Authorization: "Bearer " + key },
     body: JSON.stringify({
       model: process.env["CLAIM_AI_MODEL"] || "gpt-4o-mini", store: false,
@@ -138,7 +139,7 @@ async function extractViaAnthropic(bytes: ArrayBuffer, mimeType: string, filenam
   else content.push({ type: "document", source: { type: "base64", media_type: "application/pdf", data: b64 } });
   content.push({ type: "text", text: claimPrompt(filename) + "\nReturn ONLY a JSON object of the form {\"claims\": [...]} where each claim has: page_number, claim_text, claim_type, value, evidence_class, nature, confidence, timestamp_claimed. No prose." });
   const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
+    method: "POST", signal: AbortSignal.timeout(45000),
     headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
     body: JSON.stringify({ model: process.env["CLAIM_AI_MODEL"] || "claude-3-5-sonnet-latest", max_tokens: 8000, messages: [{ role: "user", content }] }),
   });
@@ -169,7 +170,7 @@ async function extractViaGateway(bytes: ArrayBuffer, mimeType: string, filename:
   else content.push({ type: "input_file", filename, file_data: `data:${mimeType || "application/pdf"};base64,${b64}` });
 
   const res = await fetch("https://ai.gateway.lovable.dev/v1/responses", {
-    method: "POST",
+    method: "POST", signal: AbortSignal.timeout(45000),
     headers: { "content-type": "application/json", "Lovable-API-Key": key, Authorization: `Bearer ${key}`, "X-Lovable-AIG-SDK": "fetch" },
     body: JSON.stringify({
       model: "openai/gpt-6-astra", stream: true, store: false,
@@ -205,6 +206,45 @@ async function extractViaGateway(bytes: ArrayBuffer, mimeType: string, filename:
     }
   }
   return parseJsonModel(out).map((c) => ({ ...c, timestamp_claimed: c.timestamp_claimed || undefined }));
+}
+
+// Every free provider is opt-in. Never silently route to a paid model or paid OCR plugin.
+export function enabledFreeFallbacks(allowTestFallback = false) {
+  const providers: ("openrouter" | "groq" | "gemini-test")[] = [];
+  if (process.env.CLAIM_OPENROUTER_FREE_FALLBACK_ENABLED === "true" && process.env.OPENROUTER_API_KEY) providers.push("openrouter");
+  if (process.env.CLAIM_GROQ_FREE_PLAN_CONFIRMED === "true" && process.env.GROQ_API_KEY) providers.push("groq");
+  if (allowTestFallback && process.env.CLAIM_GEMINI_TEST_FALLBACK_ENABLED === "true" && process.env.CLAIM_GEMINI_FREE_TIER_CONFIRMED === "true" && process.env.GEMINI_API_KEY) providers.push("gemini-test");
+  return providers;
+}
+async function extractFreeFallback(provider: "openrouter" | "groq" | "gemini-test", bytes: ArrayBuffer, mimeType: string, filename: string) {
+  const plain = isPlainDocument(mimeType, filename);
+  if (provider === "gemini-test") {
+    const parts: any[] = [{ text: claimPrompt(filename) + '\nReturn only JSON: {"claims": [...]}.' }];
+    if (plain) parts.push({ text: "DOCUMENT (page 1):\n" + new TextDecoder().decode(bytes) });
+    else parts.push({ inline_data: { mime_type: mimeType || "application/pdf", data: bytesToBase64(new Uint8Array(bytes)) } });
+    const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent", {
+      method: "POST", signal: AbortSignal.timeout(30000), headers: { "Content-Type": "application/json", "x-goog-api-key": process.env.GEMINI_API_KEY! },
+      body: JSON.stringify({ contents: [{ role: "user", parts }], generationConfig: { temperature: 0, maxOutputTokens: 8000, responseMimeType: "application/json" } }),
+    });
+    if (!res.ok) throw new Error("FREE_GEMINI_" + res.status);
+    const json: any = await res.json();
+    return parseJsonModel((json.candidates?.[0]?.content?.parts ?? []).map((p: any) => p.text ?? "").join(""));
+  }
+  const text = plain ? new TextDecoder().decode(bytes) : (await readPdfLines(bytes)).map(line => `[page ${line.page_number}] ${line.text}`).join("\n");
+  plainTextClaims(text);
+  const isRouter = provider === "openrouter";
+  const res = await fetch(isRouter ? "https://openrouter.ai/api/v1/chat/completions" : "https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST", signal: AbortSignal.timeout(30000),
+    headers: { "Content-Type": "application/json", Authorization: "Bearer " + (isRouter ? process.env.OPENROUTER_API_KEY : process.env.GROQ_API_KEY) },
+    body: JSON.stringify({ model: isRouter ? "openrouter/free" : "openai/gpt-oss-20b", temperature: 0, max_tokens: 8000,
+      ...(isRouter ? { provider: { data_collection: "deny", zdr: true } } : {}),
+      messages: [{ role: "system", content: claimPrompt(filename) + '\nReturn ONLY a JSON object {"claims": [...]}.' }, { role: "user", content: "DOCUMENT:\n" + text }],
+      response_format: { type: "json_object" },
+    }),
+  });
+  if (!res.ok) throw new Error("FREE_" + provider.toUpperCase() + "_" + res.status);
+  const json: any = await res.json();
+  return parseJsonModel(json.choices?.[0]?.message?.content ?? "");
 }
 
 function timestampConflict(a: ClaimDraft, b: ClaimDraft) {
@@ -248,6 +288,7 @@ export function filterNewClaims<T extends { claim_text: string }>(claims: T[], e
 export async function extractDocumentClaimsForPath(input: {
   documentId: string;
   noAi?: boolean;
+  allowTestFallback?: boolean;
   caseId: string;
   tenantId: string;
   supabase: SupabaseClient;
@@ -261,20 +302,32 @@ export async function extractDocumentClaimsForPath(input: {
   assertDocumentSize(blob.size);
   const bytes = await blob.arrayBuffer();
   const plain = isPlainDocument(doc.file_type, doc.name);
-  if (input.noAi && !plain) throw new Error("No-AI mode accepts TXT or CSV files. Export the PDF text first; scanned PDFs need transcription.");
-  let mode: "ai" | "text" | "text-fallback" = input.noAi ? "text" : "ai";
-  const importLines = async (): Promise<ClaimDraft[]> => plainTextClaims(await blob.text()).map(line => ({
-    page_number: 1, claim_text: line, claim_type: "TEXT_RECORD", normalized_value: line,
-    evidence_class: inferClass(doc.name), nature: "REPORTED", confidence: 0.55,
-  }));
+  if (plain) plainTextClaims(await blob.text());
+  const pdf = doc.file_type === "application/pdf" || /\.pdf$/i.test(doc.name);
+  if (input.noAi && !plain && !pdf) throw new Error("No-AI mode accepts TXT, CSV or text-based PDF files.");
+  let mode: "ai" | "text" | "text-fallback" | "pdf-text" | "pdf-text-fallback" = input.noAi ? (pdf ? "pdf-text" : "text") : "ai";
+  let providerUsed = input.noAi ? "none" : resolveClaimAiProvider().kind as string;
+  const importLines = async (): Promise<ClaimDraft[]> => {
+    const rows = pdf ? await readPdfLines(bytes) : plainTextClaims(await blob.text()).map(text => ({ page_number: 1, text }));
+    return rows.map(line => ({ page_number: line.page_number, claim_text: line.text, claim_type: "TEXT_RECORD", normalized_value: line.text,
+      evidence_class: inferClass(doc.name), nature: "REPORTED", confidence: 0.55 }));
+  };
   let claims: ClaimDraft[] = [];
   if (input.noAi) claims = await importLines();
   else {
     try { claims = await extractWithGemini(bytes, doc.file_type, doc.name); }
     catch (error) {
-      if (plain) { claims = await importLines(); mode = "text-fallback"; }
-      else if (/credits exhausted|AI_402|AI_KEY_NOT_CONFIGURED|AI_429|rate limited/i.test(error instanceof Error ? error.message : String(error))) throw new Error(PDF_AI_UNAVAILABLE);
-      else throw error;
+      let recovered = false;
+      for (const provider of enabledFreeFallbacks(input.allowTestFallback)) {
+        try { claims = await extractFreeFallback(provider, bytes, doc.file_type, doc.name); if (claims.length) { providerUsed = provider; recovered = true; break; } }
+        catch { /* bounded one attempt per enabled free provider, never paid retry */ }
+      }
+      if (!recovered) {
+        if (plain || pdf) {
+          try { claims = await importLines(); mode = pdf ? "pdf-text-fallback" : "text-fallback"; providerUsed = "none"; }
+          catch (parseError) { throw new Error(PDF_AI_UNAVAILABLE + " " + (parseError instanceof Error ? parseError.message : "Could not read text.")); }
+        } else throw error;
+      }
     }
   }
 
@@ -288,7 +341,7 @@ export async function extractDocumentClaimsForPath(input: {
   if (existingError) throw existingError;
   claims = filterNewClaims(claims, (existingRows ?? []).map((r: any) => String(r.claim_text ?? "")), header);
   if (!claims.length) {
-    return { claims: [], count: 0, skippedDuplicates: true, mode };
+    return { claims: [], count: 0, skippedDuplicates: true, mode, providerUsed };
   }
 
   const inserted: any[] = [];
@@ -347,10 +400,10 @@ export async function extractDocumentClaimsForPath(input: {
     action: "DOCUMENT_EXTRACTED",
     entity_type: "document",
     entity_id: input.documentId,
-    payload: { claims: inserted.length, filename: doc.name, mode },
+    payload: { claims: inserted.length, filename: doc.name, mode, providerUsed },
   });
 
-  return { claims: inserted, count: inserted.length, mode };
+  return { claims: inserted, count: inserted.length, mode, providerUsed };
 }
 
 export const extractionHealth = createServerFn({ method: "GET" }).handler(async () => {

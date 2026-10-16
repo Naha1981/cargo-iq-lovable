@@ -147,7 +147,7 @@ export const registerDocument = createServerFn({ method: "POST" })
   });
 
 export const runDocumentExtraction = createServerFn({ method: "POST" })
-  .validator(z.object({ documentId: z.string().uuid(), caseId: z.string().uuid(), noAi: z.boolean().optional() }))
+  .validator(z.object({ documentId: z.string().uuid(), caseId: z.string().uuid(), noAi: z.boolean().optional(), allowTestFallback: z.boolean().optional() }))
   .middleware([tenantMiddleware])
   .handler(async ({ data, context }) => {
     if (!["admin", "investigator"].includes(context.role)) throw new Error("Investigator access required");

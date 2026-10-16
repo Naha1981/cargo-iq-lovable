@@ -25,6 +25,7 @@ function DocsPage() {
   }
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [allowTestFallback, setAllowTestFallback] = useState(false);
   const [notice, setNotice] = useState("");
   const [decisions, setDecisions] = useState<Record<string, "VERIFIED" | "DISPUTED">>({});
   const supabase = createClient();
@@ -67,8 +68,8 @@ function DocsPage() {
     setError("");
     try {
       setNotice("");
-      const result = await runDocumentExtraction({ data: { documentId: id, caseId, noAi } });
-      setNotice(result.skippedDuplicates ? "No new claims: these lines are already imported." : result.mode === "ai" ? `${result.count} AI claims extracted. Review each claim before verification.` : `${result.count} text lines imported without AI credits. No event understanding or automatic timestamps. Review each line; this is not AI extraction.`);
+      const result = await runDocumentExtraction({ data: { documentId: id, caseId, noAi, allowTestFallback } });
+      setNotice(result.skippedDuplicates ? "No new claims: these lines are already imported." : result.mode === "ai" ? `${result.count} AI claims extracted (${result.providerUsed}). Review each claim before verification.` : `${result.count} text lines imported without AI credits. No event understanding or automatic timestamps. Review each line; this is not AI extraction.`);
       await router.invalidate();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Extraction failed.");
@@ -101,7 +102,7 @@ function DocsPage() {
   }
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[390px_1fr]">
+    <div className="grid min-w-0 grid-cols-1 gap-6 xl:grid-cols-[390px_minmax(0,1fr)]">
       <Panel title={"Documents · " + data.documents.length} action={
         <>
           <input ref={file} type="file" multiple hidden accept=".pdf,.csv,.txt,application/pdf,text/csv,text/plain" onChange={(e) => onUpload(e.target.files)} />
@@ -109,7 +110,8 @@ function DocsPage() {
         </>
       }>
         {error && <div className="mb-3 rounded border border-disputed/40 bg-disputed/10 p-3 text-xs text-disputed">{error}</div>}
-        <p className="mb-3 text-xs text-muted-foreground">PDF, TXT or CSV, up to 5 MB per file. TXT/CSV: choose Import text for a no-AI option (up to 500 lines and 200,000 characters). Human review is always required.</p>
+        <p className="mb-3 text-xs text-muted-foreground">PDF, TXT or CSV, up to 5 MB per file. Import text uses no AI credits (up to 500 lines, 200,000 characters and 20 PDF pages). Scanned PDFs need AI or a transcription. If AI is unavailable, readable text is imported and clearly labelled. Human review is always required.</p>
+        <label className="mb-3 flex gap-2 text-xs"><input type="checkbox" checked={allowTestFallback} onChange={e => setAllowTestFallback(e.target.checked)} />Optional Gemini test fallback: I confirm this is synthetic or non-confidential test data. Google unpaid API may use it for training or human review. Disabled unless configured by the owner.</label>
         {notice && <div role="status" className="mb-3 rounded border p-3 text-xs">{notice}</div>}
         <label className="mb-4 block text-sm">Source organization for this upload
           <input value={sourceParty} maxLength={200} onChange={e=>setSourceParty(e.target.value)} placeholder="Organization that supplied the record" className="mt-2 w-full rounded border bg-background p-2 text-sm" />
@@ -124,7 +126,7 @@ function DocsPage() {
                 <div className="mt-1 text-xs text-muted-foreground">Source: {d.source_party || "Not recorded (legacy upload)"}</div>
                 <div className="mt-1 text-xs text-muted-foreground">{d.sha256_hash.slice(0, 12)}… · {d.evidence_class}</div>
                 <Button disabled={busy} variant="ghost" className="mt-2 py-1 text-xs" onClick={() => extract(d.id)}>Extract claims with AI</Button>
-                {isPlainDocument(d.file_type, d.name) && <Button disabled={busy} variant="ghost" className="mt-2 py-1 text-xs" onClick={() => extract(d.id, true)}>Import text (no AI credits)</Button>}
+                {(isPlainDocument(d.file_type, d.name) || d.file_type === "application/pdf" || /\.pdf$/i.test(d.name)) && <Button disabled={busy} variant="ghost" className="mt-2 py-1 text-xs" onClick={() => extract(d.id, true)}>Import text (no AI credits)</Button>}
               </div>
             </li>
           ))}
@@ -132,7 +134,7 @@ function DocsPage() {
         </ul>
       </Panel>
 
-      <div className="space-y-6">
+      <div className="min-w-0 space-y-6">
         <Panel title={"Extracted claims · " + data.claims.length}>
           <ul className="divide-y">
             {data.claims.map((c: any) => {
@@ -150,7 +152,7 @@ function DocsPage() {
                     )}
                   </div>
                   <div className="mt-1 text-sm">{c.claim_text}</div>
-                  {c.timestamp_claimed && <div className="mt-1 font-mono text-xs text-primary">{c.timestamp_claimed} UTC</div>}
+                  {c.timestamp_claimed && <div className="mt-1 break-all font-mono text-xs text-primary">{c.timestamp_claimed} UTC</div>}
                 </div>
                 <div className="flex gap-2">
                   <button onClick={() => review(c.id, "VERIFIED")} className={cn("rounded border px-2.5 py-1 text-xs", status === "VERIFIED" ? "border-observed bg-observed/15 text-observed" : "hover:bg-accent")}>{status === "VERIFIED" ? "Verified" : "Verify"}</button>

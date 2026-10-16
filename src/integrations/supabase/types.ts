@@ -14,6 +14,80 @@ export type Database = {
   }
   public: {
     Tables: {
+      appointment_attributions: {
+        Row: {
+          appointment_clock_id: string
+          assertion: string
+          case_id: string
+          claim_target: string
+          claimant: string
+          created_at: string
+          created_by: string
+          id: string
+          source_document_id: string
+          source_reference: string
+          tenant_id: string
+          terms_reference: string
+        }
+        Insert: {
+          appointment_clock_id: string
+          assertion: string
+          case_id: string
+          claim_target: string
+          claimant: string
+          created_at?: string
+          created_by: string
+          id?: string
+          source_document_id: string
+          source_reference: string
+          tenant_id: string
+          terms_reference: string
+        }
+        Update: {
+          appointment_clock_id?: string
+          assertion?: string
+          case_id?: string
+          claim_target?: string
+          claimant?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          source_document_id?: string
+          source_reference?: string
+          tenant_id?: string
+          terms_reference?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "appointment_attributions_appointment_clock_id_fkey"
+            columns: ["appointment_clock_id"]
+            isOneToOne: false
+            referencedRelation: "operational_clocks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointment_attributions_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointment_attributions_source_document_id_fkey"
+            columns: ["source_document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointment_attributions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_log: {
         Row: {
           action: string
@@ -121,6 +195,83 @@ export type Database = {
           },
         ]
       }
+      clock_reconciliations: {
+        Row: {
+          case_id: string
+          considered_clock_ids: string[]
+          created_at: string
+          created_by: string
+          explanation: string
+          id: string
+          kind: string
+          physical_reference: string
+          selected_clock_id: string
+          source_document_id: string
+          source_reference: string
+          tenant_id: string
+          version: number
+        }
+        Insert: {
+          case_id: string
+          considered_clock_ids: string[]
+          created_at?: string
+          created_by: string
+          explanation: string
+          id?: string
+          kind: string
+          physical_reference: string
+          selected_clock_id: string
+          source_document_id: string
+          source_reference: string
+          tenant_id: string
+          version: number
+        }
+        Update: {
+          case_id?: string
+          considered_clock_ids?: string[]
+          created_at?: string
+          created_by?: string
+          explanation?: string
+          id?: string
+          kind?: string
+          physical_reference?: string
+          selected_clock_id?: string
+          source_document_id?: string
+          source_reference?: string
+          tenant_id?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clock_reconciliations_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clock_reconciliations_selected_clock_id_fkey"
+            columns: ["selected_clock_id"]
+            isOneToOne: false
+            referencedRelation: "operational_clocks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clock_reconciliations_source_document_id_fkey"
+            columns: ["source_document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clock_reconciliations_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       commercial_rules: {
         Row: {
           active: boolean
@@ -175,6 +326,8 @@ export type Database = {
           description: string | null
           detected_by: string
           id: string
+          resolution_document_id: string | null
+          resolution_evidence_reference: string | null
           resolution_note: string | null
           resolved_at: string | null
           resolved_by: string | null
@@ -192,6 +345,8 @@ export type Database = {
           description?: string | null
           detected_by?: string
           id?: string
+          resolution_document_id?: string | null
+          resolution_evidence_reference?: string | null
           resolution_note?: string | null
           resolved_at?: string | null
           resolved_by?: string | null
@@ -209,6 +364,8 @@ export type Database = {
           description?: string | null
           detected_by?: string
           id?: string
+          resolution_document_id?: string | null
+          resolution_evidence_reference?: string | null
           resolution_note?: string | null
           resolved_at?: string | null
           resolved_by?: string | null
@@ -240,7 +397,163 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "contradictions_resolution_document_id_fkey"
+            columns: ["resolution_document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "contradictions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cross_party_match_reviews: {
+        Row: {
+          case_id: string
+          created_at: string
+          created_by: string
+          explanation: string
+          id: string
+          match_id: string
+          source_document_id: string
+          source_reference: string
+          status: string
+          tenant_id: string
+          version: number
+        }
+        Insert: {
+          case_id: string
+          created_at?: string
+          created_by: string
+          explanation: string
+          id?: string
+          match_id: string
+          source_document_id: string
+          source_reference: string
+          status: string
+          tenant_id: string
+          version: number
+        }
+        Update: {
+          case_id?: string
+          created_at?: string
+          created_by?: string
+          explanation?: string
+          id?: string
+          match_id?: string
+          source_document_id?: string
+          source_reference?: string
+          status?: string
+          tenant_id?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cross_party_match_reviews_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cross_party_match_reviews_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "cross_party_matches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cross_party_match_reviews_source_document_id_fkey"
+            columns: ["source_document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cross_party_match_reviews_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cross_party_matches: {
+        Row: {
+          case_id: string
+          claim_a_id: string
+          claim_b_id: string
+          contradiction_id: string | null
+          created_at: string
+          created_by: string
+          event_reference: string
+          id: string
+          rationale: string
+          result: string
+          tenant_id: string
+        }
+        Insert: {
+          case_id: string
+          claim_a_id: string
+          claim_b_id: string
+          contradiction_id?: string | null
+          created_at?: string
+          created_by: string
+          event_reference: string
+          id?: string
+          rationale: string
+          result: string
+          tenant_id: string
+        }
+        Update: {
+          case_id?: string
+          claim_a_id?: string
+          claim_b_id?: string
+          contradiction_id?: string | null
+          created_at?: string
+          created_by?: string
+          event_reference?: string
+          id?: string
+          rationale?: string
+          result?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cross_party_matches_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cross_party_matches_claim_a_id_fkey"
+            columns: ["claim_a_id"]
+            isOneToOne: false
+            referencedRelation: "extracted_claims"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cross_party_matches_claim_b_id_fkey"
+            columns: ["claim_b_id"]
+            isOneToOne: false
+            referencedRelation: "extracted_claims"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cross_party_matches_contradiction_id_fkey"
+            columns: ["contradiction_id"]
+            isOneToOne: false
+            referencedRelation: "contradictions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cross_party_matches_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -301,6 +614,79 @@ export type Database = {
           },
           {
             foreignKeyName: "documents_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      evidence_gap_entries: {
+        Row: {
+          case_id: string
+          created_at: string
+          created_by: string
+          document_ids: string[]
+          evidence_reference: string
+          explanation: string
+          id: string
+          physical_reference: string
+          required_event: string
+          requirement_basis: string
+          status: string
+          supersedes_id: string | null
+          tenant_id: string
+          version: number
+        }
+        Insert: {
+          case_id: string
+          created_at?: string
+          created_by: string
+          document_ids?: string[]
+          evidence_reference: string
+          explanation: string
+          id?: string
+          physical_reference: string
+          required_event: string
+          requirement_basis: string
+          status: string
+          supersedes_id?: string | null
+          tenant_id: string
+          version: number
+        }
+        Update: {
+          case_id?: string
+          created_at?: string
+          created_by?: string
+          document_ids?: string[]
+          evidence_reference?: string
+          explanation?: string
+          id?: string
+          physical_reference?: string
+          required_event?: string
+          requirement_basis?: string
+          status?: string
+          supersedes_id?: string | null
+          tenant_id?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "evidence_gap_entries_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "evidence_gap_entries_supersedes_id_fkey"
+            columns: ["supersedes_id"]
+            isOneToOne: false
+            referencedRelation: "evidence_gap_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "evidence_gap_entries_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -561,6 +947,275 @@ export type Database = {
           },
         ]
       }
+      kpi_definitions: {
+        Row: {
+          acceptance: string
+          benchmark_basis: string
+          benchmark_hours: number | null
+          case_id: string
+          created_at: string
+          created_by: string
+          definition: string
+          end_kind: string
+          id: string
+          name: string
+          party: string
+          physical_reference: string
+          source_document_id: string
+          source_reference: string
+          start_kind: string
+          supersedes_id: string | null
+          tenant_id: string
+          version: number
+        }
+        Insert: {
+          acceptance: string
+          benchmark_basis: string
+          benchmark_hours?: number | null
+          case_id: string
+          created_at?: string
+          created_by: string
+          definition: string
+          end_kind: string
+          id?: string
+          name: string
+          party: string
+          physical_reference: string
+          source_document_id: string
+          source_reference: string
+          start_kind: string
+          supersedes_id?: string | null
+          tenant_id: string
+          version: number
+        }
+        Update: {
+          acceptance?: string
+          benchmark_basis?: string
+          benchmark_hours?: number | null
+          case_id?: string
+          created_at?: string
+          created_by?: string
+          definition?: string
+          end_kind?: string
+          id?: string
+          name?: string
+          party?: string
+          physical_reference?: string
+          source_document_id?: string
+          source_reference?: string
+          start_kind?: string
+          supersedes_id?: string | null
+          tenant_id?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kpi_definitions_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kpi_definitions_source_document_id_fkey"
+            columns: ["source_document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kpi_definitions_supersedes_id_fkey"
+            columns: ["supersedes_id"]
+            isOneToOne: false
+            referencedRelation: "kpi_definitions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kpi_definitions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      operational_clocks: {
+        Row: {
+          appointment_issuer: string | null
+          appointment_parties: string | null
+          appointment_reference: string | null
+          appointment_terms: string | null
+          case_id: string
+          created_at: string
+          created_by: string
+          id: string
+          kind: string
+          location_basis: string
+          occurred_at: string
+          physical_reference: string
+          source_document_id: string
+          source_party: string
+          source_reference: string
+          tenant_id: string
+          time_zone: string
+          timestamp_original: string
+        }
+        Insert: {
+          appointment_issuer?: string | null
+          appointment_parties?: string | null
+          appointment_reference?: string | null
+          appointment_terms?: string | null
+          case_id: string
+          created_at?: string
+          created_by: string
+          id?: string
+          kind: string
+          location_basis: string
+          occurred_at: string
+          physical_reference: string
+          source_document_id: string
+          source_party: string
+          source_reference: string
+          tenant_id: string
+          time_zone: string
+          timestamp_original: string
+        }
+        Update: {
+          appointment_issuer?: string | null
+          appointment_parties?: string | null
+          appointment_reference?: string | null
+          appointment_terms?: string | null
+          case_id?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          kind?: string
+          location_basis?: string
+          occurred_at?: string
+          physical_reference?: string
+          source_document_id?: string
+          source_party?: string
+          source_reference?: string
+          tenant_id?: string
+          time_zone?: string
+          timestamp_original?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "operational_clocks_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "operational_clocks_source_document_id_fkey"
+            columns: ["source_document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "operational_clocks_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      operational_definitions: {
+        Row: {
+          acceptance: string
+          acceptance_basis: string
+          case_id: string
+          created_at: string
+          created_by: string
+          effective_from: string
+          effective_to: string | null
+          id: string
+          metric: string
+          original_source_text: string
+          party: string
+          rule: string
+          source_document_id: string
+          source_reference: string
+          supersedes_id: string | null
+          tenant_id: string
+          unit: string
+          version: number
+        }
+        Insert: {
+          acceptance: string
+          acceptance_basis: string
+          case_id: string
+          created_at?: string
+          created_by: string
+          effective_from: string
+          effective_to?: string | null
+          id?: string
+          metric: string
+          original_source_text: string
+          party: string
+          rule: string
+          source_document_id: string
+          source_reference: string
+          supersedes_id?: string | null
+          tenant_id: string
+          unit: string
+          version: number
+        }
+        Update: {
+          acceptance?: string
+          acceptance_basis?: string
+          case_id?: string
+          created_at?: string
+          created_by?: string
+          effective_from?: string
+          effective_to?: string | null
+          id?: string
+          metric?: string
+          original_source_text?: string
+          party?: string
+          rule?: string
+          source_document_id?: string
+          source_reference?: string
+          supersedes_id?: string | null
+          tenant_id?: string
+          unit?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "operational_definitions_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "operational_definitions_source_document_id_fkey"
+            columns: ["source_document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "operational_definitions_supersedes_id_fkey"
+            columns: ["supersedes_id"]
+            isOneToOne: false
+            referencedRelation: "operational_definitions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "operational_definitions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tenants: {
         Row: {
           created_at: string
@@ -673,6 +1328,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      has_unresolved_operational_clocks: {
+        Args: { _case_id: string }
+        Returns: boolean
+      }
       is_tenant_member: { Args: { _tenant_id: string }; Returns: boolean }
       provision_organization: { Args: { org_name?: string }; Returns: string }
       seed_demo_case: {

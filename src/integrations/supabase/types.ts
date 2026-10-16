@@ -698,6 +698,7 @@ export type Database = {
         Row: {
           approved_at: string | null
           approved_by: string | null
+          canonical_payload: string | null
           case_id: string
           generated_at: string
           id: string
@@ -710,6 +711,7 @@ export type Database = {
         Insert: {
           approved_at?: string | null
           approved_by?: string | null
+          canonical_payload?: string | null
           case_id: string
           generated_at?: string
           id?: string
@@ -722,6 +724,7 @@ export type Database = {
         Update: {
           approved_at?: string | null
           approved_by?: string | null
+          canonical_payload?: string | null
           case_id?: string
           generated_at?: string
           id?: string
@@ -1328,11 +1331,57 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      approve_evidence_pack_atomic: {
+        Args: { _case_id: string; _pack_id: string }
+        Returns: {
+          approved_at: string | null
+          approved_by: string | null
+          canonical_payload: string | null
+          case_id: string
+          generated_at: string
+          id: string
+          pack_payload: Json
+          sha256_hash: string
+          status: string
+          tenant_id: string
+          version: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "evidence_packs"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      current_pack_source: { Args: { _case_id: string }; Returns: Json }
       has_unresolved_operational_clocks: {
         Args: { _case_id: string }
         Returns: boolean
       }
       is_tenant_member: { Args: { _tenant_id: string }; Returns: boolean }
+      normalize_pack_source: { Args: { _source: Json }; Returns: Json }
+      persist_evidence_pack_atomic: {
+        Args: { _canonical: string; _case_id: string }
+        Returns: {
+          approved_at: string | null
+          approved_by: string | null
+          canonical_payload: string | null
+          case_id: string
+          generated_at: string
+          id: string
+          pack_payload: Json
+          sha256_hash: string
+          status: string
+          tenant_id: string
+          version: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "evidence_packs"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       provision_organization: { Args: { org_name?: string }; Returns: string }
       seed_demo_case: {
         Args: { _tenant: string; _user: string }

@@ -1,0 +1,5 @@
+import {describe,it,expect} from "vitest";import {evaluateKpi} from "./kpi-definitions";
+const d={physical_reference:"VESSEL-SYN",start_kind:"FIRST_BOX_OFF",end_kind:"LAST_BOX_ON",acceptance:"AGREED",benchmark_hours:18};
+const c=(kind:string,time:string)=>({id:kind,physical_reference:"VESSEL-SYN",kind,timestamp_original:time});
+const clocks=[c("FIRST_BOX_OFF","2026-10-14T04:00:00Z"),c("LAST_BOX_ON","2026-10-14T20:00:00Z")];
+describe("per-agreement KPI",()=>{it("uses source clock and agreed benchmark",()=>{expect(evaluateKpi(d,clocks)).toMatchObject({hours:16,referenceHours:18,status:"DERIVED"})});it("does not turn a party assertion into agreed benchmark",()=>{expect(evaluateKpi({...d,acceptance:"PARTY_REPORTED"},clocks).referenceHours).toBeNull()});it("never substitutes 18h when no benchmark supplied",()=>{expect(evaluateKpi({...d,benchmark_hours:null},clocks).referenceHours).toBeNull()});it("withholds conflict/missing inputs",()=>{expect(evaluateKpi(d,[...clocks,c("FIRST_BOX_OFF","2026-10-14T05:00:00Z")]).hours).toBeNull();expect(evaluateKpi(d,[]).status).toBe("MISSING")})});

@@ -354,6 +354,7 @@ export const generateEvidencePack = createServerFn({ method: "POST" })
       "## Operational definitions",
       ...(definitions.data ?? []).map((x: any) => "- " + x.party + " / " + x.metric + " v" + x.version + ": " + x.unit + " [" + x.acceptance + "] - " + x.rule + " (source " + x.source_document_id + ", " + x.source_reference + ")"),
       "",
+
       "## Contradictions",
       ...(contradictions.data ?? []).map((x: any) => "- " + x.title + ": " + x.description),
       "",

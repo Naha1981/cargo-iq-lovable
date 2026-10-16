@@ -1,3 +1,4 @@
+import { assertDocumentSize, isPlainDocument } from "@/lib/extraction-policy";
 import { Route as CaseRoute } from "./cases.$caseId";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useRef, useState } from "react";
@@ -24,6 +25,7 @@ function DocsPage() {
   }
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [decisions, setDecisions] = useState<Record<string, "VERIFIED" | "DISPUTED">>({});
   const supabase = createClient();
 
@@ -34,6 +36,7 @@ function DocsPage() {
     setError("");
     try {
       for (const item of Array.from(files)) {
+        assertDocumentSize(item.size);
         const safeName = item.name.replace(/[^a-zA-Z0-9._-]+/g, "_");
         const path = data.tenantId + "/" + caseId + "/" + crypto.randomUUID() + "-" + safeName;
         const { error: uploadError } = await supabase.storage.from("case-documents").upload(path, item, { upsert: false });
@@ -59,11 +62,13 @@ function DocsPage() {
     }
   }
 
-  async function extract(id: string) {
+  async function extract(id: string, noAi = false) {
     setBusy(true);
     setError("");
     try {
-      await runDocumentExtraction({ data: { documentId: id, caseId } });
+      setNotice("");
+      const result = await runDocumentExtraction({ data: { documentId: id, caseId, noAi } });
+      setNotice(result.skippedDuplicates ? "No new claims: these lines are already imported." : result.mode === "ai" ? `${result.count} AI claims extracted. Review each claim before verification.` : `${result.count} text lines imported without AI credits. No event understanding or automatic timestamps. Review each line; this is not AI extraction.`);
       await router.invalidate();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Extraction failed.");
@@ -104,6 +109,8 @@ function DocsPage() {
         </>
       }>
         {error && <div className="mb-3 rounded border border-disputed/40 bg-disputed/10 p-3 text-xs text-disputed">{error}</div>}
+        <p className="mb-3 text-xs text-muted-foreground">PDF, TXT or CSV, up to 5 MB per file. TXT/CSV: choose Import text for a no-AI option (up to 500 lines and 200,000 characters). Human review is always required.</p>
+        {notice && <div role="status" className="mb-3 rounded border p-3 text-xs">{notice}</div>}
         <label className="mb-4 block text-sm">Source organization for this upload
           <input value={sourceParty} maxLength={200} onChange={e=>setSourceParty(e.target.value)} placeholder="Organization that supplied the record" className="mt-2 w-full rounded border bg-background p-2 text-sm" />
           <span className="mt-1 block text-xs text-muted-foreground">Applies to every file in this selection. Upload different organizations separately.</span>
@@ -116,7 +123,8 @@ function DocsPage() {
                 <div className="truncate text-sm font-medium">{d.name}</div>
                 <div className="mt-1 text-xs text-muted-foreground">Source: {d.source_party || "Not recorded (legacy upload)"}</div>
                 <div className="mt-1 text-xs text-muted-foreground">{d.sha256_hash.slice(0, 12)}… · {d.evidence_class}</div>
-                <Button disabled={busy} variant="ghost" className="mt-2 py-1 text-xs" onClick={() => extract(d.id)}>Extract claims</Button>
+                <Button disabled={busy} variant="ghost" className="mt-2 py-1 text-xs" onClick={() => extract(d.id)}>Extract claims with AI</Button>
+                {isPlainDocument(d.file_type, d.name) && <Button disabled={busy} variant="ghost" className="mt-2 py-1 text-xs" onClick={() => extract(d.id, true)}>Import text (no AI credits)</Button>}
               </div>
             </li>
           ))}

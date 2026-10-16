@@ -1,3 +1,4 @@
+import { assertDocumentSize } from "./extraction-policy";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { tenantMiddleware } from "@/lib/auth-middleware";
@@ -129,6 +130,7 @@ export const registerDocument = createServerFn({ method: "POST" })
     const { data: blob, error: downloadError } = await context.supabase.storage.from("case-documents").download(data.filePath);
     if (downloadError || !blob) throw downloadError ?? new Error("DOCUMENT_DOWNLOAD_FAILED");
 
+    assertDocumentSize(blob.size);
     const sha256 = await sha256Hex(await blob.arrayBuffer());
     const { data: row, error } = await context.supabase.from("documents").insert({
       tenant_id: context.tenantId,
@@ -145,7 +147,7 @@ export const registerDocument = createServerFn({ method: "POST" })
   });
 
 export const runDocumentExtraction = createServerFn({ method: "POST" })
-  .validator(z.object({ documentId: z.string().uuid(), caseId: z.string().uuid() }))
+  .validator(z.object({ documentId: z.string().uuid(), caseId: z.string().uuid(), noAi: z.boolean().optional() }))
   .middleware([tenantMiddleware])
   .handler(async ({ data, context }) => {
     if (!["admin", "investigator"].includes(context.role)) throw new Error("Investigator access required");

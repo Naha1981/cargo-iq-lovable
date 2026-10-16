@@ -1,3 +1,4 @@
+import { assertDocumentSize, isPlainDocument, plainTextClaims, PDF_AI_UNAVAILABLE } from "./extraction-policy";
 import { createServerFn } from "@tanstack/react-start";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -179,7 +180,7 @@ async function extractViaGateway(bytes: ArrayBuffer, mimeType: string, filename:
   });
   if (!res.ok || !res.body) {
     const msg = await res.text().catch(() => "");
-    if (res.status === 402) throw new Error("AI credits exhausted — add credits in workspace settings.");
+    if (res.status === 402) throw new Error("AI credits exhausted. Use TXT/CSV text mode without AI credits.");
     if (res.status === 429) throw new Error("AI is rate limited — try again in a minute.");
     throw new Error("AI_" + res.status + " " + msg.slice(0, 200));
   }
@@ -246,6 +247,7 @@ export function filterNewClaims<T extends { claim_text: string }>(claims: T[], e
 
 export async function extractDocumentClaimsForPath(input: {
   documentId: string;
+  noAi?: boolean;
   caseId: string;
   tenantId: string;
   supabase: SupabaseClient;
@@ -256,24 +258,24 @@ export async function extractDocumentClaimsForPath(input: {
 
   const { data: blob, error: blobError } = await input.supabase.storage.from("case-documents").download(doc.file_path);
   if (blobError || !blob) throw new Error(doc.file_path.startsWith("demo/") ? "This is a sample document with no file attached — upload a real file to extract claims." : "Could not read the uploaded file.");
+  assertDocumentSize(blob.size);
   const bytes = await blob.arrayBuffer();
-
+  const plain = isPlainDocument(doc.file_type, doc.name);
+  if (input.noAi && !plain) throw new Error("No-AI mode accepts TXT or CSV files. Export the PDF text first; scanned PDFs need transcription.");
+  let mode: "ai" | "text" | "text-fallback" = input.noAi ? "text" : "ai";
+  const importLines = async (): Promise<ClaimDraft[]> => plainTextClaims(await blob.text()).map(line => ({
+    page_number: 1, claim_text: line, claim_type: "TEXT_RECORD", normalized_value: line,
+    evidence_class: inferClass(doc.name), nature: "REPORTED", confidence: 0.55,
+  }));
   let claims: ClaimDraft[] = [];
-  try {
-    claims = await extractWithGemini(bytes, doc.file_type, doc.name);
-  } catch (error) {
-    if (doc.file_type === "text/plain" || doc.name.toLowerCase().endsWith(".csv") || doc.name.toLowerCase().endsWith(".txt")) {
-      const text = await blob.text();
-      claims = text.split(/\r?\n/).map((line, index) => ({
-        page_number: 1,
-        claim_text: line.trim(),
-        claim_type: "TEXT_RECORD",
-        normalized_value: line.trim(),
-        evidence_class: inferClass(doc.name),
-        nature: "REPORTED" as const,
-        confidence: 0.55,
-      })).filter((x) => x.claim_text);
-    } else throw error;
+  if (input.noAi) claims = await importLines();
+  else {
+    try { claims = await extractWithGemini(bytes, doc.file_type, doc.name); }
+    catch (error) {
+      if (plain) { claims = await importLines(); mode = "text-fallback"; }
+      else if (/credits exhausted|AI_402|AI_KEY_NOT_CONFIGURED|AI_429|rate limited/i.test(error instanceof Error ? error.message : String(error))) throw new Error(PDF_AI_UNAVAILABLE);
+      else throw error;
+    }
   }
 
   if (!claims.length) throw new Error("NO_CLAIMS_EXTRACTED");
@@ -286,7 +288,7 @@ export async function extractDocumentClaimsForPath(input: {
   if (existingError) throw existingError;
   claims = filterNewClaims(claims, (existingRows ?? []).map((r: any) => String(r.claim_text ?? "")), header);
   if (!claims.length) {
-    return { claims: [], count: 0, skippedDuplicates: true };
+    return { claims: [], count: 0, skippedDuplicates: true, mode };
   }
 
   const inserted: any[] = [];
@@ -345,10 +347,10 @@ export async function extractDocumentClaimsForPath(input: {
     action: "DOCUMENT_EXTRACTED",
     entity_type: "document",
     entity_id: input.documentId,
-    payload: { claims: inserted.length, filename: doc.name },
+    payload: { claims: inserted.length, filename: doc.name, mode },
   });
 
-  return { claims: inserted, count: inserted.length };
+  return { claims: inserted, count: inserted.length, mode };
 }
 
 export const extractionHealth = createServerFn({ method: "GET" }).handler(async () => {

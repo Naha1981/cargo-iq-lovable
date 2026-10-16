@@ -1,9 +1,8 @@
+import {recordFromDb, ruleFromDb} from "./count-ledger";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { tenantMiddleware } from "./auth-middleware";
 import { countRecordInput, countRuleInput, type CountRecord, type CountRule } from "./count-ledger";
-export function recordFromDb(r: any): CountRecord { return { id:r.id,version:r.version,caseId:r.case_id,physicalReference:r.physical_reference,party:r.party,metric:r.metric,basis:r.basis,quantity:Number(r.quantity),occurredAt:r.occurred_at,containers20:r.containers20,containers40:r.containers40,gateKind:r.gate_kind,sourceDocumentId:r.source_document_id,sourceReference:r.source_reference,limitations:r.limitations,supersedesId:r.supersedes_id }; }
-export function ruleFromDb(r: any): CountRule { return { id:r.id,version:r.version,caseId:r.case_id,name:r.name,metric:r.metric,inputBasis:r.input_basis,outputUnit:r.output_unit,calculation:r.calculation,numerator:r.numerator,denominator:r.denominator,gateKinds:r.gate_kinds,acceptance:r.acceptance,effectiveFrom:r.effective_from,effectiveTo:r.effective_to,sourceDocumentId:r.source_document_id,sourceReference:r.source_reference,rationale:r.rationale,supersedesId:r.supersedes_id }; }
 export const listCountLedger=createServerFn({method:"GET"}).validator(z.object({caseId:z.string().uuid()})).middleware([tenantMiddleware]).handler(async({data,context})=>{
  const db=context.supabase;const [sources,rules]=await Promise.all([db.from("count_source_records").select("*").eq("case_id",data.caseId).order("created_at",{ascending:true}),db.from("count_rule_versions").select("*").eq("case_id",data.caseId).order("created_at",{ascending:true})]);
  if(sources.error||rules.error)throw new Error("Count ledger is unavailable. The reviewed count-ledger migration must be applied before use. "+(sources.error?.message||rules.error?.message));

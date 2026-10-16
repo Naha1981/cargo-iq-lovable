@@ -1,3 +1,4 @@
+import {frozenOperationalResults} from "./count-pack";
 // Dependency-free, deterministic PDF writer for the Evidence Pack.
 // Runs entirely in the browser: no network, no external service. Same pack in = same bytes out.
 
@@ -179,6 +180,11 @@ export function buildEvidencePackPdf(pack: any): Uint8Array {
   }
 
   const operationalSections: [string, string, (x: any) => string][] = [
+    ["countSourceRecords", "Raw count source ledger (all versions)", (x) => x.party+" / "+x.physical_reference+" v"+x.version+"\nReported: "+x.quantity+" "+x.basis+"; metric "+x.metric+"; gate "+x.gate_kind+"\n20ft: "+(x.containers20??"unknown")+"; 40ft: "+(x.containers40??"unknown")+"; occurred "+x.occurred_at+"\nLimitations: "+x.limitations],
+    ["countRuleVersions", "Executable local count rules (all versions)", (x) => x.name+" v"+x.version+" ["+x.acceptance+"]\n"+x.input_basis+" to "+x.output_unit+": "+x.calculation+" x "+x.numerator+"/"+x.denominator+"\nEffective: "+x.effective_from+" to "+(x.effective_to??"open")+"; gates "+x.gate_kinds.join(", ")+"\nRationale: "+x.rationale],
+    ["countComparisons", "Explicit common-unit scopes and productivity definitions", (x) => x.name+" v"+x.version+" ["+x.acceptance+"]\nPhysical scope: "+x.physical_references.join(", ")+"\nMappings: "+x.rule_ids.join(", ")+"; duration definition "+(x.kpi_definition_id??"none")+"\nAgreement / limitations: "+x.rationale],
+    ["appointmentLifecycle", "Appointment revisions, attendance and human causal review", (x) => x.appointment_reference+" / "+x.physical_reference+" / "+x.record_type+" v"+x.version+"\nIssuer: "+x.issuer+"; source party "+x.party+"\nEvent: "+x.occurred_at+"; window "+(x.start_at??"n/a")+" to "+(x.end_at??"n/a")+"\nClaim target: "+(x.claim_target||"not assessed")+" ["+x.outcome+"]\n"+x.explanation+"\nTerms / causal basis: "+x.terms_reference],
+    ["authorisedImports", "Authorised export provenance (operator assertion, not access proof)", (x) => x.dataset+" / "+x.row_count+" rows; source party "+x.source_party+"\nExported: "+x.exported_at+"; imported: "+x.created_at+"; actor "+x.created_by+"\nRaw CSV SHA256: "+x.raw_sha256+"\nAuthority basis: "+x.authorization_basis+"\nOriginal CSV and typed mapping retained in frozen JSON. Hash proves integrity, not truth."],
     ["operationalDefinitions", "Operational counting definitions (all versions)", (x) => x.party + " / " + x.metric + " v" + x.version + " [" + x.acceptance + "]\nUnit: " + x.unit + "\nRule: " + x.rule + "\nOriginal: " + x.original_source_text + "\nEffective: " + x.effective_from + " to " + (x.effective_to ?? "open-ended") + "\nAcceptance basis: " + x.acceptance_basis],
     ["operationalClocks", "Separate source clocks", (x) => x.physical_reference + " / " + x.kind + "\nOriginal time: " + x.timestamp_original + " (" + x.time_zone + ")\nSource organization: " + x.source_party + "\nLocation/event basis: " + x.location_basis + (x.appointment_issuer ? "\nAppointment issuer: " + x.appointment_issuer + "; ref " + x.appointment_reference + "\nParties: " + x.appointment_parties + "\nTerms: " + x.appointment_terms : "")],
     ["appointmentAttributions", "Appointment-to-claim attribution (not liability)", (x) => "Appointment clock " + x.appointment_clock_id + "\nClaimant: " + x.claimant + "; target: " + x.claim_target + "\nAssertion: " + x.assertion + "\nTerms reference: " + x.terms_reference],
@@ -200,6 +206,18 @@ export function buildEvidencePackPdf(pack: any): Uint8Array {
   }
   // Keep approval lines and limitations together instead of orphaning the caveat.
   d.reserve(245);
+  const frozen=frozenOperationalResults(p);
+  if(frozen.counts.length||frozen.appointments.length){
+    d.heading("Frozen operational calculations (engine v1)");
+    d.text("Derived only from this frozen payload. Different count bases and lateness are not factual contradictions or proof of liability.",{indent:4,size:8});
+    for(const {definition,result} of frozen.counts){
+      d.text(definition.name+": "+(result.comparable?"COMPARABLE DERIVED VALUES":"COMPARISON WITHHELD"),{indent:4,bold:true});
+      for(const issue of result.issues)d.text(issue,{indent:14});
+      for(const r of result.results){d.text(r.party+": "+(r.total===null?"WITHHELD":r.total+" "+definition.outputUnit)+(definition.kpiDefinitionId?"; productivity "+(r.perHour===null?"WITHHELD":r.perHour.toFixed(3)+" "+definition.outputUnit+"/hour")+"; evidenced hours "+(r.hours??"unknown"):""),{indent:14});for(const reason of [...r.reasons,...r.productivityReasons])d.text(reason,{indent:24,size:8});}
+    }
+    for(const a of frozen.appointments){d.text(a.reference+": "+a.timing+"; minutes after slot end "+(a.minutesLate??"withheld"),{indent:4});for(const reason of a.reasons)d.text(reason,{indent:14,size:8});d.text(a.disclaimer,{indent:14,size:8});}
+  }
+
   d.heading("Integrity and approval");
   d.text("SHA-256 of the canonical pack payload:", { indent: 4 });
   d.text(String(pack.sha256_hash ?? "n/a"), { indent: 4, bold: true, size: 9 });

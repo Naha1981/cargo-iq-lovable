@@ -57,7 +57,7 @@ export function reconcileCounts(records: CountRecord[], rule: CountRule) {
     if (new Set(identities).size !== identities.length) reasons.push("Duplicate physical-event records need source reconciliation");
     let total = 0;
     for (const r of eligible) {
-      if (rule.calculation === "PER_PHYSICAL_REFERENCE") { if (eligible.findIndex(x => x.physicalReference === r.physicalReference) === eligible.indexOf(r)) total += 1; }
+      if (rule.calculation === "PER_PHYSICAL_REFERENCE") { if(r.quantity<=0) reasons.push("Non-positive source quantity does not prove a physical event: "+r.id); if (eligible.findIndex(x => x.physicalReference === r.physicalReference) === eligible.indexOf(r)) total += 1; }
       else if (rule.calculation === "CONTAINERS_FROM_MANIFEST" || rule.calculation === "TEU_FROM_MANIFEST") {
         if (r.containers20 === null || r.containers40 === null) reasons.push("Missing manifest composition: " + r.id);
         else total += r.containers20 + r.containers40 * (rule.calculation === "TEU_FROM_MANIFEST" ? 2 : 1);
@@ -73,3 +73,6 @@ export function reconcileCounts(records: CountRecord[], rule: CountRule) {
 export function countProductivity(total: number | null, hours: number | null) {
   return total !== null && hours !== null && Number.isFinite(total) && total >= 0 && Number.isFinite(hours) && hours > 0 ? total / hours : null;
 }
+
+export function recordFromDb(r: any): CountRecord { return { id:r.id,version:r.version,caseId:r.case_id,physicalReference:r.physical_reference,party:r.party,metric:r.metric,basis:r.basis,quantity:Number(r.quantity),occurredAt:r.occurred_at,containers20:r.containers20,containers40:r.containers40,gateKind:r.gate_kind,sourceDocumentId:r.source_document_id,sourceReference:r.source_reference,limitations:r.limitations,supersedesId:r.supersedes_id }; }
+export function ruleFromDb(r: any): CountRule { return { id:r.id,version:r.version,caseId:r.case_id,name:r.name,metric:r.metric,inputBasis:r.input_basis,outputUnit:r.output_unit,calculation:r.calculation,numerator:r.numerator,denominator:r.denominator,gateKinds:r.gate_kinds,acceptance:r.acceptance,effectiveFrom:r.effective_from,effectiveTo:r.effective_to,sourceDocumentId:r.source_document_id,sourceReference:r.source_reference,rationale:r.rationale,supersedesId:r.supersedes_id }; }

@@ -27,3 +27,5 @@ export function evaluateAppointment(rows:AppointmentLifecycle[]){
  return {reference,history,active,timing,minutesLate,reasons,issuer:slot?.issuer??null,systemFailures:active.filter(r=>r.recordType==="SYSTEM_FAILURE"),reviews:active.filter(r=>r.recordType==="RESPONSIBILITY_REVIEW"),disclaimer:"Timing and appointment issuer do not establish fault or legal liability. Review the source-backed terms, changes and competing assertions."};
  });
 }
+
+export function lifecycleFromDb(r:any):AppointmentLifecycle{return {id:r.id,version:r.version,caseId:r.case_id,appointmentReference:r.appointment_reference,physicalReference:r.physical_reference,recordType:r.record_type,issuer:r.issuer,party:r.party,startAt:r.start_at,endAt:r.end_at,occurredAt:r.occurred_at,claimTarget:r.claim_target,outcome:r.outcome,explanation:r.explanation,termsReference:r.terms_reference,sourceDocumentId:r.source_document_id,sourceReference:r.source_reference,supersedesId:r.supersedes_id};}

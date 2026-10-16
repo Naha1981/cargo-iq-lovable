@@ -305,7 +305,7 @@ export const generateEvidencePack = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     if (!["admin", "investigator"].includes(context.role)) throw new Error("Investigator access required");
     const db = context.supabase;
-    const [c, docs, claims, contradictions, timeline, observations, calculations, existing, definitions, clocks, attributions, kpis, matches, gaps, identityReviews, clockDecisions] = await Promise.all([
+    const [c, docs, claims, contradictions, timeline, observations, calculations, existing, definitions, clocks, attributions, kpis, matches, gaps, identityReviews, clockDecisions, countSources, countRules, countComparisons, appointmentLifecycle, authorisedImports] = await Promise.all([
       db.from("cases").select("*").eq("id", data.caseId).single(),
       db.from("documents").select("*").eq("case_id", data.caseId).order("uploaded_at", { ascending: true }),
       db.from("extracted_claims").select("*").eq("case_id", data.caseId).order("created_at", { ascending: true }),
@@ -322,8 +322,13 @@ export const generateEvidencePack = createServerFn({ method: "POST" })
       db.from("evidence_gap_entries").select("*").eq("case_id", data.caseId).order("created_at", { ascending: true }),
       db.from("cross_party_match_reviews").select("*").eq("case_id", data.caseId).order("created_at", { ascending: true }),
       db.from("clock_reconciliations").select("*").eq("case_id", data.caseId).order("created_at", { ascending: true }),
+      db.from("count_source_records").select("*").eq("case_id", data.caseId).order("created_at", { ascending: true }),
+      db.from("count_rule_versions").select("*").eq("case_id", data.caseId).order("created_at", { ascending: true }),
+      db.from("count_comparison_definitions").select("*").eq("case_id", data.caseId).order("created_at", { ascending: true }),
+      db.from("appointment_lifecycle").select("*").eq("case_id", data.caseId).order("created_at", { ascending: true }),
+      db.from("authorised_imports").select("*").eq("case_id", data.caseId).order("created_at", { ascending: true }),
     ]);
-    for (const x of [c, docs, claims, contradictions, timeline, observations, calculations, existing, definitions, clocks, attributions, kpis, matches, gaps, identityReviews, clockDecisions]) if (x.error) throw x.error;
+    for (const x of [c, docs, claims, contradictions, timeline, observations, calculations, existing, definitions, clocks, attributions, kpis, matches, gaps, identityReviews, clockDecisions, countSources, countRules, countComparisons, appointmentLifecycle, authorisedImports]) if (x.error) throw x.error;
 
     const unresolved = (contradictions.data ?? []).filter((x: any) => x.status === "FLAGGED").length;
     if (unresolved > 0) throw new Error("Resolve the flagged contradictions before generating an evidence pack.");
@@ -343,6 +348,12 @@ export const generateEvidencePack = createServerFn({ method: "POST" })
       evidenceGapHistory: gaps.data ?? [],
       eventIdentityReviews: identityReviews.data ?? [],
       clockReconciliations: clockDecisions.data ?? [],
+      countSourceRecords: countSources.data ?? [],
+      countRuleVersions: countRules.data ?? [],
+      countComparisons: countComparisons.data ?? [],
+      appointmentLifecycle: appointmentLifecycle.data ?? [],
+      authorisedImports: authorisedImports.data ?? [],
+      countEngineVersion: "1",
       verifiedClaims: (claims.data ?? []).filter((x: any) => x.status === "VERIFIED"),
       claims: claims.data ?? [],
       contradictions: contradictions.data ?? [],
@@ -372,6 +383,17 @@ export const generateEvidencePack = createServerFn({ method: "POST" })
       "",
       "## Timeline",
       ...(timeline.data ?? []).map((e: any) => "- " + e.timestamp + " — " + e.title + " [" + e.nature + "] — " + e.source),
+      "",
+      "## Count source records and executable mappings (engine v1)",
+      ...(countSources.data ?? []).map((x:any)=>"- "+x.party+" / "+x.physical_reference+" v"+x.version+": "+x.quantity+" "+x.basis+"; evidence "+x.source_document_id+", "+x.source_reference),
+      ...(countRules.data ?? []).map((x:any)=>"- Rule "+x.name+" v"+x.version+": "+x.input_basis+" -> "+x.output_unit+", "+x.calculation+" x "+x.numerator+"/"+x.denominator+" ["+x.acceptance+"]"),
+      ...(countComparisons.data ?? []).map((x:any)=>"- Common scope "+x.name+" v"+x.version+": "+x.physical_references.join(", ")+"; mappings "+x.rule_ids.join(", ")+"; duration definition "+(x.kpi_definition_id??"none")+" ["+x.acceptance+"]"),
+      "",
+      "## Appointment lifecycle and human causal review",
+      ...(appointmentLifecycle.data ?? []).map((x:any)=>"- "+x.appointment_reference+" / "+x.record_type+" v"+x.version+": "+x.explanation+"; issuer "+x.issuer+"; claim target "+(x.claim_target||"not assessed")+" ["+x.outcome+"]; terms "+x.terms_reference),
+      "",
+      "## Authorised export provenance (permission is an operator assertion)",
+      ...(authorisedImports.data ?? []).map((x:any)=>"- "+x.dataset+" / "+x.row_count+" rows; exported "+x.exported_at+"; SHA256 "+x.raw_sha256+"; authority basis "+x.authorization_basis),
       "",
       "## Operational definitions",
       ...(definitions.data ?? []).map((x: any) => "- " + x.party + " / " + x.metric + " v" + x.version + ": " + x.unit + " [" + x.acceptance + "] - " + x.rule + " (source " + x.source_document_id + ", " + x.source_reference + ")"),

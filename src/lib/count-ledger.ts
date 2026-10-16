@@ -27,6 +27,9 @@ export const countRuleInput = z.object({
   sourceDocumentId: z.string().uuid(), sourceReference: z.string().trim().min(3).max(1000),
   rationale: z.string().trim().min(10).max(4000), supersedesId: z.string().uuid().nullable(),
 }).superRefine((r, ctx) => {
+  const allowed = r.metric === "HATCH_COVER" ? ["HATCH_OPERATION", "INDIVIDUAL_LIFT"] : r.metric === "TRUCK_VISIT" ? ["TRUCK_VISIT"] : r.metric === "CONTAINER_DELIVERY" ? ["CONTAINER", "TEU"] : ["GATE_EVENT"];
+  if(!allowed.includes(r.inputBasis))ctx.addIssue({code:"custom",path:["inputBasis"],message:"Input basis does not match metric"});
+  if(r.metric!=="GATE_COUNT"&&r.gateKinds.length)ctx.addIssue({code:"custom",path:["gateKinds"],message:"Gate filters apply only to gate metrics"});
   if (r.effectiveTo && Date.parse(r.effectiveTo) <= Date.parse(r.effectiveFrom)) ctx.addIssue({ code: "custom", path: ["effectiveTo"], message: "End must follow start" });
   if (r.metric === "GATE_COUNT" && !r.gateKinds.length) ctx.addIssue({ code: "custom", path: ["gateKinds"], message: "Select eligible gate kinds explicitly" });
   if (new Set(r.gateKinds).size !== r.gateKinds.length) ctx.addIssue({ code: "custom", path: ["gateKinds"], message: "Duplicate gate kind" });

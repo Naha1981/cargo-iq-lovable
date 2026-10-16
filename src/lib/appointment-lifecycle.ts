@@ -22,7 +22,7 @@ export function evaluateAppointment(rows:AppointmentLifecycle[]){
  if(slots.length!==1)reasons.push(slots.length?"Conflicting current slot records":"Missing slot window");
  if(attendance.length!==1)reasons.push(attendance.length?"Conflicting attendance records":"Missing attendance evidence");
  const cancelled=active.some(r=>r.recordType==="CANCELLATION");if(cancelled)reasons.push("Cancellation recorded; window comparison needs review");
- const slot=slots[0],arrival=attendance[0];let timing:"EARLY"|"IN_WINDOW"|"LATE"|"WITHHELD"="WITHHELD",minutesLate:number|null=null;
+ const slot=slots[0],arrival=attendance[0];if(slot&&arrival&&Date.parse(slot.occurredAt)>Date.parse(arrival.occurredAt))reasons.push("Current slot was issued or revised after attendance; retrospective window compliance needs review");let timing:"EARLY"|"IN_WINDOW"|"LATE"|"WITHHELD"="WITHHELD",minutesLate:number|null=null;
  if(!reasons.length&&slot.startAt&&slot.endAt){const at=Date.parse(arrival.occurredAt),start=Date.parse(slot.startAt),end=Date.parse(slot.endAt);timing=at<start?"EARLY":at>end?"LATE":"IN_WINDOW";minutesLate=at>end?(at-end)/60000:0;}
  return {reference,history,active,timing,minutesLate,reasons,issuer:slot?.issuer??null,systemFailures:active.filter(r=>r.recordType==="SYSTEM_FAILURE"),reviews:active.filter(r=>r.recordType==="RESPONSIBILITY_REVIEW"),disclaimer:"Timing and appointment issuer do not establish fault or legal liability. Review the source-backed terms, changes and competing assertions."};
  });

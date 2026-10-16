@@ -10,7 +10,7 @@ CREATE TABLE public.appointment_lifecycle (
  explanation text NOT NULL CHECK(length(trim(explanation)) BETWEEN 10 AND 4000),terms_reference text NOT NULL CHECK(length(trim(terms_reference)) BETWEEN 3 AND 2000),
  source_document_id uuid NOT NULL REFERENCES public.documents(id),source_reference text NOT NULL CHECK(length(trim(source_reference)) BETWEEN 3 AND 1000),
  supersedes_id uuid REFERENCES public.appointment_lifecycle(id),version integer NOT NULL,created_by uuid NOT NULL,created_at timestamptz NOT NULL DEFAULT now(),
- CHECK((record_type='SLOT' AND start_at IS NOT NULL AND end_at>start_at) OR (record_type<>'SLOT' AND start_at IS NULL AND end_at IS NULL)),
+ CHECK((record_type='SLOT' AND start_at IS NOT NULL AND end_at IS NOT NULL AND end_at>start_at) OR (record_type<>'SLOT' AND start_at IS NULL AND end_at IS NULL)),
  CHECK(record_type<>'RESPONSIBILITY_REVIEW' OR (length(trim(claim_target))>0 AND outcome<>'NOT_ASSESSED'))
 );
 CREATE INDEX appointment_lifecycle_case ON public.appointment_lifecycle(case_id,appointment_reference,created_at);

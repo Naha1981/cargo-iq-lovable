@@ -39,7 +39,8 @@ CREATE TABLE public.count_rule_versions (
  rationale text NOT NULL CHECK(length(trim(rationale)) BETWEEN 10 AND 4000),supersedes_id uuid REFERENCES public.count_rule_versions(id),version integer NOT NULL,
  created_by uuid NOT NULL,created_at timestamptz NOT NULL DEFAULT now(),
  CHECK(gate_kinds <@ ARRAY['PHYSICAL_IN','PHYSICAL_OUT','VIRTUAL_IN','VIRTUAL_OUT']::text[]),
- CHECK(metric<>'GATE_COUNT' OR cardinality(gate_kinds)>0),
+ CHECK((metric='GATE_COUNT' AND cardinality(gate_kinds)>0) OR (metric<>'GATE_COUNT' AND cardinality(gate_kinds)=0)),
+ CHECK((metric='HATCH_COVER' AND input_basis IN ('HATCH_OPERATION','INDIVIDUAL_LIFT')) OR (metric='TRUCK_VISIT' AND input_basis='TRUCK_VISIT') OR (metric='CONTAINER_DELIVERY' AND input_basis IN ('CONTAINER','TEU')) OR (metric='GATE_COUNT' AND input_basis='GATE_EVENT')),
  CHECK(calculation='EXPLICIT_FACTOR' OR (numerator=1 AND denominator=1)),
  CHECK(calculation NOT IN ('CONTAINERS_FROM_MANIFEST','TEU_FROM_MANIFEST') OR metric IN ('TRUCK_VISIT','CONTAINER_DELIVERY'))
 );
@@ -54,7 +55,7 @@ BEGIN
  IF TG_TABLE_NAME='count_source_records' THEN
   IF NOT EXISTS(SELECT 1 FROM public.documents WHERE id=NEW.source_document_id AND lower(trim(source_party))=lower(trim(NEW.party))) THEN RAISE EXCEPTION 'Count party must match the source document organization'; END IF;
   identity:=NEW.party||':'||NEW.physical_reference||':'||NEW.metric||':'||NEW.gate_kind;
- ELSE identity:=NEW.name; END IF;
+ ELSE IF cardinality(NEW.gate_kinds)<>(SELECT count(DISTINCT k) FROM unnest(NEW.gate_kinds) k) THEN RAISE EXCEPTION 'Duplicate gate filters'; END IF; identity:=NEW.name; END IF;
  PERFORM pg_advisory_xact_lock(hashtextextended(TG_TABLE_NAME||':'||NEW.case_id::text||':'||identity,0));
  IF TG_TABLE_NAME='count_source_records' THEN
   SELECT id,version INTO latest_id,latest_version FROM public.count_source_records WHERE case_id=NEW.case_id AND party=NEW.party AND physical_reference=NEW.physical_reference AND metric=NEW.metric AND gate_kind=NEW.gate_kind ORDER BY version DESC LIMIT 1;
@@ -90,7 +91,7 @@ CREATE TABLE public.appointment_lifecycle (
  explanation text NOT NULL CHECK(length(trim(explanation)) BETWEEN 10 AND 4000),terms_reference text NOT NULL CHECK(length(trim(terms_reference)) BETWEEN 3 AND 2000),
  source_document_id uuid NOT NULL REFERENCES public.documents(id),source_reference text NOT NULL CHECK(length(trim(source_reference)) BETWEEN 3 AND 1000),
  supersedes_id uuid REFERENCES public.appointment_lifecycle(id),version integer NOT NULL,created_by uuid NOT NULL,created_at timestamptz NOT NULL DEFAULT now(),
- CHECK((record_type='SLOT' AND start_at IS NOT NULL AND end_at>start_at) OR (record_type<>'SLOT' AND start_at IS NULL AND end_at IS NULL)),
+ CHECK((record_type='SLOT' AND start_at IS NOT NULL AND end_at IS NOT NULL AND end_at>start_at) OR (record_type<>'SLOT' AND start_at IS NULL AND end_at IS NULL)),
  CHECK(record_type<>'RESPONSIBILITY_REVIEW' OR (length(trim(claim_target))>0 AND outcome<>'NOT_ASSESSED'))
 );
 CREATE INDEX appointment_lifecycle_case ON public.appointment_lifecycle(case_id,appointment_reference,created_at);

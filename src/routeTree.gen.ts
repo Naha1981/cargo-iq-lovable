@@ -25,6 +25,7 @@ import { Route as CasesCaseIdDefinitionsRouteImport } from './routes/cases.$case
 import { Route as CasesCaseIdDocumentsRouteImport } from './routes/cases.$caseId.documents'
 import { Route as CasesCaseIdFinancialsRouteImport } from './routes/cases.$caseId.financials'
 import { Route as CasesCaseIdGapsRouteImport } from './routes/cases.$caseId.gaps'
+import { Route as CasesCaseIdImportsRouteImport } from './routes/cases.$caseId.imports'
 import { Route as CasesCaseIdKpisRouteImport } from './routes/cases.$caseId.kpis'
 import { Route as CasesCaseIdMapRouteImport } from './routes/cases.$caseId.map'
 import { Route as CasesCaseIdMatchesRouteImport } from './routes/cases.$caseId.matches'
@@ -110,6 +111,11 @@ const CasesCaseIdGapsRoute = CasesCaseIdGapsRouteImport.update({
   path: '/gaps',
   getParentRoute: () => CasesCaseIdRoute,
 } as any)
+const CasesCaseIdImportsRoute = CasesCaseIdImportsRouteImport.update({
+  id: '/imports',
+  path: '/imports',
+  getParentRoute: () => CasesCaseIdRoute,
+} as any)
 const CasesCaseIdKpisRoute = CasesCaseIdKpisRouteImport.update({
   id: '/kpis',
   path: '/kpis',
@@ -147,6 +153,7 @@ export interface FileRoutesByFullPath {
   '/cases/$caseId/documents': typeof CasesCaseIdDocumentsRoute
   '/cases/$caseId/financials': typeof CasesCaseIdFinancialsRoute
   '/cases/$caseId/gaps': typeof CasesCaseIdGapsRoute
+  '/cases/$caseId/imports': typeof CasesCaseIdImportsRoute
   '/cases/$caseId/kpis': typeof CasesCaseIdKpisRoute
   '/cases/$caseId/map': typeof CasesCaseIdMapRoute
   '/cases/$caseId/matches': typeof CasesCaseIdMatchesRoute
@@ -168,6 +175,7 @@ export interface FileRoutesByTo {
   '/cases/$caseId/documents': typeof CasesCaseIdDocumentsRoute
   '/cases/$caseId/financials': typeof CasesCaseIdFinancialsRoute
   '/cases/$caseId/gaps': typeof CasesCaseIdGapsRoute
+  '/cases/$caseId/imports': typeof CasesCaseIdImportsRoute
   '/cases/$caseId/kpis': typeof CasesCaseIdKpisRoute
   '/cases/$caseId/map': typeof CasesCaseIdMapRoute
   '/cases/$caseId/matches': typeof CasesCaseIdMatchesRoute
@@ -191,6 +199,7 @@ export interface FileRoutesById {
   '/cases/$caseId/documents': typeof CasesCaseIdDocumentsRoute
   '/cases/$caseId/financials': typeof CasesCaseIdFinancialsRoute
   '/cases/$caseId/gaps': typeof CasesCaseIdGapsRoute
+  '/cases/$caseId/imports': typeof CasesCaseIdImportsRoute
   '/cases/$caseId/kpis': typeof CasesCaseIdKpisRoute
   '/cases/$caseId/map': typeof CasesCaseIdMapRoute
   '/cases/$caseId/matches': typeof CasesCaseIdMatchesRoute
@@ -215,6 +224,7 @@ export interface FileRouteTypes {
     | '/cases/$caseId/documents'
     | '/cases/$caseId/financials'
     | '/cases/$caseId/gaps'
+    | '/cases/$caseId/imports'
     | '/cases/$caseId/kpis'
     | '/cases/$caseId/map'
     | '/cases/$caseId/matches'
@@ -236,6 +246,7 @@ export interface FileRouteTypes {
     | '/cases/$caseId/documents'
     | '/cases/$caseId/financials'
     | '/cases/$caseId/gaps'
+    | '/cases/$caseId/imports'
     | '/cases/$caseId/kpis'
     | '/cases/$caseId/map'
     | '/cases/$caseId/matches'
@@ -258,6 +269,7 @@ export interface FileRouteTypes {
     | '/cases/$caseId/documents'
     | '/cases/$caseId/financials'
     | '/cases/$caseId/gaps'
+    | '/cases/$caseId/imports'
     | '/cases/$caseId/kpis'
     | '/cases/$caseId/map'
     | '/cases/$caseId/matches'
@@ -389,6 +401,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CasesCaseIdGapsRouteImport
       parentRoute: typeof CasesCaseIdRoute
     }
+    '/cases/$caseId/imports': {
+      id: '/cases/$caseId/imports'
+      path: '/imports'
+      fullPath: '/cases/$caseId/imports'
+      preLoaderRoute: typeof CasesCaseIdImportsRouteImport
+      parentRoute: typeof CasesCaseIdRoute
+    }
     '/cases/$caseId/kpis': {
       id: '/cases/$caseId/kpis'
       path: '/kpis'
@@ -429,6 +448,7 @@ interface CasesCaseIdRouteChildren {
   CasesCaseIdDocumentsRoute: typeof CasesCaseIdDocumentsRoute
   CasesCaseIdFinancialsRoute: typeof CasesCaseIdFinancialsRoute
   CasesCaseIdGapsRoute: typeof CasesCaseIdGapsRoute
+  CasesCaseIdImportsRoute: typeof CasesCaseIdImportsRoute
   CasesCaseIdKpisRoute: typeof CasesCaseIdKpisRoute
   CasesCaseIdMapRoute: typeof CasesCaseIdMapRoute
   CasesCaseIdMatchesRoute: typeof CasesCaseIdMatchesRoute
@@ -445,6 +465,7 @@ const CasesCaseIdRouteChildren: CasesCaseIdRouteChildren = {
   CasesCaseIdDocumentsRoute: CasesCaseIdDocumentsRoute,
   CasesCaseIdFinancialsRoute: CasesCaseIdFinancialsRoute,
   CasesCaseIdGapsRoute: CasesCaseIdGapsRoute,
+  CasesCaseIdImportsRoute: CasesCaseIdImportsRoute,
   CasesCaseIdKpisRoute: CasesCaseIdKpisRoute,
   CasesCaseIdMapRoute: CasesCaseIdMapRoute,
   CasesCaseIdMatchesRoute: CasesCaseIdMatchesRoute,

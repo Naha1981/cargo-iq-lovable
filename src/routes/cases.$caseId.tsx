@@ -33,6 +33,7 @@ const tabs = [
   { to: "/cases/$caseId/appointments", label: "Appointments" },
   { to: "/cases/$caseId/kpis", label: "KPIs" },
   { to: "/cases/$caseId/matches", label: "Matches" },
+  { to: "/cases/$caseId/gaps", label: "Gaps" },
   // CCTV stays off the demo navigation until server encryption is configured.
   { to: "/cases/$caseId/financials", label: "Financials" },
   { to: "/cases/$caseId/pack", label: "Evidence Pack" },

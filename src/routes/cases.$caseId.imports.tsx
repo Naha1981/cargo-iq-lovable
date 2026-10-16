@@ -1,2 +1,2 @@
 import {Route as CaseRoute} from "./cases.$caseId";import {createFileRoute} from "@tanstack/react-router";import {AuthorisedImport} from "@/components/AuthorisedImport";
-export const Route=createFileRoute("/cases/$caseId/imports")({head:()=>({meta:[{title:"Authorised imports | CargoIQ"}]}),component:Page});function Page(){const data=CaseRoute.useLoaderData(),{caseId}=Route.useParams();return <AuthorisedImport caseId={caseId} documents={data.documents}/>;}
+export const Route=createFileRoute("/cases/$caseId/imports")({head:()=>({meta:[{title:"Authorised imports | CargoIQ"}]}),component:Page});function Page(){const data=CaseRoute.useLoaderData(),{caseId}=Route.useParams();return <AuthorisedImport key={caseId} caseId={caseId} documents={data.documents}/>;}

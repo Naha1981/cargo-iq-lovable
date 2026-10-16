@@ -11,5 +11,5 @@ export const Route = createFileRoute("/cases/$caseId/appointments")({
 function AppointmentsPage() {
   const data = CaseRoute.useLoaderData();
   const { caseId } = Route.useParams();
-  return <><AppointmentAttribution caseId={caseId} documents={data.documents} /><AppointmentLifecycle caseId={caseId} documents={data.documents} /></>;
+  return <><AppointmentAttribution caseId={caseId} documents={data.documents} /><AppointmentLifecycle key={caseId} caseId={caseId} documents={data.documents} /></>;
 }

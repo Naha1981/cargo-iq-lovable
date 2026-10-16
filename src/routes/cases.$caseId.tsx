@@ -31,6 +31,7 @@ const tabs = [
   { to: "/cases/$caseId/map", label: "Harbour Map" },
   { to: "/cases/$caseId/documents", label: "Documents & Contradictions" },
   { to: "/cases/$caseId/definitions", label: "Definitions" },
+  { to: "/cases/$caseId/counts", label: "Count reconciliation" },
   { to: "/cases/$caseId/clocks", label: "Clocks" },
   { to: "/cases/$caseId/appointments", label: "Appointments" },
   { to: "/cases/$caseId/kpis", label: "KPIs" },

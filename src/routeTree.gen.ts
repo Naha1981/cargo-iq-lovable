@@ -19,6 +19,8 @@ import { Route as ApiCctvIngestRouteImport } from './routes/api/cctv/ingest'
 import { Route as CasesCaseIdIndexRouteImport } from './routes/cases.$caseId.index'
 import { Route as CasesCaseIdAppointmentsRouteImport } from './routes/cases.$caseId.appointments'
 import { Route as CasesCaseIdCctvRouteImport } from './routes/cases.$caseId.cctv'
+import { Route as CasesCaseIdClocksRouteImport } from './routes/cases.$caseId.clocks'
+import { Route as CasesCaseIdDefinitionsRouteImport } from './routes/cases.$caseId.definitions'
 import { Route as CasesCaseIdDocumentsRouteImport } from './routes/cases.$caseId.documents'
 import { Route as CasesCaseIdFinancialsRouteImport } from './routes/cases.$caseId.financials'
 import { Route as CasesCaseIdGapsRouteImport } from './routes/cases.$caseId.gaps'
@@ -77,6 +79,16 @@ const CasesCaseIdCctvRoute = CasesCaseIdCctvRouteImport.update({
   path: '/cctv',
   getParentRoute: () => CasesCaseIdRoute,
 } as any)
+const CasesCaseIdClocksRoute = CasesCaseIdClocksRouteImport.update({
+  id: '/clocks',
+  path: '/clocks',
+  getParentRoute: () => CasesCaseIdRoute,
+} as any)
+const CasesCaseIdDefinitionsRoute = CasesCaseIdDefinitionsRouteImport.update({
+  id: '/definitions',
+  path: '/definitions',
+  getParentRoute: () => CasesCaseIdRoute,
+} as any)
 const CasesCaseIdDocumentsRoute = CasesCaseIdDocumentsRouteImport.update({
   id: '/documents',
   path: '/documents',
@@ -123,6 +135,8 @@ export interface FileRoutesByFullPath {
   '/api/cctv/ingest': typeof ApiCctvIngestRoute
   '/cases/$caseId/appointments': typeof CasesCaseIdAppointmentsRoute
   '/cases/$caseId/cctv': typeof CasesCaseIdCctvRoute
+  '/cases/$caseId/clocks': typeof CasesCaseIdClocksRoute
+  '/cases/$caseId/definitions': typeof CasesCaseIdDefinitionsRoute
   '/cases/$caseId/documents': typeof CasesCaseIdDocumentsRoute
   '/cases/$caseId/financials': typeof CasesCaseIdFinancialsRoute
   '/cases/$caseId/gaps': typeof CasesCaseIdGapsRoute
@@ -141,6 +155,8 @@ export interface FileRoutesByTo {
   '/api/cctv/ingest': typeof ApiCctvIngestRoute
   '/cases/$caseId/appointments': typeof CasesCaseIdAppointmentsRoute
   '/cases/$caseId/cctv': typeof CasesCaseIdCctvRoute
+  '/cases/$caseId/clocks': typeof CasesCaseIdClocksRoute
+  '/cases/$caseId/definitions': typeof CasesCaseIdDefinitionsRoute
   '/cases/$caseId/documents': typeof CasesCaseIdDocumentsRoute
   '/cases/$caseId/financials': typeof CasesCaseIdFinancialsRoute
   '/cases/$caseId/gaps': typeof CasesCaseIdGapsRoute
@@ -161,6 +177,8 @@ export interface FileRoutesById {
   '/api/cctv/ingest': typeof ApiCctvIngestRoute
   '/cases/$caseId/appointments': typeof CasesCaseIdAppointmentsRoute
   '/cases/$caseId/cctv': typeof CasesCaseIdCctvRoute
+  '/cases/$caseId/clocks': typeof CasesCaseIdClocksRoute
+  '/cases/$caseId/definitions': typeof CasesCaseIdDefinitionsRoute
   '/cases/$caseId/documents': typeof CasesCaseIdDocumentsRoute
   '/cases/$caseId/financials': typeof CasesCaseIdFinancialsRoute
   '/cases/$caseId/gaps': typeof CasesCaseIdGapsRoute
@@ -182,6 +200,8 @@ export interface FileRouteTypes {
     | '/api/cctv/ingest'
     | '/cases/$caseId/appointments'
     | '/cases/$caseId/cctv'
+    | '/cases/$caseId/clocks'
+    | '/cases/$caseId/definitions'
     | '/cases/$caseId/documents'
     | '/cases/$caseId/financials'
     | '/cases/$caseId/gaps'
@@ -200,6 +220,8 @@ export interface FileRouteTypes {
     | '/api/cctv/ingest'
     | '/cases/$caseId/appointments'
     | '/cases/$caseId/cctv'
+    | '/cases/$caseId/clocks'
+    | '/cases/$caseId/definitions'
     | '/cases/$caseId/documents'
     | '/cases/$caseId/financials'
     | '/cases/$caseId/gaps'
@@ -219,6 +241,8 @@ export interface FileRouteTypes {
     | '/api/cctv/ingest'
     | '/cases/$caseId/appointments'
     | '/cases/$caseId/cctv'
+    | '/cases/$caseId/clocks'
+    | '/cases/$caseId/definitions'
     | '/cases/$caseId/documents'
     | '/cases/$caseId/financials'
     | '/cases/$caseId/gaps'
@@ -311,6 +335,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CasesCaseIdCctvRouteImport
       parentRoute: typeof CasesCaseIdRoute
     }
+    '/cases/$caseId/clocks': {
+      id: '/cases/$caseId/clocks'
+      path: '/clocks'
+      fullPath: '/cases/$caseId/clocks'
+      preLoaderRoute: typeof CasesCaseIdClocksRouteImport
+      parentRoute: typeof CasesCaseIdRoute
+    }
+    '/cases/$caseId/definitions': {
+      id: '/cases/$caseId/definitions'
+      path: '/definitions'
+      fullPath: '/cases/$caseId/definitions'
+      preLoaderRoute: typeof CasesCaseIdDefinitionsRouteImport
+      parentRoute: typeof CasesCaseIdRoute
+    }
     '/cases/$caseId/documents': {
       id: '/cases/$caseId/documents'
       path: '/documents'
@@ -366,6 +404,8 @@ declare module '@tanstack/react-router' {
 interface CasesCaseIdRouteChildren {
   CasesCaseIdAppointmentsRoute: typeof CasesCaseIdAppointmentsRoute
   CasesCaseIdCctvRoute: typeof CasesCaseIdCctvRoute
+  CasesCaseIdClocksRoute: typeof CasesCaseIdClocksRoute
+  CasesCaseIdDefinitionsRoute: typeof CasesCaseIdDefinitionsRoute
   CasesCaseIdDocumentsRoute: typeof CasesCaseIdDocumentsRoute
   CasesCaseIdFinancialsRoute: typeof CasesCaseIdFinancialsRoute
   CasesCaseIdGapsRoute: typeof CasesCaseIdGapsRoute
@@ -379,6 +419,8 @@ interface CasesCaseIdRouteChildren {
 const CasesCaseIdRouteChildren: CasesCaseIdRouteChildren = {
   CasesCaseIdAppointmentsRoute: CasesCaseIdAppointmentsRoute,
   CasesCaseIdCctvRoute: CasesCaseIdCctvRoute,
+  CasesCaseIdClocksRoute: CasesCaseIdClocksRoute,
+  CasesCaseIdDefinitionsRoute: CasesCaseIdDefinitionsRoute,
   CasesCaseIdDocumentsRoute: CasesCaseIdDocumentsRoute,
   CasesCaseIdFinancialsRoute: CasesCaseIdFinancialsRoute,
   CasesCaseIdGapsRoute: CasesCaseIdGapsRoute,

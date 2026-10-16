@@ -392,9 +392,12 @@ export const generateEvidencePack = createServerFn({ method: "POST" })
       ...(matches.data ?? []).map((x: any) => "- " + x.event_reference + ": " + x.result + ", claims " + x.claim_a_id + " / " + x.claim_b_id + ", rationale " + x.rationale),
       "",
       "## Match review history (retractions and reaffirmations)",
+      ...(identityReviews.data ?? []).map((x: any) => "- match " + x.match_id + " v" + x.version + ": " + x.status + " - " + x.explanation + " (evidence " + x.source_document_id + ", " + x.source_reference + ")"),
+      "",
+      "## Evidenced clock reconciliation decisions",
+      ...(clockDecisions.data ?? []).map((x: any) => "- " + x.physical_reference + " / " + x.kind + " v" + x.version + ": selected " + x.selected_clock_id + "; considered " + x.considered_clock_ids.join(", ") + " - " + x.explanation + " (evidence " + x.source_document_id + ", " + x.source_reference + ")"),
       "",
       "## Required evidence and gaps (history, not proof of non-occurrence)",
-      ...(identityReviews.data ?? []).map((x: any) => "- match " + x.match_id + " v" + x.version + ": " + x.status + " - " + x.explanation + " (evidence " + x.source_document_id + ", " + x.source_reference + ")"),
       ...(gaps.data ?? []).map((x: any) => "- " + x.physical_reference + " / " + x.required_event + " v" + x.version + ": " + x.status + " - " + x.explanation),
       "",
 

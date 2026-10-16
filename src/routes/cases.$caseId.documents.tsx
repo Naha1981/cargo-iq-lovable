@@ -2,8 +2,6 @@ import { Route as CaseRoute } from "./cases.$caseId";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import { Button, ClassTag, NatureBadge, Panel } from "@/components/ui-kit";
-import { OperationalDefinitionRegister } from "@/components/OperationalDefinitionRegister";
-import { OperationalClockRegister } from "@/components/OperationalClockRegister";
 import { registerDocument, resolveContradiction, reviewClaim, runDocumentExtraction } from "@/lib/case.functions";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
@@ -127,8 +125,6 @@ function DocsPage() {
       </Panel>
 
       <div className="space-y-6">
-        <OperationalDefinitionRegister caseId={caseId} documents={data.documents} />
-        <OperationalClockRegister caseId={caseId} documents={data.documents} />
         <Panel title={"Extracted claims · " + data.claims.length}>
           <ul className="divide-y">
             {data.claims.map((c: any) => {

@@ -30,6 +30,8 @@ const tabs = [
   { to: "/cases/$caseId", label: "Timeline", exact: true },
   { to: "/cases/$caseId/map", label: "Harbour Map" },
   { to: "/cases/$caseId/documents", label: "Documents & Contradictions" },
+  { to: "/cases/$caseId/definitions", label: "Definitions" },
+  { to: "/cases/$caseId/clocks", label: "Clocks" },
   { to: "/cases/$caseId/appointments", label: "Appointments" },
   { to: "/cases/$caseId/kpis", label: "KPIs" },
   { to: "/cases/$caseId/matches", label: "Matches" },

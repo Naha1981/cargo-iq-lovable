@@ -281,7 +281,7 @@ export const generateEvidencePack = createServerFn({ method: "POST" })
   .middleware([tenantMiddleware])
   .handler(async ({ data, context }) => {
     const db = context.supabase;
-    const [c, docs, claims, contradictions, timeline, observations, calculations, existing] = await Promise.all([
+    const [c, docs, claims, contradictions, timeline, observations, calculations, existing, definitions] = await Promise.all([
       db.from("cases").select("*").eq("id", data.caseId).single(),
       db.from("documents").select("*").eq("case_id", data.caseId).order("uploaded_at", { ascending: true }),
       db.from("extracted_claims").select("*").eq("case_id", data.caseId).order("created_at", { ascending: true }),
@@ -290,8 +290,9 @@ export const generateEvidencePack = createServerFn({ method: "POST" })
       db.from("external_observations").select("*").eq("case_id", data.caseId).order("observed_at", { ascending: true }),
       db.from("financial_calculations").select("*").eq("case_id", data.caseId).order("created_at", { ascending: true }),
       db.from("evidence_packs").select("version,status").eq("case_id", data.caseId).order("version", { ascending: false }),
+      db.from("operational_definitions").select("*").eq("case_id", data.caseId).order("created_at", { ascending: true }),
     ]);
-    for (const x of [c, docs, claims, contradictions, timeline, observations, calculations, existing]) if (x.error) throw x.error;
+    for (const x of [c, docs, claims, contradictions, timeline, observations, calculations, existing, definitions]) if (x.error) throw x.error;
 
     const unresolved = (contradictions.data ?? []).filter((x: any) => x.status === "FLAGGED").length;
     if (unresolved > 0) throw new Error("Resolve the flagged contradictions before generating an evidence pack.");
@@ -302,6 +303,7 @@ export const generateEvidencePack = createServerFn({ method: "POST" })
       version,
       case: c.data,
       documents: docs.data ?? [],
+      operationalDefinitions: definitions.data ?? [],
       verifiedClaims: (claims.data ?? []).filter((x: any) => x.status === "VERIFIED"),
       claims: claims.data ?? [],
       contradictions: contradictions.data ?? [],
@@ -348,6 +350,9 @@ export const generateEvidencePack = createServerFn({ method: "POST" })
       "",
       "## Timeline",
       ...(timeline.data ?? []).map((e: any) => "- " + e.timestamp + " — " + e.title + " [" + e.nature + "] — " + e.source),
+      "",
+      "## Operational definitions",
+      ...(definitions.data ?? []).map((x: any) => "- " + x.party + " / " + x.metric + " v" + x.version + ": " + x.unit + " [" + x.acceptance + "] - " + x.rule + " (source " + x.source_document_id + ", " + x.source_reference + ")"),
       "",
       "## Contradictions",
       ...(contradictions.data ?? []).map((x: any) => "- " + x.title + ": " + x.description),

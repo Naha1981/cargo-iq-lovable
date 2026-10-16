@@ -13,9 +13,11 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as DiagnosticsRouteImport } from './routes/diagnostics'
 import { Route as NewCaseRouteImport } from './routes/new-case'
+import { Route as WhatsappQuotesRouteImport } from './routes/whatsapp-quotes'
 import { Route as CasesCaseIdRouteImport } from './routes/cases.$caseId'
 import { Route as DemoCufRouteImport } from './routes/demo.cuf'
 import { Route as ApiCctvIngestRouteImport } from './routes/api/cctv/ingest'
+import { Route as ApiWhatsappWebhookRouteImport } from './routes/api/whatsapp/webhook'
 import { Route as CasesCaseIdIndexRouteImport } from './routes/cases.$caseId.index'
 import { Route as CasesCaseIdCctvRouteImport } from './routes/cases.$caseId.cctv'
 import { Route as CasesCaseIdDocumentsRouteImport } from './routes/cases.$caseId.documents'
@@ -43,6 +45,11 @@ const NewCaseRoute = NewCaseRouteImport.update({
   path: '/new-case',
   getParentRoute: () => rootRouteImport,
 } as any)
+const WhatsappQuotesRoute = WhatsappQuotesRouteImport.update({
+  id: '/whatsapp-quotes',
+  path: '/whatsapp-quotes',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CasesCaseIdRoute = CasesCaseIdRouteImport.update({
   id: '/cases/$caseId',
   path: '/cases/$caseId',
@@ -56,6 +63,11 @@ const DemoCufRoute = DemoCufRouteImport.update({
 const ApiCctvIngestRoute = ApiCctvIngestRouteImport.update({
   id: '/api/cctv/ingest',
   path: '/api/cctv/ingest',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWhatsappWebhookRoute = ApiWhatsappWebhookRouteImport.update({
+  id: '/api/whatsapp/webhook',
+  path: '/api/whatsapp/webhook',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CasesCaseIdIndexRoute = CasesCaseIdIndexRouteImport.update({
@@ -94,9 +106,11 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/diagnostics': typeof DiagnosticsRoute
   '/new-case': typeof NewCaseRoute
+  '/whatsapp-quotes': typeof WhatsappQuotesRoute
   '/cases/$caseId': typeof CasesCaseIdRouteWithChildren
   '/demo/cuf': typeof DemoCufRoute
   '/api/cctv/ingest': typeof ApiCctvIngestRoute
+  '/api/whatsapp/webhook': typeof ApiWhatsappWebhookRoute
   '/cases/$caseId/cctv': typeof CasesCaseIdCctvRoute
   '/cases/$caseId/documents': typeof CasesCaseIdDocumentsRoute
   '/cases/$caseId/financials': typeof CasesCaseIdFinancialsRoute
@@ -109,8 +123,10 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/diagnostics': typeof DiagnosticsRoute
   '/new-case': typeof NewCaseRoute
+  '/whatsapp-quotes': typeof WhatsappQuotesRoute
   '/demo/cuf': typeof DemoCufRoute
   '/api/cctv/ingest': typeof ApiCctvIngestRoute
+  '/api/whatsapp/webhook': typeof ApiWhatsappWebhookRoute
   '/cases/$caseId/cctv': typeof CasesCaseIdCctvRoute
   '/cases/$caseId/documents': typeof CasesCaseIdDocumentsRoute
   '/cases/$caseId/financials': typeof CasesCaseIdFinancialsRoute
@@ -124,9 +140,11 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/diagnostics': typeof DiagnosticsRoute
   '/new-case': typeof NewCaseRoute
+  '/whatsapp-quotes': typeof WhatsappQuotesRoute
   '/cases/$caseId': typeof CasesCaseIdRouteWithChildren
   '/demo/cuf': typeof DemoCufRoute
   '/api/cctv/ingest': typeof ApiCctvIngestRoute
+  '/api/whatsapp/webhook': typeof ApiWhatsappWebhookRoute
   '/cases/$caseId/cctv': typeof CasesCaseIdCctvRoute
   '/cases/$caseId/documents': typeof CasesCaseIdDocumentsRoute
   '/cases/$caseId/financials': typeof CasesCaseIdFinancialsRoute
@@ -141,9 +159,11 @@ export interface FileRouteTypes {
     | '/auth'
     | '/diagnostics'
     | '/new-case'
+    | '/whatsapp-quotes'
     | '/cases/$caseId'
     | '/demo/cuf'
     | '/api/cctv/ingest'
+    | '/api/whatsapp/webhook'
     | '/cases/$caseId/cctv'
     | '/cases/$caseId/documents'
     | '/cases/$caseId/financials'
@@ -156,8 +176,10 @@ export interface FileRouteTypes {
     | '/auth'
     | '/diagnostics'
     | '/new-case'
+    | '/whatsapp-quotes'
     | '/demo/cuf'
     | '/api/cctv/ingest'
+    | '/api/whatsapp/webhook'
     | '/cases/$caseId/cctv'
     | '/cases/$caseId/documents'
     | '/cases/$caseId/financials'
@@ -170,9 +192,11 @@ export interface FileRouteTypes {
     | '/auth'
     | '/diagnostics'
     | '/new-case'
+    | '/whatsapp-quotes'
     | '/cases/$caseId'
     | '/demo/cuf'
     | '/api/cctv/ingest'
+    | '/api/whatsapp/webhook'
     | '/cases/$caseId/cctv'
     | '/cases/$caseId/documents'
     | '/cases/$caseId/financials'
@@ -186,9 +210,11 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   DiagnosticsRoute: typeof DiagnosticsRoute
   NewCaseRoute: typeof NewCaseRoute
+  WhatsappQuotesRoute: typeof WhatsappQuotesRoute
   CasesCaseIdRoute: typeof CasesCaseIdRouteWithChildren
   DemoCufRoute: typeof DemoCufRoute
   ApiCctvIngestRoute: typeof ApiCctvIngestRoute
+  ApiWhatsappWebhookRoute: typeof ApiWhatsappWebhookRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -221,6 +247,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof NewCaseRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/whatsapp-quotes': {
+      id: '/whatsapp-quotes'
+      path: '/whatsapp-quotes'
+      fullPath: '/whatsapp-quotes'
+      preLoaderRoute: typeof WhatsappQuotesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/cases/$caseId': {
       id: '/cases/$caseId'
       path: '/cases/$caseId'
@@ -240,6 +273,13 @@ declare module '@tanstack/react-router' {
       path: '/api/cctv/ingest'
       fullPath: '/api/cctv/ingest'
       preLoaderRoute: typeof ApiCctvIngestRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/whatsapp/webhook': {
+      id: '/api/whatsapp/webhook'
+      path: '/api/whatsapp/webhook'
+      fullPath: '/api/whatsapp/webhook'
+      preLoaderRoute: typeof ApiWhatsappWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/cases/$caseId/': {
@@ -314,9 +354,11 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   DiagnosticsRoute: DiagnosticsRoute,
   NewCaseRoute: NewCaseRoute,
+  WhatsappQuotesRoute: WhatsappQuotesRoute,
   CasesCaseIdRoute: CasesCaseIdRouteWithChildren,
   DemoCufRoute: DemoCufRoute,
   ApiCctvIngestRoute: ApiCctvIngestRoute,
+  ApiWhatsappWebhookRoute: ApiWhatsappWebhookRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -271,15 +271,70 @@ export function csvHeaderLine(bytes: ArrayBuffer, fileType: string, filename: st
   return first || null;
 }
 
+// Verbs and boilerplate AI phrasings wrap every fact in; they carry no evidential weight.
+const CLAIM_FILLER_TOKENS = new Set([
+  "the", "a", "an", "of", "on", "at", "is", "was", "were", "are", "be", "been",
+  "that", "this", "it", "its", "by", "for", "to", "in", "and", "or", "as", "per", "with", "from",
+  "states", "state", "stated", "reports", "report", "reported", "lists", "list", "listed",
+  "identifies", "identify", "identified", "shows", "show", "shown", "confirms", "confirm", "confirmed",
+  "notes", "note", "noted", "records", "record", "recorded", "says", "said",
+  "invoice", "invoiced", "document", "claim", "claims",
+]);
+
+// Content tokens: lowercase, punctuation trimmed, numbers de-commas'd, filler dropped,
+// prefix-5 so inflections agree ("collection"/"collected" -> "colle", "expires"/"expiring" -> "expir").
+function contentTokens(text: string): Set<string> {
+  const out = new Set<string>();
+  for (const raw of text.split(/\s+/)) {
+    let t = raw.toLowerCase().replace(/^[^a-z0-9]+|[^a-z0-9:]+$/g, "");
+    if (!t) continue;
+    if (/^[0-9][0-9,]*(\.[0-9]+)?$/.test(t)) t = t.replace(/,/g, "");
+    if (CLAIM_FILLER_TOKENS.has(t)) continue;
+    out.add(t.length > 5 ? t.slice(0, 5) : t);
+  }
+  return out;
+}
+
+function hasNumericAnchor(tokens: Set<string>): boolean {
+  for (const t of tokens) if (/\d/.test(t)) return true;
+  return false;
+}
+
+// A re-read of the same document phrases the same fact differently. Treat a candidate as a
+// duplicate of a stored claim only when it is essentially a subset of it (containment) or the
+// two nearly coincide (jaccard) - and they share a concrete anchor (number, date, id) so two
+// different facts that merely share topic words never merge. Conflicting values keep different
+// anchors or enough distinct tokens, so contradictions survive.
+export function isSemanticDuplicate(a: string, b: string): boolean {
+  const ta = contentTokens(a);
+  const tb = contentTokens(b);
+  if (ta.size < 2 || tb.size < 2) return false;
+  let overlap = 0;
+  const shared = new Set<string>();
+  for (const t of ta) if (tb.has(t)) { overlap++; shared.add(t); }
+  if (overlap < 4 || !hasNumericAnchor(shared)) return false;
+  // Differing values on BOTH sides (08:00 vs 14:00, 10 vs 11 October) means the claims
+  // state the same kind of fact with different values: a potential contradiction, never a duplicate.
+  const numA = [...ta].filter((t) => /\d/.test(t) && !tb.has(t));
+  const numB = [...tb].filter((t) => /\d/.test(t) && !ta.has(t));
+  if (numA.length && numB.length) return false;
+  const containment = overlap / Math.min(ta.size, tb.size);
+  const jaccard = overlap / (ta.size + tb.size - overlap);
+  return containment >= 0.85 || jaccard >= 0.7;
+}
+
 // Keep only claims that are new for (case, document): dedupe inside the batch and against stored rows.
 export function filterNewClaims<T extends { claim_text: string }>(claims: T[], existingTexts: string[], headerLine?: string | null): T[] {
   const headerKey = headerLine ? normalizeClaimKey(headerLine) : null;
   const seen = new Set<string>(existingTexts.map(normalizeClaimKey));
+  const keptTexts: string[] = [...existingTexts];
   const out: T[] = [];
   for (const claim of claims) {
     const key = normalizeClaimKey(claim.claim_text);
     if (!key || key === headerKey || seen.has(key)) continue;
+    if (keptTexts.some((t) => isSemanticDuplicate(claim.claim_text, t))) continue;
     seen.add(key);
+    keptTexts.push(claim.claim_text);
     out.push(claim);
   }
   return out;

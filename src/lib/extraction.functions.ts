@@ -334,6 +334,24 @@ export async function extractDocumentClaimsForPath(input: {
   if (!claims.length) throw new Error("NO_CLAIMS_EXTRACTED");
 
   // Re-running extraction on a document must not duplicate claims.
+  // AI re-reads phrase the same facts differently, so exact-text dedupe is not enough:
+  // for AI runs, first drop the document's still-unverified (PENDING) claims and their
+  // open flags, then insert the fresh set. Verified and disputed claims are never touched.
+  if (!input.noAi) {
+    const { data: pendingRows, error: pendingError } = await input.supabase
+      .from("extracted_claims").select("id")
+      .eq("case_id", input.caseId).eq("document_id", input.documentId).eq("status", "PENDING");
+    if (pendingError) throw pendingError;
+    const pendingIds = (pendingRows ?? []).map((r: any) => String(r.id));
+    if (pendingIds.length) {
+      const inList = pendingIds.map((id) => `"${id}"`).join(",");
+      await input.supabase.from("timeline_events").delete().in("provenance_id", pendingIds);
+      await input.supabase.from("contradictions").delete().eq("case_id", input.caseId).eq("status", "FLAGGED")
+        .or(`claim_a_id.in.(${inList}),claim_b_id.in.(${inList})`);
+      const { error: delError } = await input.supabase.from("extracted_claims").delete().in("id", pendingIds);
+      if (delError) throw delError;
+    }
+  }
   const header = csvHeaderLine(bytes, doc.file_type, doc.name);
   const { data: existingRows, error: existingError } = await input.supabase
     .from("extracted_claims").select("claim_text")

@@ -118,7 +118,10 @@ export function AppHeader({ public: isPublicPage = false }: { public?: boolean }
         <div className="flex items-center gap-3 text-xs text-muted-foreground">
           <ThemeToggle />
           {!isPublicRoute && (
-            <button onClick={logout} className="rounded border bg-secondary px-2 py-1 text-xs hover:bg-accent">Sign out</button>
+            <>
+              <Link to="/settings" className="rounded border bg-secondary px-2 py-1 text-xs hover:bg-accent">Account</Link>
+              <button onClick={logout} className="rounded border bg-secondary px-2 py-1 text-xs hover:bg-accent">Sign out</button>
+            </>
           )}
         </div>
       </div>

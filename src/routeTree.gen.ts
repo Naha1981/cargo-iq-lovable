@@ -13,6 +13,10 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as DiagnosticsRouteImport } from './routes/diagnostics'
 import { Route as NewCaseRouteImport } from './routes/new-case'
+import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as TermsRouteImport } from './routes/terms'
 import { Route as CasesCaseIdRouteImport } from './routes/cases.$caseId'
 import { Route as DemoCufRouteImport } from './routes/demo.cuf'
 import { Route as ApiCctvIngestRouteImport } from './routes/api/cctv/ingest'
@@ -49,6 +53,26 @@ const DiagnosticsRoute = DiagnosticsRouteImport.update({
 const NewCaseRoute = NewCaseRouteImport.update({
   id: '/new-case',
   path: '/new-case',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CasesCaseIdRoute = CasesCaseIdRouteImport.update({
@@ -142,6 +166,10 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/diagnostics': typeof DiagnosticsRoute
   '/new-case': typeof NewCaseRoute
+  '/privacy': typeof PrivacyRoute
+  '/reset-password': typeof ResetPasswordRoute
+  '/settings': typeof SettingsRoute
+  '/terms': typeof TermsRoute
   '/cases/$caseId': typeof CasesCaseIdRouteWithChildren
   '/demo/cuf': typeof DemoCufRoute
   '/api/cctv/ingest': typeof ApiCctvIngestRoute
@@ -165,6 +193,10 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/diagnostics': typeof DiagnosticsRoute
   '/new-case': typeof NewCaseRoute
+  '/privacy': typeof PrivacyRoute
+  '/reset-password': typeof ResetPasswordRoute
+  '/settings': typeof SettingsRoute
+  '/terms': typeof TermsRoute
   '/demo/cuf': typeof DemoCufRoute
   '/api/cctv/ingest': typeof ApiCctvIngestRoute
   '/cases/$caseId/appointments': typeof CasesCaseIdAppointmentsRoute
@@ -188,6 +220,10 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/diagnostics': typeof DiagnosticsRoute
   '/new-case': typeof NewCaseRoute
+  '/privacy': typeof PrivacyRoute
+  '/reset-password': typeof ResetPasswordRoute
+  '/settings': typeof SettingsRoute
+  '/terms': typeof TermsRoute
   '/cases/$caseId': typeof CasesCaseIdRouteWithChildren
   '/demo/cuf': typeof DemoCufRoute
   '/api/cctv/ingest': typeof ApiCctvIngestRoute
@@ -213,6 +249,10 @@ export interface FileRouteTypes {
     | '/auth'
     | '/diagnostics'
     | '/new-case'
+    | '/privacy'
+    | '/reset-password'
+    | '/settings'
+    | '/terms'
     | '/cases/$caseId'
     | '/demo/cuf'
     | '/api/cctv/ingest'
@@ -236,6 +276,10 @@ export interface FileRouteTypes {
     | '/auth'
     | '/diagnostics'
     | '/new-case'
+    | '/privacy'
+    | '/reset-password'
+    | '/settings'
+    | '/terms'
     | '/demo/cuf'
     | '/api/cctv/ingest'
     | '/cases/$caseId/appointments'
@@ -258,6 +302,10 @@ export interface FileRouteTypes {
     | '/auth'
     | '/diagnostics'
     | '/new-case'
+    | '/privacy'
+    | '/reset-password'
+    | '/settings'
+    | '/terms'
     | '/cases/$caseId'
     | '/demo/cuf'
     | '/api/cctv/ingest'
@@ -282,6 +330,10 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   DiagnosticsRoute: typeof DiagnosticsRoute
   NewCaseRoute: typeof NewCaseRoute
+  PrivacyRoute: typeof PrivacyRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
+  SettingsRoute: typeof SettingsRoute
+  TermsRoute: typeof TermsRoute
   CasesCaseIdRoute: typeof CasesCaseIdRouteWithChildren
   DemoCufRoute: typeof DemoCufRoute
   ApiCctvIngestRoute: typeof ApiCctvIngestRoute
@@ -315,6 +367,34 @@ declare module '@tanstack/react-router' {
       path: '/new-case'
       fullPath: '/new-case'
       preLoaderRoute: typeof NewCaseRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/cases/$caseId': {
@@ -482,6 +562,10 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   DiagnosticsRoute: DiagnosticsRoute,
   NewCaseRoute: NewCaseRoute,
+  PrivacyRoute: PrivacyRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
+  SettingsRoute: SettingsRoute,
+  TermsRoute: TermsRoute,
   CasesCaseIdRoute: CasesCaseIdRouteWithChildren,
   DemoCufRoute: DemoCufRoute,
   ApiCctvIngestRoute: ApiCctvIngestRoute,

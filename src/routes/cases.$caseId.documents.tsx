@@ -2,10 +2,11 @@ import { assertDocumentSize, isPlainDocument } from "@/lib/extraction-policy";
 import { Route as CaseRoute } from "./cases.$caseId";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useRef, useState } from "react";
-import { Button, ClassTag, NatureBadge, Panel } from "@/components/ui-kit";
+import { Button, ClassTag, NatureBadge, Panel, DisputeBadge } from "@/components/ui-kit";
 import { registerDocument, resolveContradiction, reviewClaim, runDocumentExtraction } from "@/lib/case.functions";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
+import { disputedClaimIds, isDisputedClaim } from "@/lib/dispute";
 
 export const Route = createFileRoute("/cases/$caseId/documents")({
   head: () => ({ meta: [{ title: "Documents & contradictions | CargoIQ" }] }),
@@ -28,6 +29,7 @@ function DocsPage() {
   const [allowTestFallback, setAllowTestFallback] = useState(false);
   const [notice, setNotice] = useState("");
   const [decisions, setDecisions] = useState<Record<string, "VERIFIED" | "DISPUTED">>({});
+  const disputed = disputedClaimIds(data.contradictions);
   const supabase = createClient();
 
   async function onUpload(files: FileList | null) {
@@ -140,13 +142,14 @@ function DocsPage() {
             {data.claims.map((c: any) => {
               const status: string = decisions[c.id] ?? c.status;
               return (
-              <li key={c.id} className="grid gap-3 py-3 md:grid-cols-[1fr_auto]">
+              <li key={c.id} className={cn("grid gap-3 rounded-sm px-2 py-3 md:grid-cols-[1fr_auto]", isDisputedClaim(c, disputed) && "border border-disputed/30 bg-disputed/5")}>
                 <div>
                   <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                     <span className="font-mono">p.{c.page_number ?? "?"}</span>
                     <NatureBadge n={String(c.nature).toLowerCase() as any} />
                     <ClassTag c={c.evidence_class} />
                     <span className="font-mono">conf {Math.round(Number(c.confidence ?? 0) * 100)}%</span>
+                    {isDisputedClaim(c, disputed) && <DisputeBadge />}
                     {status !== "PENDING" && (
                       <span className={cn("rounded px-2 py-0.5 text-xs font-medium", status === "VERIFIED" ? "bg-observed/15 text-observed" : "bg-disputed/15 text-disputed")}>{status}</span>
                     )}
@@ -168,9 +171,22 @@ function DocsPage() {
         <Panel title={"Contradictions · " + data.contradictions.filter((c: any) => c.status === "FLAGGED").length + " flagged"}>
           <div className="space-y-3">
             {data.contradictions.map((c: any) => (
-              <div key={c.id} className="rounded-md border p-4">
-                <div className="flex items-center justify-between"><span className="font-medium">{c.title}</span><span className={cn("rounded px-2 py-1 text-xs", c.status === "RESOLVED" ? "bg-observed/15 text-observed" : "bg-disputed/15 text-disputed")}>{c.status}</span></div>
+              <div key={c.id} className={cn("rounded-md border p-4", c.status === "FLAGGED" && "border-disputed/40 bg-disputed/5")}>
+                <div className="flex items-center justify-between"><span className="font-medium">{c.title}</span><span className="flex items-center gap-2">{c.status === "FLAGGED" && <DisputeBadge />}<span className={cn("rounded px-2 py-1 text-xs", c.status === "RESOLVED" ? "bg-observed/15 text-observed" : "bg-disputed/15 text-disputed")}>{c.status}</span></span></div>
                 <p className="mt-2 text-sm text-muted-foreground">{c.description}</p>
+                {[c.claim_a_id, c.claim_b_id].filter(Boolean).length > 0 && (
+                  <ul className="mt-3 space-y-1.5">
+                    {[c.claim_a_id, c.claim_b_id].filter(Boolean).map((id: any) => {
+                      const linked = data.claims.find((cl: any) => String(cl.id) === String(id));
+                      return (
+                        <li key={String(id)} className="flex items-start gap-2 rounded border border-disputed/25 bg-disputed/5 px-2 py-1.5 text-xs">
+                          <DisputeBadge label="Linked" className="mt-0.5 shrink-0" />
+                          <span className="text-muted-foreground">{linked ? linked.claim_text : "Linked claim " + String(id).slice(0, 8)}</span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
                 {c.status === "FLAGGED" && <div className="mt-4 space-y-3">
                   <label className="block text-sm">Resolution explanation<textarea value={draft(c.id).explanation} onChange={e=>editDraft(c.id,"explanation",e.target.value)} minLength={10} maxLength={4000} className="mt-1 min-h-24 w-full rounded border bg-background p-2" placeholder="Explain how the competing records were reconciled and what remains uncertain." /></label>
                   <label className="block text-sm">Supporting case document<select value={draft(c.id).documentId} onChange={e=>editDraft(c.id,"documentId",e.target.value)} className="mt-1 w-full rounded border bg-background p-2"><option value="">Select source evidence</option>{data.documents.map((d:any)=><option key={d.id} value={d.id}>{d.name} ({d.source_party || "source not recorded"})</option>)}</select></label>

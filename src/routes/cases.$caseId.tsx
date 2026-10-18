@@ -1,5 +1,5 @@
 import { createFileRoute, Link, Outlet, notFound, redirect } from "@tanstack/react-router";
-import { AppHeader } from "@/components/ui-kit";
+import { AppHeader, DisputeBadge } from "@/components/ui-kit";
 import { getCaseWorkspace } from "@/lib/case.functions";
 
 export const Route = createFileRoute("/cases/$caseId")({
@@ -45,7 +45,9 @@ const tabs = [
 ] as const;
 
 function CaseLayout() {
-  const c = Route.useLoaderData().case;
+  const data = Route.useLoaderData();
+  const c = data.case;
+  const openDisputes = data.contradictions.filter((x: any) => x.status === "FLAGGED").length;
 
   return (
     <div className="min-h-screen">
@@ -58,6 +60,11 @@ function CaseLayout() {
               <div className="font-mono text-xs text-primary">{c.reference_no} · {c.port_code ?? "—"} · {c.status}</div>
               <h1 className="mt-1 text-2xl font-semibold tracking-tight">{c.vessel_name || "Unnamed vessel"} {c.voyage_no ? "· " + c.voyage_no : ""}</h1>
               <p className="text-sm text-muted-foreground">{c.container_no ? "Container " + c.container_no : "Multiple containers"} · Opened {new Date(c.created_at).toLocaleDateString("en-GB")}</p>
+              {openDisputes > 0 && (
+                <Link to="/cases/$caseId/documents" params={{ caseId: c.id }} className="mt-2 inline-block" aria-label="Open the disputed items">
+                  <DisputeBadge label={openDisputes + " open dispute" + (openDisputes === 1 ? "" : "s") + " · review"} />
+                </Link>
+              )}
             </div>
           </div>
 

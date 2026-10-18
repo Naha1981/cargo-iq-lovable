@@ -1,8 +1,9 @@
 import { Route as CaseRoute } from "./cases.$caseId";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Panel, Stat, NatureBadge, ClassTag } from "@/components/ui-kit";
+import { Panel, Stat, NatureBadge, ClassTag, DisputeBadge } from "@/components/ui-kit";
 import { cn } from "@/lib/utils";
+import { disputedClaimIds, disputedWindow, isDisputeEvent } from "@/lib/dispute";
 
 export const Route = createFileRoute("/cases/$caseId/")({
   head: () => ({ meta: [{ title: "Investigation timeline | CargoIQ" }] }),
@@ -27,6 +28,8 @@ function TimelinePage() {
   const docCount = data.documents.length;
   const claimCount = data.claims.length;
   const openCount = data.contradictions.filter((c: any) => c.status === "FLAGGED").length;
+  const disputed = disputedClaimIds(data.contradictions);
+  const window = disputedWindow(data.claims, disputed);
   const verifiedCount = data.claims.filter((c: any) => c.status === "VERIFIED").length;
   const pendingCount = data.claims.filter((c: any) => c.status === "PENDING").length;
   const nextAction = docCount === 0
@@ -56,16 +59,25 @@ function TimelinePage() {
           <ol aria-label="Timeline events" className="space-y-2 sm:hidden">
             {events.map((e: any) => (
               <li key={e.id}>
-                <button onClick={() => setSelectedId(e.id)} className={cn("w-full rounded border px-3 py-3 text-left", e.id === selected?.id && "border-primary bg-accent")}>
+                <button onClick={() => setSelectedId(e.id)} className={cn("w-full rounded border px-3 py-3 text-left", e.id === selected?.id && "border-primary bg-accent", isDisputeEvent(e, disputed) && "border-disputed/40 bg-disputed/5")}>
                   <span className="block font-mono text-xs text-muted-foreground">{new Date(e.timestamp).toISOString().slice(0,16).replace("T", " ")}Z</span>
                   <span className="mt-1 block text-sm">{e.title}</span>
-                  <span className="mt-2 block"><NatureBadge n={String(e.nature).toLowerCase() as any} /></span>
+                  <span className="mt-2 flex flex-wrap gap-2"><NatureBadge n={String(e.nature).toLowerCase() as any} />{isDisputeEvent(e, disputed) && <DisputeBadge />}</span>
                 </button>
               </li>
             ))}
           </ol>
           <div className="relative hidden h-56 sm:block">
             <div className="absolute left-0 right-0 top-1/2 h-px bg-border" />
+            {window && t1 > t0 && (
+              <div
+                className="absolute top-2 bottom-2 rounded border border-disputed/30 bg-disputed/10"
+                style={{ left: pos(new Date(window.start).toISOString()) + "%", width: Math.max(2, pos(new Date(window.end).toISOString()) - pos(new Date(window.start).toISOString())) + "%" }}
+                aria-label="Disputed window"
+              >
+                <span className="absolute -top-0.5 left-1 font-mono text-[9px] uppercase tracking-widest text-disputed">Disputed window</span>
+              </div>
+            )}
             {events.map((e: any, i: number) => (
               <button
                 key={e.id}
@@ -98,7 +110,7 @@ function TimelinePage() {
                 >
                   <span className="font-mono text-xs text-muted-foreground">{new Date(e.timestamp).toISOString().slice(0,16).replace("T"," ")}Z</span>
                   <span>{e.title}<span className="block text-xs text-muted-foreground">{e.source}</span></span>
-                  <NatureBadge n={String(e.nature).toLowerCase() as any} />
+                  <span className="flex flex-wrap items-center gap-2">{isDisputeEvent(e, disputed) && <DisputeBadge />}<NatureBadge n={String(e.nature).toLowerCase() as any} /></span>
                 </button>
               </li>
             ))}
@@ -108,7 +120,7 @@ function TimelinePage() {
         <Panel title="Provenance">
           {selected ? (
             <div className="space-y-4 text-sm">
-              <NatureBadge n={String(selected.nature).toLowerCase() as any} />
+              <div className="flex flex-wrap gap-2"><NatureBadge n={String(selected.nature).toLowerCase() as any} />{isDisputeEvent(selected, disputed) && <DisputeBadge />}</div>
               <p className="text-base font-medium">{selected.title}</p>
               <dl className="grid grid-cols-[95px_1fr] gap-y-2 text-xs">
                 <dt className="text-muted-foreground">Timestamp</dt><dd className="font-mono">{selected.timestamp} UTC</dd>

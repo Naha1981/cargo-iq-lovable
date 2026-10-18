@@ -1,9 +1,10 @@
 import { Route as CaseRoute } from "./cases.$caseId";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Button, NatureBadge, Panel } from "@/components/ui-kit";
+import { Button, DisputeBadge, NatureBadge, Panel } from "@/components/ui-kit";
 import { corroborateCase } from "@/lib/case.functions";
 import { cn } from "@/lib/utils";
+import { disputedClaimIds, disputedWindow, isDisputeEvent } from "@/lib/dispute";
 
 type TrackPoint = { at: string; lat: number; lon: number; sog: number; cog: number | null };
 
@@ -88,6 +89,10 @@ function MapPage() {
 
   const nearby = data.timeline.filter((e: any) => Math.abs(Date.parse(e.timestamp) - time) <= 24 * 3600000).slice(0, 10);
   const flagged = data.contradictions.filter((x: any) => x.status === "FLAGGED").slice(0, 6);
+  const disputed = disputedClaimIds(data.contradictions);
+  const dWindow = disputedWindow(data.claims, disputed);
+  const inDisputedWindow = !!dWindow && time >= dWindow.start - 1 && time <= dWindow.end + 1;
+  const markerColor = inDisputedWindow ? "var(--disputed)" : "#d2ff6b";
 
   async function refreshSensors() {
     setRefreshing(true);
@@ -109,7 +114,7 @@ function MapPage() {
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
         {[
-          ["DATA STATUS", isSample ? "SAMPLE DATA" : "RECORDED OBSERVATIONS · CORROBORATION"],
+          ["DATA STATUS", inDisputedWindow ? "DISPUTED WINDOW" : isSample ? "SAMPLE DATA" : "RECORDED OBSERVATIONS · CORROBORATION"],
           ["TIME (UTC)", new Date(time).toISOString().replace("T", " ").slice(0, 19) + "Z"],
           ["VESSEL POSITION", locked ? current.lat.toFixed(5) + " / " + current.lon.toFixed(5) : "NOT TRACKING"],
           ["VESSEL COURSE", current.cog == null ? "—" : Math.round(current.cog) + "°"],
@@ -179,10 +184,10 @@ function MapPage() {
                   return <circle key={i} cx={pos.x} cy={pos.y} r={Math.max(2, Math.min(6, 2 + p.sog / 4))} fill="#d2ff6b" fillOpacity={Math.min(1, 0.2 + p.sog / 12)} />;
                 })}
                 <g transform={"translate(" + current.x + "," + current.y + ")"}>
-                  <circle r="18" fill="none" stroke="#d2ff6b">
+                  <circle r="18" fill="none" stroke={markerColor}>
                     <animate attributeName="r" values="12;28;12" dur="1.8s" repeatCount="indefinite" />
                   </circle>
-                  <path d="M0 -10 L6 8 L0 4 L-6 8Z" fill="#d2ff6b" />
+                  <path d="M0 -10 L6 8 L0 4 L-6 8Z" fill={markerColor} />
                 </g>
               </g>
             )}
@@ -205,7 +210,7 @@ function MapPage() {
               <circle key={i} cx={760 + i * 22} cy={565} r={Math.max(4, Number(w.payload?.waveHeight ?? 1) * 3)} fill="#7dd3fc" fillOpacity=".26" />
             ))}
 
-            <g stroke="#d2ff6b" opacity=".82">
+            <g stroke={markerColor} opacity=".82">
               <path d={"M" + (current.x - 30) + " " + current.y + "H" + (current.x + 30) + "M" + current.x + " " + (current.y - 30) + "V" + (current.y + 30)} />
               <circle cx={current.x} cy={current.y} r="32" fill="none" />
               <circle cx={current.x} cy={current.y} r="45" fill="none" strokeDasharray="2 8" />
@@ -225,6 +230,7 @@ function MapPage() {
           <div className="relative mx-3 mt-3 md:absolute md:mx-0 md:mt-0 md:left-4 md:top-8 rounded border border-[#d2ff6b]/40 bg-black/65 px-3 py-2 font-mono text-[10px] backdrop-blur">
             <div className="text-[#d2ff6b]">VESSEL {locked ? "TRACKING ON" : "TRACKING OFF"}</div>
             <div className="mt-1 text-white/70">SPEED {current.sog.toFixed(1)} kn</div>
+            {inDisputedWindow && <div className="mt-1 font-semibold" style={{ color: "var(--disputed)" }}>DISPUTED WINDOW</div>}
           </div>
 
           <div className="relative mx-3 mt-3 md:absolute md:mx-0 md:mt-0 md:left-4 md:top-[5.75rem] md:w-64 md:max-w-[45%] rounded border border-[#d2ff6b]/40 bg-black/70 px-3 py-2 font-mono text-[10px] backdrop-blur">
@@ -232,7 +238,7 @@ function MapPage() {
             <ul className="mt-2 max-h-44 space-y-2 overflow-y-auto pr-1 md:max-h-[clamp(64px,calc(100vh-640px),34vh)]">
               {nearby.map((e: any) => (
                 <li key={e.id} className="border-t border-white/10 pt-1.5 first:border-t-0 first:pt-0">
-                  <div className="flex items-center justify-between gap-2"><span className="text-white/60">{String(e.timestamp).slice(5, 16).replace("T", " ")}Z</span><NatureBadge n={String(e.nature).toLowerCase() as any} /></div>
+                  <div className="flex items-center justify-between gap-2"><span className="text-white/60">{String(e.timestamp).slice(5, 16).replace("T", " ")}Z</span><span className="flex items-center gap-1.5">{isDisputeEvent(e, disputed) && <DisputeBadge />}<NatureBadge n={String(e.nature).toLowerCase() as any} /></span></div>
                   <div className="mt-0.5 font-sans text-[11px] leading-snug text-white/90">{e.title}</div>
                 </li>
               ))}
@@ -282,7 +288,7 @@ function MapPage() {
         <Panel title="Discrepancy callouts">
           {flagged.map((c: any) => (
             <div key={c.id} className="mb-3 rounded border border-disputed/40 bg-disputed/5 p-3 text-sm">
-              <div className="font-medium text-disputed">{c.title}</div>
+              <div className="flex items-center gap-2"><DisputeBadge /><span className="font-medium text-disputed">{c.title}</span></div>
               <div className="mt-1 text-xs text-muted-foreground">{c.description}</div>
             </div>
           ))}

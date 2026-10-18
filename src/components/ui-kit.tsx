@@ -20,6 +20,15 @@ export const natureFill: Record<Nature, string> = {
   disputed: "var(--disputed)",
 };
 
+export function DisputeBadge({ label = "Disputed", className }: { label?: string; className?: string }) {
+  return (
+    <span className={cn("inline-flex items-center gap-1 rounded border border-disputed/40 bg-disputed/15 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-disputed", className)}>
+      <span className="h-1.5 w-1.5 animate-pulse rounded-full" style={{ background: "var(--disputed)" }} />
+      {label}
+    </span>
+  );
+}
+
 export function NatureBadge({ n }: { n: Nature }) {
   return (
     <span className={cn("inline-flex items-center gap-1 rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider", natureCls[n])}>

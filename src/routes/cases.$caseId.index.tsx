@@ -30,6 +30,7 @@ function TimelinePage() {
   const openCount = data.contradictions.filter((c: any) => c.status === "FLAGGED").length;
   const disputed = disputedClaimIds(data.contradictions);
   const window = disputedWindow(data.claims, disputed);
+  const showNature = (e: any) => String(e.nature).toLowerCase() !== "disputed" || !isDisputeEvent(e, disputed);
   const verifiedCount = data.claims.filter((c: any) => c.status === "VERIFIED").length;
   const pendingCount = data.claims.filter((c: any) => c.status === "PENDING").length;
   const nextAction = docCount === 0
@@ -56,13 +57,19 @@ function TimelinePage() {
           <div className="py-14 text-center text-sm text-muted-foreground">No timeline events yet. Upload records or refresh satellite and marine data.</div>
         ) : (
           <>
+          {window && (
+            <div className="mb-3 flex items-center gap-2 rounded border border-disputed/40 bg-disputed/10 px-3 py-2 sm:hidden" aria-label="Disputed window">
+              <DisputeBadge label="Disputed window" />
+              <span className="font-mono text-[11px] text-disputed">{new Date(window.start).toISOString().slice(5,16).replace("T", " ")}Z – {new Date(window.end).toISOString().slice(5,16).replace("T", " ")}Z</span>
+            </div>
+          )}
           <ol aria-label="Timeline events" className="space-y-2 sm:hidden">
             {events.map((e: any) => (
               <li key={e.id}>
                 <button onClick={() => setSelectedId(e.id)} className={cn("w-full rounded border px-3 py-3 text-left", e.id === selected?.id && "border-primary bg-accent", isDisputeEvent(e, disputed) && "border-disputed/40 bg-disputed/5")}>
                   <span className="block font-mono text-xs text-muted-foreground">{new Date(e.timestamp).toISOString().slice(0,16).replace("T", " ")}Z</span>
                   <span className="mt-1 block text-sm">{e.title}</span>
-                  <span className="mt-2 flex flex-wrap gap-2"><NatureBadge n={String(e.nature).toLowerCase() as any} />{isDisputeEvent(e, disputed) && <DisputeBadge />}</span>
+                  <span className="mt-2 flex flex-wrap gap-2">{showNature(e) && <NatureBadge n={String(e.nature).toLowerCase() as any} />}{isDisputeEvent(e, disputed) && <DisputeBadge />}</span>
                 </button>
               </li>
             ))}
@@ -110,7 +117,7 @@ function TimelinePage() {
                 >
                   <span className="font-mono text-xs text-muted-foreground">{new Date(e.timestamp).toISOString().slice(0,16).replace("T"," ")}Z</span>
                   <span>{e.title}<span className="block text-xs text-muted-foreground">{e.source}</span></span>
-                  <span className="flex flex-wrap items-center gap-2">{isDisputeEvent(e, disputed) && <DisputeBadge />}<NatureBadge n={String(e.nature).toLowerCase() as any} /></span>
+                  <span className="flex flex-wrap items-center gap-2">{isDisputeEvent(e, disputed) && <DisputeBadge />}{showNature(e) && <NatureBadge n={String(e.nature).toLowerCase() as any} />}</span>
                 </button>
               </li>
             ))}
@@ -120,7 +127,7 @@ function TimelinePage() {
         <Panel title="Provenance">
           {selected ? (
             <div className="space-y-4 text-sm">
-              <div className="flex flex-wrap gap-2"><NatureBadge n={String(selected.nature).toLowerCase() as any} />{isDisputeEvent(selected, disputed) && <DisputeBadge />}</div>
+              <div className="flex flex-wrap gap-2">{showNature(selected) && <NatureBadge n={String(selected.nature).toLowerCase() as any} />}{isDisputeEvent(selected, disputed) && <DisputeBadge />}</div>
               <p className="text-base font-medium">{selected.title}</p>
               <dl className="grid grid-cols-[95px_1fr] gap-y-2 text-xs">
                 <dt className="text-muted-foreground">Timestamp</dt><dd className="font-mono">{selected.timestamp} UTC</dd>

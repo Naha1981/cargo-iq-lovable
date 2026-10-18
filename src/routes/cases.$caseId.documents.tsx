@@ -150,7 +150,7 @@ function DocsPage() {
                     <ClassTag c={c.evidence_class} />
                     <span className="font-mono">conf {Math.round(Number(c.confidence ?? 0) * 100)}%</span>
                     {isDisputedClaim(c, disputed) && <DisputeBadge />}
-                    {status !== "PENDING" && (
+                    {status !== "PENDING" && !(status === "DISPUTED" && isDisputedClaim(c, disputed)) && (
                       <span className={cn("rounded px-2 py-0.5 text-xs font-medium", status === "VERIFIED" ? "bg-observed/15 text-observed" : "bg-disputed/15 text-disputed")}>{status}</span>
                     )}
                   </div>

@@ -1,9 +1,8 @@
 import { Route as CaseRoute } from "./cases.$caseId";
-import { createFileRoute, useRouter } from "@tanstack/react-router";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Button, NatureBadge, Panel } from "@/components/ui-kit";
 import { corroborateCase } from "@/lib/case.functions";
-import { liveHarbourHref } from "@/lib/live-harbour";
 import { cn } from "@/lib/utils";
 
 type TrackPoint = { at: string; lat: number; lon: number; sog: number; cog: number | null };
@@ -123,18 +122,17 @@ function MapPage() {
         ))}
       </div>
 
-      <a
-        href={liveHarbourHref(data.case.port_code)}
-        target="_blank"
-        rel="noopener noreferrer"
+      <Link
+        to="/cases/$caseId/live-harbour"
+        params={{ caseId: data.case.id }}
         className="flex items-center justify-between gap-3 rounded border border-primary/40 bg-primary/5 px-3 py-2 hover:bg-primary/10"
       >
         <span>
           <span className="font-mono text-[10px] tracking-[0.2em] text-primary">LIVE HARBOUR VIEW</span>
-          <span className="mt-0.5 block text-xs text-muted-foreground">Real-time vessels off the South African coast - opens in a new tab.</span>
+          <span className="mt-0.5 block text-xs text-muted-foreground">Real-time vessels off the South African coast, inside this case.</span>
         </span>
-        <span aria-hidden className="text-primary">↗</span>
-      </a>
+        <span aria-hidden className="text-primary">→</span>
+      </Link>
 
       <div className="overflow-hidden rounded-lg border bg-[#061016]">
         <div className="relative">

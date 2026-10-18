@@ -1,7 +1,6 @@
 import { createFileRoute, Link, Outlet, notFound, redirect } from "@tanstack/react-router";
 import { AppHeader } from "@/components/ui-kit";
 import { getCaseWorkspace } from "@/lib/case.functions";
-import { liveHarbourHref } from "@/lib/live-harbour";
 
 export const Route = createFileRoute("/cases/$caseId")({
   ssr: false,
@@ -30,6 +29,7 @@ export const Route = createFileRoute("/cases/$caseId")({
 const tabs = [
   { to: "/cases/$caseId", label: "Timeline", exact: true },
   { to: "/cases/$caseId/map", label: "Harbour Map" },
+  { to: "/cases/$caseId/live-harbour", label: "Live Harbour View" },
   { to: "/cases/$caseId/documents", label: "Documents & Contradictions" },
   { to: "/cases/$caseId/definitions", label: "Definitions" },
   { to: "/cases/$caseId/counts", label: "Count reconciliation" },
@@ -75,14 +75,6 @@ function CaseLayout() {
                 {t.label}
               </Link>
             ))}
-            <a
-              href={liveHarbourHref(c.port_code)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="rounded-sm border-b-2 border-transparent px-3 py-2.5 text-sm text-primary hover:text-foreground sm:whitespace-nowrap"
-            >
-              Live Harbour View ↗
-            </a>
           </nav>
         </div>
       </div>

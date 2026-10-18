@@ -117,6 +117,9 @@ export function AppHeader({ public: isPublicPage = false }: { public?: boolean }
         </Link>
         <div className="flex items-center gap-3 text-xs text-muted-foreground">
           <ThemeToggle />
+          {isPublicRoute && (
+            <Link to="/auth" className="rounded border bg-secondary px-2 py-1 text-xs text-foreground hover:bg-accent">Sign in</Link>
+          )}
           {!isPublicRoute && (
             <>
               <Link to="/settings" className="rounded border bg-secondary px-2 py-1 text-xs hover:bg-accent">Account</Link>

@@ -19,6 +19,7 @@ import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as CasesCaseIdRouteImport } from './routes/cases.$caseId'
 import { Route as DemoCufRouteImport } from './routes/demo.cuf'
+import { Route as JoinTokenRouteImport } from './routes/join.$token'
 import { Route as ApiCctvIngestRouteImport } from './routes/api/cctv/ingest'
 import { Route as CasesCaseIdIndexRouteImport } from './routes/cases.$caseId.index'
 import { Route as CasesCaseIdAppointmentsRouteImport } from './routes/cases.$caseId.appointments'
@@ -84,6 +85,11 @@ const CasesCaseIdRoute = CasesCaseIdRouteImport.update({
 const DemoCufRoute = DemoCufRouteImport.update({
   id: '/demo/cuf',
   path: '/demo/cuf',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const JoinTokenRoute = JoinTokenRouteImport.update({
+  id: '/join/$token',
+  path: '/join/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiCctvIngestRoute = ApiCctvIngestRouteImport.update({
@@ -178,6 +184,7 @@ export interface FileRoutesByFullPath {
   '/terms': typeof TermsRoute
   '/cases/$caseId': typeof CasesCaseIdRouteWithChildren
   '/demo/cuf': typeof DemoCufRoute
+  '/join/$token': typeof JoinTokenRoute
   '/api/cctv/ingest': typeof ApiCctvIngestRoute
   '/cases/$caseId/appointments': typeof CasesCaseIdAppointmentsRoute
   '/cases/$caseId/cctv': typeof CasesCaseIdCctvRoute
@@ -205,6 +212,7 @@ export interface FileRoutesByTo {
   '/settings': typeof SettingsRoute
   '/terms': typeof TermsRoute
   '/demo/cuf': typeof DemoCufRoute
+  '/join/$token': typeof JoinTokenRoute
   '/api/cctv/ingest': typeof ApiCctvIngestRoute
   '/cases/$caseId/appointments': typeof CasesCaseIdAppointmentsRoute
   '/cases/$caseId/cctv': typeof CasesCaseIdCctvRoute
@@ -234,6 +242,7 @@ export interface FileRoutesById {
   '/terms': typeof TermsRoute
   '/cases/$caseId': typeof CasesCaseIdRouteWithChildren
   '/demo/cuf': typeof DemoCufRoute
+  '/join/$token': typeof JoinTokenRoute
   '/api/cctv/ingest': typeof ApiCctvIngestRoute
   '/cases/$caseId/appointments': typeof CasesCaseIdAppointmentsRoute
   '/cases/$caseId/cctv': typeof CasesCaseIdCctvRoute
@@ -264,6 +273,7 @@ export interface FileRouteTypes {
     | '/terms'
     | '/cases/$caseId'
     | '/demo/cuf'
+    | '/join/$token'
     | '/api/cctv/ingest'
     | '/cases/$caseId/appointments'
     | '/cases/$caseId/cctv'
@@ -291,6 +301,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/terms'
     | '/demo/cuf'
+    | '/join/$token'
     | '/api/cctv/ingest'
     | '/cases/$caseId/appointments'
     | '/cases/$caseId/cctv'
@@ -319,6 +330,7 @@ export interface FileRouteTypes {
     | '/terms'
     | '/cases/$caseId'
     | '/demo/cuf'
+    | '/join/$token'
     | '/api/cctv/ingest'
     | '/cases/$caseId/appointments'
     | '/cases/$caseId/cctv'
@@ -348,6 +360,7 @@ export interface RootRouteChildren {
   TermsRoute: typeof TermsRoute
   CasesCaseIdRoute: typeof CasesCaseIdRouteWithChildren
   DemoCufRoute: typeof DemoCufRoute
+  JoinTokenRoute: typeof JoinTokenRoute
   ApiCctvIngestRoute: typeof ApiCctvIngestRoute
 }
 
@@ -421,6 +434,13 @@ declare module '@tanstack/react-router' {
       path: '/demo/cuf'
       fullPath: '/demo/cuf'
       preLoaderRoute: typeof DemoCufRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/join/$token': {
+      id: '/join/$token'
+      path: '/join/$token'
+      fullPath: '/join/$token'
+      preLoaderRoute: typeof JoinTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/cctv/ingest': {
@@ -589,6 +609,7 @@ const rootRouteChildren: RootRouteChildren = {
   TermsRoute: TermsRoute,
   CasesCaseIdRoute: CasesCaseIdRouteWithChildren,
   DemoCufRoute: DemoCufRoute,
+  JoinTokenRoute: JoinTokenRoute,
   ApiCctvIngestRoute: ApiCctvIngestRoute,
 }
 export const routeTree = rootRouteImport

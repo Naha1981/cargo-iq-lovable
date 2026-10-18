@@ -1,18 +1,18 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getAuthed } from "@/lib/supabase/server";
+import { pickMembership } from "@/lib/active-workspace";
 import { resolveClaimAiProvider } from "@/lib/extraction.functions";
 
 export const getCurrentUser = createServerFn({ method: "GET" }).handler(async () => {
   const { supabase, user } = await getAuthed();
   if (!user) return { user: null, tenantId: null, role: null };
 
-  const { data: membership } = await supabase
+  const { data: memberships } = await supabase
     .from("user_roles")
     .select("tenant_id, role")
     .eq("user_id", user.id)
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle();
+    .order("created_at", { ascending: true });
+  const membership = pickMembership(memberships);
 
   return {
     user: { id: user.id, email: user.email ?? "", metadata: (user.user_metadata ?? {}) as Record<string, string> },

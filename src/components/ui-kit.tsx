@@ -3,6 +3,7 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import { cn } from "@/lib/utils";
 import { NATURE_LABEL, type Nature } from "@/lib/case-data";
 import { createClient } from "@/lib/supabase/client";
+import { WorkspaceSwitcher } from "@/components/TeamPanel";
 
 const natureCls: Record<Nature, string> = {
   observed: "border-observed/40 bg-observed/10 text-observed",
@@ -131,6 +132,7 @@ export function AppHeader({ public: isPublicPage = false }: { public?: boolean }
           )}
           {!isPublicRoute && (
             <>
+              <WorkspaceSwitcher />
               <Link to="/settings" className="rounded border bg-secondary px-2 py-1 text-xs hover:bg-accent">Account</Link>
               <button onClick={logout} className="rounded border bg-secondary px-2 py-1 text-xs hover:bg-accent">Sign out</button>
             </>

@@ -4,6 +4,7 @@ import { Button, Panel } from "@/components/ui-kit";
 import { SiteFooter } from "@/components/SiteFooter";
 import { createClient } from "@/lib/supabase/client";
 import { ensureOrganization } from "@/lib/auth.functions";
+import { acceptInvite, setActiveWorkspace, friendly } from "@/lib/workspace-client";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({ meta: [{ title: "CargoIQ — Sign in" }] }),
@@ -21,6 +22,17 @@ function AuthPage() {
   const [busy, setBusy] = useState(false);
   const supabase = createClient();
 
+  function joinToken(): string | null {
+    const t = new URLSearchParams(window.location.search).get("join");
+    return t && /^[A-Za-z0-9]{20,80}$/.test(t) ? t : null;
+  }
+  async function joinNow() {
+    const t = joinToken();
+    if (!t) return;
+    try { setActiveWorkspace(await acceptInvite(t)); }
+    catch (e) { throw new Error(friendly(e instanceof Error ? e.message : "Could not join.")); }
+  }
+
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setBusy(true);
@@ -36,7 +48,7 @@ function AuthPage() {
         });
         if (signUpError) throw signUpError;
 
-        if (data.session) await ensureOrganization({ data: { name: organization } });
+        if (data.session) { if (joinToken()) await joinNow(); else await ensureOrganization({ data: { name: organization } }); }
         if (!data.session) {
           setError("Account created. Check your email to confirm the account, then sign in.");
           setMode("signin");
@@ -54,7 +66,7 @@ function AuthPage() {
       } else {
         const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
         if (signInError) throw signInError;
-        await ensureOrganization({ data: { name: organization } });
+        if (joinToken()) await joinNow(); else await ensureOrganization({ data: { name: organization } });
       }
 
       await navigate({ to: "/" });

@@ -3,6 +3,7 @@ import { useState } from "react";
 import { AppHeader, Button, Panel } from "@/components/ui-kit";
 import { SiteFooter } from "@/components/SiteFooter";
 import { getCurrentUser, deleteOwnAccount } from "@/lib/auth.functions";
+import { TeamPanel } from "@/components/TeamPanel";
 import { createClient } from "@/lib/supabase/client";
 
 export const Route = createFileRoute("/settings")({
@@ -17,7 +18,7 @@ export const Route = createFileRoute("/settings")({
 });
 
 function SettingsPage() {
-  const { session } = Route.useRouteContext() as { session: { user: { email: string } | null } };
+  const { session } = Route.useRouteContext() as { session: { user: { id: string; email: string } | null } };
   const navigate = useNavigate();
   const [confirmText, setConfirmText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -47,6 +48,8 @@ function SettingsPage() {
         <Panel className="mt-8" title="Signed in">
           <p className="text-sm text-muted-foreground">{session.user?.email}</p>
         </Panel>
+
+        {session.user && <TeamPanel myId={session.user.id} />}
 
         <Panel className="mt-6" title="Delete account">
           <p className="text-sm leading-relaxed text-muted-foreground">

@@ -6,7 +6,7 @@ import { corroborateCase } from "@/lib/case.functions";
 import { cn } from "@/lib/utils";
 import { disputedClaimIds, disputedWindow, isDisputeEvent } from "@/lib/dispute";
 
-type TrackPoint = { at: string; lat: number; lon: number; sog: number; cog: number | null };
+type TrackPoint = { at: string; lat: number; lon: number; sog: number; cog: number | null; mmsi: string | null; vesselName: string | null };
 
 const DURBAN = { lat: -29.8833, lon: 31.05 };
 
@@ -25,6 +25,8 @@ function aisTrack(observations: any[]): TrackPoint[] {
       lon: Number(x.longitude),
       sog: Number(x.payload?.sog ?? 0),
       cog: x.payload?.cog == null ? null : Number(x.payload.cog),
+      mmsi: x.payload?.mmsi ? String(x.payload.mmsi) : null,
+      vesselName: x.payload?.vesselName ? String(x.payload.vesselName) : null,
     }))
     .filter((x) => Number.isFinite(Date.parse(x.at)))
     .sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
@@ -59,6 +61,18 @@ function MapPage() {
   const [locked, setLocked] = useState(true);
   const [layers, setLayers] = useState({ ais: true, sar: true, optical: true, weather: false, infrastructure: true });
   const [refreshing, setRefreshing] = useState(false);
+  type Preview =
+    | { kind: "vessel" }
+    | { kind: "position"; p: TrackPoint }
+    | { kind: "terminal"; name: string; covers: string }
+    | { kind: "sar" | "optical"; scene: any }
+    | { kind: "weather"; w: any };
+  const [preview, setPreview] = useState<Preview | null>(null);
+  const [pinned, setPinned] = useState(false);
+  const showPreview = (next: Preview) => { if (!pinned) setPreview(next); };
+  const tapPreview = (next: Preview) => { setPreview(next); setPinned(true); };
+  const clearPreview = () => { setPreview(null); setPinned(false); };
+  const hoverOut = () => { if (!pinned) setPreview(null); };
 
   useEffect(() => {
     if (!playing) return;
@@ -92,7 +106,88 @@ function MapPage() {
   const disputed = disputedClaimIds(data.contradictions);
   const dWindow = disputedWindow(data.claims, disputed);
   const inDisputedWindow = !!dWindow && time >= dWindow.start - 1 && time <= dWindow.end + 1;
+  const inWindowAt = (t: number) => !!dWindow && t >= dWindow.start - 1 && t <= dWindow.end + 1;
   const markerColor = inDisputedWindow ? "var(--disputed)" : "#d2ff6b";
+
+  function renderPreview() {
+    if (!preview) return null;
+    const last = track[track.length - 1];
+    const fmt = (ms: number) => new Date(ms).toISOString().replace("T", " ").slice(0, 16) + "Z";
+    let title = "";
+    let rows: [string, string][] = [];
+    let dispute: { on: boolean; text: string } | null = null;
+    if (preview.kind === "vessel") {
+      title = "Case vessel";
+      const name = last?.vesselName || data.case.vessel_name || "Unnamed vessel";
+      rows = [
+        ["Name", name + (data.case.voyage_no ? " · voyage " + data.case.voyage_no : "")],
+        ["MMSI (radio ID)", last?.mmsi ?? "Not recorded"],
+        ["Flag", "Not recorded"],
+        ["Speed", current.sog.toFixed(1) + " knots"],
+        ["Course", current.cog == null ? "Not recorded" : Math.round(current.cog) + "°"],
+        ["Destination", "Not recorded"],
+        ["Last update", last ? fmt(Date.parse(last.at)) : "No positions recorded"],
+      ];
+      dispute = { on: inDisputedWindow, text: inDisputedWindow ? "Inside the disputed window" + (dWindow ? " (" + fmt(dWindow.start) + " – " + fmt(dWindow.end) + ")" : "") : "Outside the disputed window" };
+    } else if (preview.kind === "position") {
+      title = "Recorded vessel position";
+      const t = Date.parse(preview.p.at);
+      rows = [
+        ["Time", fmt(t)],
+        ["Position", preview.p.lat.toFixed(5) + " / " + preview.p.lon.toFixed(5)],
+        ["Speed", preview.p.sog.toFixed(1) + " knots"],
+        ["Course", preview.p.cog == null ? "Not recorded" : Math.round(preview.p.cog) + "°"],
+        ["Source", "AIS — the ship's own broadcast"],
+      ];
+      dispute = { on: inWindowAt(t), text: inWindowAt(t) ? "Inside the disputed window" : "Outside the disputed window" };
+    } else if (preview.kind === "terminal") {
+      title = preview.name;
+      rows = [
+        ["Location", "Durban harbour (schematic overlay)"],
+        ["Covers", preview.covers],
+        ["Last refresh", "Fixed overlay — not live data"],
+      ];
+    } else if (preview.kind === "sar" || preview.kind === "optical") {
+      const sc = preview.scene;
+      const t = Date.parse(String(sc.observed_at));
+      title = preview.kind === "sar" ? "Satellite radar image (Sentinel-1)" : "Satellite photo (Sentinel-2)";
+      rows = [
+        ["Captured", Number.isFinite(t) ? fmt(t) : "Not recorded"],
+        ["What it shows", preview.kind === "sar" ? "Radar image of the boxed harbour area — sees through cloud" : "Photo of the boxed harbour area"],
+        ["Orbit", String(sc.payload?.relativeOrbit ?? "Not recorded")],
+      ];
+      if (preview.kind === "optical") rows.push(["Cloud cover", Math.round(Number(sc.payload?.cloudPercent ?? 0)) + "%"]);
+      rows.push(["Scene ID", String(sc.payload?.id ?? sc.id)]);
+      if (Number.isFinite(t)) dispute = { on: inWindowAt(t), text: inWindowAt(t) ? "Captured inside the disputed window" : "Captured outside the disputed window" };
+    } else if (preview.kind === "weather") {
+      const t = Date.parse(String(preview.w.observed_at));
+      title = "Sea state";
+      rows = [
+        ["Wave height", Number(preview.w.payload?.waveHeight ?? 0).toFixed(1) + " m"],
+        ["Time", Number.isFinite(t) ? fmt(t) : "Not recorded"],
+        ["Source", "Marine weather reading"],
+      ];
+    }
+    return (
+      <div className="relative z-10 mx-3 mt-3 rounded border border-[#d2ff6b]/40 bg-black/85 px-3 py-3 backdrop-blur md:absolute md:right-4 md:top-24 md:mx-0 md:mt-0 md:w-80" aria-live="polite">
+        <div className="flex items-start justify-between gap-2">
+          <div className="font-mono text-[10px] tracking-[0.2em] text-[#d2ff6b]">{title.toUpperCase()}</div>
+          <button onClick={clearPreview} className="shrink-0 rounded border border-white/20 px-2 py-0.5 text-[10px] text-white/70 hover:text-white">Close</button>
+        </div>
+        <dl className="mt-2 space-y-1 font-sans text-xs text-white/90">
+          {rows.map(([k, v]) => (
+            <div key={k} className="flex items-baseline justify-between gap-3"><dt className="shrink-0 text-white/60">{k}</dt><dd className="text-right">{v}</dd></div>
+          ))}
+        </dl>
+        {dispute && (
+          <div className="mt-2 flex items-center gap-2 border-t border-white/10 pt-2 text-xs">
+            {dispute.on && <DisputeBadge />}
+            <span className={dispute.on ? "font-medium" : "text-white/60"} style={dispute.on ? { color: "var(--disputed)" } : undefined}>{dispute.text}</span>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   async function refreshSensors() {
     setRefreshing(true);
@@ -153,7 +248,7 @@ function MapPage() {
               <filter id="hud-glow"><feGaussianBlur stdDeviation="2.5" result="blur" /><feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
             </defs>
 
-            <rect width="1000" height="640" fill="#08151a" />
+            <rect width="1000" height="640" fill="#08151a" onClick={clearPreview} />
             <rect width="1000" height="640" fill="url(#hud-grid)" />
 
             <path d="M0 0H1000V175C860 200 760 145 690 190C560 235 450 215 320 235C200 255 110 230 0 260Z" fill="#1f2a26" />
@@ -161,9 +256,15 @@ function MapPage() {
 
             {layers.infrastructure && (
               <g fill="none" stroke="#d2ff6b" strokeDasharray="5 4" opacity=".78">
-                <rect x="330" y="225" width="210" height="70" />
-                <rect x="345" y="302" width="190" height="92" />
-                <circle cx="900" cy="515" r="64" />
+                {([
+                  { name: "North quay terminal zone", covers: "Berth and container stack area inside the dashed outline", el: <rect key="t1" x="330" y="225" width="210" height="70" /> },
+                  { name: "South quay terminal zone", covers: "Berth and container stack area inside the dashed outline", el: <rect key="t2" x="345" y="302" width="190" height="92" /> },
+                  { name: "Anchorage ring", covers: "Waiting area for vessels outside the harbour entrance", el: <circle key="t3" cx="900" cy="515" r="64" /> },
+                ]).map((t) => (
+                  <g key={t.name} style={{ cursor: "pointer" }} onClick={() => tapPreview({ kind: "terminal", name: t.name, covers: t.covers })} onMouseEnter={() => showPreview({ kind: "terminal", name: t.name, covers: t.covers })} onMouseLeave={hoverOut}>
+                    {t.el}
+                  </g>
+                ))}
               </g>
             )}
 
@@ -181,9 +282,15 @@ function MapPage() {
                 />
                 {track.map((p, i) => {
                   const pos = project(p.lat, p.lon);
-                  return <circle key={i} cx={pos.x} cy={pos.y} r={Math.max(2, Math.min(6, 2 + p.sog / 4))} fill="#d2ff6b" fillOpacity={Math.min(1, 0.2 + p.sog / 12)} />;
+                  return (
+                    <g key={i} style={{ cursor: "pointer" }} onClick={() => tapPreview({ kind: "position", p })} onMouseEnter={() => showPreview({ kind: "position", p })} onMouseLeave={hoverOut}>
+                      <circle cx={pos.x} cy={pos.y} r="14" fill="transparent" />
+                      <circle cx={pos.x} cy={pos.y} r={Math.max(2, Math.min(6, 2 + p.sog / 4))} fill="#d2ff6b" fillOpacity={Math.min(1, 0.2 + p.sog / 12)} />
+                    </g>
+                  );
                 })}
-                <g transform={"translate(" + current.x + "," + current.y + ")"}>
+                <g transform={"translate(" + current.x + "," + current.y + ")"} style={{ cursor: "pointer" }} onClick={() => tapPreview({ kind: "vessel" })} onMouseEnter={() => showPreview({ kind: "vessel" })} onMouseLeave={hoverOut}>
+                  <circle r="30" fill="transparent" />
                   <circle r="18" fill="none" stroke={markerColor}>
                     <animate attributeName="r" values="12;28;12" dur="1.8s" repeatCount="indefinite" />
                   </circle>
@@ -194,20 +301,23 @@ function MapPage() {
 
             {layers.sar && scenes.filter((s: any) => s.observation_type === "SENTINEL_1_SCENE").map((scene: any, i: number) => (
               <g key={scene.id}>
-                <rect x={680 + i * 50} y={70 + i * 45} width="165" height="110" fill="#5ffbf1" fillOpacity=".04" stroke="#5ffbf1" strokeOpacity=".75" />
-                <text x={687 + i * 50} y={88 + i * 45} fill="#5ffbf1" fontSize="10">SATELLITE RADAR · ORBIT {scene.payload?.relativeOrbit ?? "—"}</text>
+                <rect x={680 + i * 50} y={70 + i * 45} width="165" height="110" fill="#5ffbf1" fillOpacity=".04" stroke="#5ffbf1" strokeOpacity=".75" style={{ cursor: "pointer" }} onClick={() => tapPreview({ kind: "sar", scene })} onMouseEnter={() => showPreview({ kind: "sar", scene })} onMouseLeave={hoverOut} />
+                <text x={687 + i * 50} y={88 + i * 45} fill="#5ffbf1" fontSize="10" pointerEvents="none">SATELLITE RADAR · ORBIT {scene.payload?.relativeOrbit ?? "—"}</text>
               </g>
             ))}
 
             {layers.optical && scenes.filter((s: any) => s.observation_type === "SENTINEL_2_SCENE").map((scene: any, i: number) => (
               <g key={scene.id}>
-                <rect x={80 + i * 55} y={395 + i * 35} width="165" height="90" fill="#7dd3fc" fillOpacity=".04" stroke="#7dd3fc" strokeOpacity=".72" />
-                <text x={87 + i * 55} y={413 + i * 35} fill="#7dd3fc" fontSize="10">SATELLITE OPTICAL · CLOUD {Math.round(Number(scene.payload?.cloudPercent ?? 0))}%</text>
+                <rect x={80 + i * 55} y={395 + i * 35} width="165" height="90" fill="#7dd3fc" fillOpacity=".04" stroke="#7dd3fc" strokeOpacity=".72" style={{ cursor: "pointer" }} onClick={() => tapPreview({ kind: "optical", scene })} onMouseEnter={() => showPreview({ kind: "optical", scene })} onMouseLeave={hoverOut} />
+                <text x={87 + i * 55} y={413 + i * 35} fill="#7dd3fc" fontSize="10" pointerEvents="none">SATELLITE OPTICAL · CLOUD {Math.round(Number(scene.payload?.cloudPercent ?? 0))}%</text>
               </g>
             ))}
 
             {layers.weather && marine.slice(-8).map((w: any, i: number) => (
-              <circle key={i} cx={760 + i * 22} cy={565} r={Math.max(4, Number(w.payload?.waveHeight ?? 1) * 3)} fill="#7dd3fc" fillOpacity=".26" />
+              <g key={i} style={{ cursor: "pointer" }} onClick={() => tapPreview({ kind: "weather", w })} onMouseEnter={() => showPreview({ kind: "weather", w })} onMouseLeave={hoverOut}>
+                <circle cx={760 + i * 22} cy={565} r="16" fill="transparent" />
+                <circle cx={760 + i * 22} cy={565} r={Math.max(4, Number(w.payload?.waveHeight ?? 1) * 3)} fill="#7dd3fc" fillOpacity=".26" />
+              </g>
             ))}
 
             <g stroke={markerColor} opacity=".82">
@@ -222,6 +332,8 @@ function MapPage() {
               <text x="960" y="40">N ↑</text>
             </g>
           </svg>
+
+          {renderPreview()}
 
           <div className="pointer-events-none absolute inset-0 opacity-[0.07] [background-image:repeating-linear-gradient(to_bottom,transparent_0,transparent_2px,#d2ff6b_2px,#d2ff6b_3px)]" />
 

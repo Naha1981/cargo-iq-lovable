@@ -312,13 +312,18 @@ export function isSemanticDuplicate(a: string, b: string): boolean {
   let overlap = 0;
   const shared = new Set<string>();
   for (const t of ta) if (tb.has(t)) { overlap++; shared.add(t); }
-  if (overlap < 4 || !hasNumericAnchor(shared)) return false;
+  if (overlap < 2) return false;
   // Differing values on BOTH sides (08:00 vs 14:00, 10 vs 11 October) means the claims
   // state the same kind of fact with different values: a potential contradiction, never a duplicate.
   const numA = [...ta].filter((t) => /\d/.test(t) && !tb.has(t));
   const numB = [...tb].filter((t) => /\d/.test(t) && !ta.has(t));
   if (numA.length && numB.length) return false;
   const containment = overlap / Math.min(ta.size, tb.size);
+  // A claim whose entire content is restated inside the other is the same fact, however phrased
+  // ("Invoice identifies container TCLU0000000." vs "The invoice identifies container TCLU0000000.").
+  if (containment === 1) return true;
+  // Partial overlap needs more evidence: several shared tokens and a concrete anchor.
+  if (overlap < 4 || !hasNumericAnchor(shared)) return false;
   const jaccard = overlap / (ta.size + tb.size - overlap);
   return containment >= 0.85 || jaccard >= 0.7;
 }

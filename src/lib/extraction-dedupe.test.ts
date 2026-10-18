@@ -81,6 +81,21 @@ describe("extraction dedupe", () => {
     expect(kept).toHaveLength(1);
   });
 
+
+  it("drops short AI re-reads that restate a stored fact word for word", () => {
+    const stored = [
+      "The invoice identifies the port as Durban (ZADUR).",
+      "The invoice identifies container TCLU0000000.",
+      "The demurrage invoice number is INV-TEST-0001.",
+    ];
+    const reRead = [
+      { claim_text: "Invoice identifies the port as Durban (ZADUR)." },
+      { claim_text: "Invoice identifies container TCLU0000000." },
+      { claim_text: "Demurrage invoice number is INV-TEST-0001." },
+    ];
+    expect(filterNewClaims(reRead, stored, null)).toEqual([]);
+  });
+
   it("drops empty claims", () => {
     expect(filterNewClaims([{ claim_text: "   " }], [], null)).toEqual([]);
   });

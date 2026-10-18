@@ -1,6 +1,7 @@
 import { createFileRoute, Link, Outlet, notFound, redirect } from "@tanstack/react-router";
 import { AppHeader } from "@/components/ui-kit";
 import { getCaseWorkspace } from "@/lib/case.functions";
+import { liveHarbourHref } from "@/lib/live-harbour";
 
 export const Route = createFileRoute("/cases/$caseId")({
   ssr: false,
@@ -74,6 +75,14 @@ function CaseLayout() {
                 {t.label}
               </Link>
             ))}
+            <a
+              href={liveHarbourHref(c.port_code)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-sm border-b-2 border-transparent px-3 py-2.5 text-sm text-primary hover:text-foreground sm:whitespace-nowrap"
+            >
+              Live Harbour View ↗
+            </a>
           </nav>
         </div>
       </div>

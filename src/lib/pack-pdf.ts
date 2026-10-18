@@ -171,12 +171,33 @@ export function buildEvidencePackPdf(pack: any): Uint8Array {
     if (parts.length) d.text("Inputs: " + parts.join(", ") + "  |  Calculated " + stamp(x.created_at), { indent: 14, size: 8, gray: 0.35 });
   });
 
-  const obs: any[] = p.externalObservations ?? [];
+  const allObs: any[] = p.externalObservations ?? [];
+  const snapshots = allObs.filter((o) => o.observation_type === "MAP_SNAPSHOT");
+  const obs = allObs.filter((o) => o.observation_type !== "MAP_SNAPSHOT");
   if (obs.length) {
     d.heading("7. Independent observations (" + obs.length + ")");
     d.text("These are corroboration only. " + String(p.truthRule ?? ""), { indent: 4, size: 8.5 });
     obs.slice(0, 40).forEach((o) => d.text(stamp(o.observed_at) + "  " + String(o.observation_type ?? "") + "  - " + String(o.source ?? ""), { indent: 14, size: 8 }));
     if (obs.length > 40) d.text("... and " + (obs.length - 40) + " more in the JSON export.", { indent: 14, size: 8, gray: 0.35 });
+  }
+
+  if (snapshots.length) {
+    d.heading("7b. Harbour map snapshots (" + snapshots.length + ")");
+    d.text("Sealed map views added by the investigator from the harbour evidence map. The image file is retained in the case documents; its SHA-256 below proves the image has not changed. " +
+      "A snapshot renders recorded AIS, satellite and case data at the chosen time - it corroborates recorded positions and coverage; it is not independent sensor data and does not by itself prove contractual liability.", { indent: 4, size: 8.5 });
+    snapshots.forEach((o, i) => {
+      const pl = o.payload ?? {};
+      d.text((i + 1) + ". Map view at " + stamp(o.observed_at) + (pl.inDisputedWindow ? "  [INSIDE THE DISPUTED WINDOW" + (pl.windowStart && pl.windowEnd ? " " + stamp(pl.windowStart) + " to " + stamp(pl.windowEnd) : "") + "]" : ""), { indent: 4, bold: true, size: 9 });
+      const parts = [
+        pl.vesselName && "Vessel: " + String(pl.vesselName) + (pl.mmsi ? " (MMSI " + String(pl.mmsi) + ")" : ""),
+        o.latitude != null && o.longitude != null && "Position: " + Number(o.latitude).toFixed(5) + " / " + Number(o.longitude).toFixed(5),
+        pl.sog != null && "Speed: " + String(pl.sog) + " kn",
+        pl.cog != null && "Course: " + String(pl.cog) + " deg",
+      ].filter(Boolean);
+      if (parts.length) d.text(parts.join("  |  "), { indent: 14, size: 8.5 });
+      if (pl.note) d.text("Note: " + String(pl.note), { indent: 14, size: 8.5 });
+      d.text("Image: " + (docName.get(pl.document_id) ?? "case document") + "  |  SHA-256 " + String(pl.sha256 ?? "n/a"), { indent: 14, size: 8, gray: 0.35 });
+    });
   }
 
   const operationalSections: [string, string, (x: any) => string][] = [

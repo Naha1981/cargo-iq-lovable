@@ -1,8 +1,10 @@
 import { Route as CaseRoute } from "./cases.$caseId";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button, DisputeBadge, NatureBadge, Panel } from "@/components/ui-kit";
 import { corroborateCase } from "@/lib/case.functions";
+import { addMapSnapshot } from "@/lib/map-snapshot.functions";
+import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { disputedClaimIds, disputedWindow, isDisputeEvent } from "@/lib/dispute";
 
@@ -61,6 +63,12 @@ function MapPage() {
   const [locked, setLocked] = useState(true);
   const [layers, setLayers] = useState({ ais: true, sar: true, optical: true, weather: false, infrastructure: true });
   const [refreshing, setRefreshing] = useState(false);
+  const [large, setLarge] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [snapshotNotice, setSnapshotNotice] = useState("");
+  const [snapshotError, setSnapshotError] = useState("");
+  const stageRef = useRef<HTMLDivElement | null>(null);
+  const supabase = createClient();
   type Preview =
     | { kind: "vessel" }
     | { kind: "position"; p: TrackPoint }
@@ -108,6 +116,90 @@ function MapPage() {
   const inDisputedWindow = !!dWindow && time >= dWindow.start - 1 && time <= dWindow.end + 1;
   const inWindowAt = (t: number) => !!dWindow && t >= dWindow.start - 1 && t <= dWindow.end + 1;
   const markerColor = inDisputedWindow ? "var(--disputed)" : "#d2ff6b";
+
+  const fmtTime = (ms: number) => new Date(ms).toISOString().replace("T", " ").slice(0, 16) + "Z";
+
+  function guideVessel() {
+    if (track.length) setTime(Date.parse(track[track.length - 1]!.at));
+    setLayers((v) => ({ ...v, ais: true }));
+    tapPreview({ kind: "vessel" });
+  }
+  function guideBerth() {
+    setLayers((v) => ({ ...v, infrastructure: true }));
+    tapPreview({ kind: "terminal", name: "North quay terminal zone", covers: "Berth and container stack area inside the dashed outline" });
+  }
+  function guideDispute() {
+    if (dWindow) setTime(dWindow.start);
+    const flaggedScene = scenes.find((sc: any) => dWindow && Math.abs(Date.parse(String(sc.observed_at)) - dWindow.start) <= 48 * 3600000);
+    if (flaggedScene) tapPreview({ kind: String(flaggedScene.observation_type).includes("SENTINEL_1") ? "sar" : "optical", scene: flaggedScene });
+    else tapPreview({ kind: "vessel" });
+  }
+
+  async function captureMapPng(): Promise<Blob> {
+    const svg = stageRef.current?.querySelector("svg");
+    if (!svg) throw new Error("Map is not ready yet.");
+    const clone = svg.cloneNode(true) as SVGSVGElement;
+    const disputeColor = getComputedStyle(document.documentElement).getPropertyValue("--disputed").trim() || "oklch(0.68 0.2 25)";
+    const serialized = new XMLSerializer().serializeToString(clone).replaceAll("var(--disputed)", disputeColor);
+    const withSize = serialized.replace("<svg ", '<svg width="2000" height="1280" font-family="JetBrains Mono, monospace" ');
+    const url = URL.createObjectURL(new Blob([withSize], { type: "image/svg+xml;charset=utf-8" }));
+    try {
+      const img = new Image();
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error("Could not render the map image."));
+        img.src = url;
+      });
+      const canvas = document.createElement("canvas");
+      canvas.width = 2000; canvas.height = 1280;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("Could not render the map image.");
+      ctx.fillStyle = "#08151a";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      return await new Promise<Blob>((resolve, reject) => canvas.toBlob((b) => b ? resolve(b) : reject(new Error("Could not encode the map image.")), "image/png"));
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
+
+  async function saveSnapshot() {
+    setSaving(true); setSnapshotError(""); setSnapshotNotice("");
+    try {
+      const png = await captureMapPng();
+      const last = track[track.length - 1];
+      const at = new Date(time).toISOString();
+      const path = data.tenantId + "/" + caseId + "/" + crypto.randomUUID() + "-map-snapshot.png";
+      const { error: uploadError } = await supabase.storage.from("case-documents").upload(path, png, { upsert: false, contentType: "image/png" });
+      if (uploadError) throw uploadError;
+      const result = await addMapSnapshot({
+        data: {
+          caseId,
+          filePath: path,
+          name: "Harbour map snapshot - " + fmtTime(time),
+          observedAt: at,
+          summary: {
+            vesselName: last?.vesselName || data.case.vessel_name || null,
+            mmsi: last?.mmsi ?? null,
+            lat: locked ? current.lat : null,
+            lon: locked ? current.lon : null,
+            sog: locked ? Number(current.sog.toFixed(1)) : null,
+            cog: current.cog == null ? null : Math.round(current.cog),
+            inDisputedWindow,
+            windowStart: dWindow ? new Date(dWindow.start).toISOString() : null,
+            windowEnd: dWindow ? new Date(dWindow.end).toISOString() : null,
+            note: isSample ? "Case contains sample data." : null,
+          },
+        },
+      });
+      setSnapshotNotice("Added to the evidence pack. Sealed with SHA-256 " + result.sha256.slice(0, 12) + "… — it will appear in the exported pack with its source and limits.");
+      await router.invalidate();
+    } catch (err) {
+      setSnapshotError(err instanceof Error ? err.message : "Could not save the snapshot.");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   function renderPreview() {
     if (!preview) return null;
@@ -207,6 +299,16 @@ function MapPage() {
 
   return (
     <div className="space-y-3">
+      <div className="rounded border bg-card px-3 py-2">
+        <p className="text-sm">This map shows where the case vessel was, minute by minute, and which satellite and terminal records back it up — so the disputed period can be checked against physical evidence.</p>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">What to look at:</span>
+          <button onClick={guideVessel} className="rounded border px-2.5 py-1 text-xs hover:bg-accent">The case vessel</button>
+          <button onClick={guideBerth} className="rounded border px-2.5 py-1 text-xs hover:bg-accent">Berth & terminals</button>
+          {dWindow && <button onClick={guideDispute} className="rounded border border-disputed/40 bg-disputed/10 px-2.5 py-1 text-xs text-disputed hover:bg-disputed/20">The disputed window ({new Date(dWindow.start).toISOString().slice(5, 10)} – {new Date(dWindow.end).toISOString().slice(5, 10)})</button>}
+          <button onClick={() => setLarge(true)} className="ml-auto rounded border border-primary/40 bg-primary/10 px-2.5 py-1 text-xs text-primary hover:bg-primary/20">Full screen</button>
+        </div>
+      </div>
       <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
         {[
           ["DATA STATUS", inDisputedWindow ? "DISPUTED WINDOW" : isSample ? "SAMPLE DATA" : "RECORDED OBSERVATIONS · CORROBORATION"],
@@ -234,7 +336,13 @@ function MapPage() {
         <span aria-hidden className="text-primary">→</span>
       </Link>
 
-      <div className="overflow-hidden rounded-lg border bg-[#061016]">
+      <div ref={stageRef} className={large ? "fixed inset-0 z-50 overflow-y-auto bg-[#061016]" : "overflow-hidden rounded-lg border bg-[#061016]"}>
+        {large && (
+          <div className="sticky top-0 z-10 flex items-center justify-between gap-2 border-b border-[#d2ff6b]/20 bg-black/80 px-3 py-2 backdrop-blur">
+            <span className="font-mono text-[10px] tracking-[0.2em] text-[#d2ff6b]">HARBOUR EVIDENCE MAP · FULL SCREEN</span>
+            <button onClick={() => setLarge(false)} className="rounded border border-[#d2ff6b]/40 px-3 py-1 text-xs text-[#d2ff6b]">Close full screen</button>
+          </div>
+        )}
         <div className="relative">
           <svg viewBox="0 0 1000 640" className="block h-auto aspect-[1000/640] md:aspect-auto w-full md:h-[calc(100vh-380px)] md:min-h-[340px]" role="img" aria-label="CargoIQ harbour evidence map">
             <defs>
@@ -363,6 +471,7 @@ function MapPage() {
               <Button className="py-1 text-xs" onClick={() => setPlaying((value) => !value)}>{playing ? "Pause" : "Play timeline"}</Button>
               <Button variant="ghost" className="py-1 text-xs" onClick={() => setLocked((value) => !value)}>{locked ? "Tracking vessel" : "Not tracking"}</Button>
               <Button variant="ghost" className="py-1 text-xs" disabled={refreshing} onClick={refreshSensors}>{refreshing ? "Refreshing…" : "Refresh satellite & marine data"}</Button>
+              <Button variant="ghost" className="py-1 text-xs" disabled={saving} onClick={saveSnapshot}>{saving ? "Sealing…" : "Add to evidence pack"}</Button>
               <span className="ml-auto font-mono text-[10px] text-white/70">{new Date(time).toISOString().replace("T", " ").slice(0, 16)}Z</span>
             </div>
             <input type="range" min={initialTime} max={maxTime} step={15 * 60 * 1000} value={time} onChange={(e) => setTime(Number(e.target.value))} className="mt-1 w-full accent-[#d2ff6b]" aria-label="Investigation timeline" />
@@ -383,6 +492,9 @@ function MapPage() {
         </div>
       </div>
 
+
+      {snapshotNotice && <div className="rounded border border-observed/40 bg-observed/10 px-3 py-2 text-sm text-observed">{snapshotNotice}</div>}
+      {snapshotError && <div className="rounded border border-disputed/40 bg-disputed/10 px-3 py-2 text-sm text-disputed">{snapshotError}</div>}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Panel title="Satellite coverage">

@@ -82,6 +82,14 @@ function CaseLayout() {
                 {t.label}
               </Link>
             ))}
+            <a
+              href="https://canvas.nahalabs.co.za/#/t/cargoiq"
+              target="_blank"
+              rel="noopener"
+              className="rounded-sm border-b-2 border-transparent px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground sm:whitespace-nowrap"
+            >
+              Case map ↗
+            </a>
           </nav>
         </div>
       </div>

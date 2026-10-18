@@ -27,6 +27,7 @@ function LiveHarbourPage() {
         <iframe
           src={src}
           title="Live harbour view - real-time vessels off the South African coast"
+          allow="microphone"
           className="block h-[calc(100dvh-300px)] min-h-[420px] w-full border-0"
         />
       </div>

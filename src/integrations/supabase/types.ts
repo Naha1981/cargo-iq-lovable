@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      app_errors: {
+        Row: {
+          created_at: string
+          id: string
+          message: string | null
+          route: string | null
+          source: string | null
+          stack: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message?: string | null
+          route?: string | null
+          source?: string | null
+          stack?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message?: string | null
+          route?: string | null
+          source?: string | null
+          stack?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       appointment_attributions: {
         Row: {
           appointment_clock_id: string
@@ -1837,6 +1867,7 @@ export type Database = {
         }
       }
       current_pack_source: { Args: { _case_id: string }; Returns: Json }
+      delete_own_account: { Args: never; Returns: undefined }
       has_unresolved_operational_clocks: {
         Args: { _case_id: string }
         Returns: boolean

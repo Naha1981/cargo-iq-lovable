@@ -74,8 +74,8 @@ function ErrorComponent({ error, reset }: ErrorComponentProps) {
   );
 }
 
-// Runs before first paint: dark is the default; only an explicit stored "light" choice switches it.
-const THEME_INIT = `try{if(localStorage.getItem("cargoiq-theme")==="light"){document.documentElement.classList.add("light")}}catch(e){}`;
+// Runs before first paint: light is the default; only an explicit stored "dark" choice switches to dark.
+const THEME_INIT = `try{if(localStorage.getItem("cargoiq-theme")!=="dark"){document.documentElement.classList.add("light")}}catch(e){document.documentElement.classList.add("light")}`;
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
@@ -89,7 +89,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:description", content: "Investigative evidence platform for freight, port and logistics disputes." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "theme-color", content: "#0b0e11" },
+      { name: "theme-color", content: "#f4f5f7" },
       { name: "mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-title", content: "CargoIQ" },

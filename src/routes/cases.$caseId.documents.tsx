@@ -40,6 +40,10 @@ function DocsPage() {
     try {
       for (const item of Array.from(files)) {
         assertDocumentSize(item.size);
+        if (item.size === 0) {
+          setError('"' + item.name + '" arrived empty (0 bytes). Re-save or re-export the file and try again.');
+          continue;
+        }
         const safeName = item.name.replace(/[^a-zA-Z0-9._-]+/g, "_");
         const path = data.tenantId + "/" + caseId + "/" + crypto.randomUUID() + "-" + safeName;
         const { error: uploadError } = await supabase.storage.from("case-documents").upload(path, item, { upsert: false });
@@ -58,7 +62,7 @@ function DocsPage() {
     } catch (err) {
       const message = err instanceof Error ? err.message : "Upload failed.";
       setError(/failed to fetch|network|load failed/i.test(message)
-        ? "The file could not reach private document storage. Check your connection and try again. If it keeps failing, ask the workspace owner to check the case-documents bucket and tenant upload policy in Lovable Cloud."
+        ? "The file could not reach private document storage. Check your connection and try again. If it keeps failing, contact sales@nahalabs.co.za and we will fix it."
         : message);
     } finally {
       setBusy(false);

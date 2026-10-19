@@ -1,7 +1,9 @@
-// Deep link into the NahaLabs live harbour view for the case's port when we know it.
+// Deep link into the in-app live harbour view for the case's port when we know it.
+// The page is served from this repo at public/harbour-view/ (folded from the old
+// standalone site); the old hosted map stays live until the cutover completes.
 export function liveHarbourHref(portCode?: string | null): string {
   const code = (portCode ?? "").trim().toUpperCase();
-  if (code === "ZADUR" || code === "DUR") return "https://nahalabs.co.za/harbour-view?fly=durban";
-  if (code === "ZARCB" || code === "RCB") return "https://nahalabs.co.za/harbour-view?fly=richards";
-  return "https://nahalabs.co.za/harbour-view";
+  if (code === "ZADUR" || code === "DUR") return "/harbour-view/index.html?fly=durban";
+  if (code === "ZARCB" || code === "RCB") return "/harbour-view/index.html?fly=richards";
+  return "/harbour-view/index.html";
 }

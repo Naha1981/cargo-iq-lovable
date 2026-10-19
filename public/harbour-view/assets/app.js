@@ -442,10 +442,14 @@
 
   // ---------- CCTV (verified free public cameras, refreshing stills) ----------
   var CAMERAS = [
-    { id: 'vetchs', name: "Vetch's Pier - Durban harbour mouth", lon: 31.0570, lat: -29.8690,
-      img: 'https://durbancoastlive.com/incoming/vetchs/vetchs.jpg', source: 'Durban Coast Live - still frame, refreshes periodically' },
-    { id: 'bluewaters', name: 'Blue Waters - Durban beachfront', lon: 31.0378, lat: -29.8362,
-      img: 'https://durbancoastlive.com/incoming/blueWaters/bwSouth.jpg', source: 'Durban Coast Live - still frame, refreshes periodically' }
+    { id: 'vetchs', name: "PYC Marina - Durban harbour entrance", lon: 31.0465, lat: -29.8665,
+      img: DATA_BASE + 'data/cam/vetchs/latest.jpg',
+      live: 'https://restreamer.cd.net.za/c1b53a50-06bb-47da-916a-01fb19d5c547.html',
+      source: 'Point Yacht Club live stream (CC BY 4.0)' },
+    { id: 'bluewaters', name: "PYC Beach - Durban beachfront", lon: 31.0460, lat: -29.8628,
+      img: DATA_BASE + 'data/cam/bluewaters/latest.jpg',
+      live: 'https://restreamer.cd.net.za/7bd8fb34-74b3-4158-abc0-06fbbc8ffb2b.html',
+      source: 'Point Yacht Club live stream (CC BY 4.0)' }
   ];
   var camEntities = [];
   var camRefreshTimer = null;
@@ -475,14 +479,25 @@
     $('cam-title').textContent = cam.name;
     $('cam-source').textContent = cam.source + ' - position approximate';
     var img = $('cam-img');
-    var bust = function () { img.src = cam.img + '?t=' + Date.now(); };
-    bust();
-    if (camRefreshTimer) clearInterval(camRefreshTimer);
-    camRefreshTimer = setInterval(bust, 10000);
+    var frame = $('cam-live');
+    if (cam.live && frame) {
+      img.classList.add('hidden');
+      frame.classList.remove('hidden');
+      frame.src = cam.live;
+    } else {
+      if (frame) { frame.classList.add('hidden'); frame.src = 'about:blank'; }
+      img.classList.remove('hidden');
+      img.src = cam.img + '?t=' + Date.now();
+    }
+    if (camRefreshTimer) { clearInterval(camRefreshTimer); camRefreshTimer = null; }
     $('cam-panel').classList.remove('hidden');
   }
   function closeCam() {
     $('cam-panel').classList.add('hidden');
+    var frame = $('cam-live');
+    if (frame) { frame.src = 'about:blank'; frame.classList.add('hidden'); }
+    var img = $('cam-img');
+    if (img) img.classList.remove('hidden');
     if (camRefreshTimer) { clearInterval(camRefreshTimer); camRefreshTimer = null; }
   }
   $('cam-close').addEventListener('click', closeCam);

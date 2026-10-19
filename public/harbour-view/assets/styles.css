@@ -138,6 +138,7 @@ body {
   padding: 4px 8px; cursor: pointer;
 }
 
+#cam-panel { z-index: 30; }
 .cam-frame { position: relative; border-radius: 10px; overflow: hidden; border: 1px solid var(--line); background: #000; }
 .cam-frame img { display: block; width: 100%; height: auto; min-height: 120px; object-fit: cover; }
 

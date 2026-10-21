@@ -601,8 +601,10 @@ export async function extractDocumentClaimsForPath(input: {
   }
 
   const inserted: any[] = [];
+  let seq = 0;
   for (const claim of claims) {
-    const { data: row, error } = await input.supabase.from("extracted_claims").insert({
+    seq += 1;
+    const base = {
       tenant_id: input.tenantId,
       case_id: input.caseId,
       document_id: input.documentId,
@@ -615,7 +617,12 @@ export async function extractDocumentClaimsForPath(input: {
       status: "PENDING",
       confidence: claim.confidence ?? 0.7,
       timestamp_claimed: claim.timestamp_claimed ?? null,
-    }).select("*").single();
+    };
+    // source_seq records reading order. If the column is not deployed yet, store without it rather than fail the analysis.
+    let { data: row, error } = await input.supabase.from("extracted_claims").insert({ ...base, source_seq: seq }).select("*").single();
+    if (error && (error.code === "42703" || error.code === "PGRST204" || /source_seq/.test(String(error.message ?? "")))) {
+      ({ data: row, error } = await input.supabase.from("extracted_claims").insert(base).select("*").single());
+    }
     if (error) throw error;
     inserted.push(row);
 

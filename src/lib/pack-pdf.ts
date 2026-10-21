@@ -114,8 +114,8 @@ export function buildEvidencePackPdf(pack: any): Uint8Array {
   const docs: any[] = p.documents ?? [];
   const docName = new Map<string, string>(docs.map((d: any) => [d.id, d.name]));
   // Database order is by id (random). Read in document, then page order so claim numbers follow the source.
-  const claims: any[] = [...(p.claims ?? [])].sort((a: any, b: any) => String(a.document_id ?? "").localeCompare(String(b.document_id ?? "")) || (a.page_number ?? 1e9) - (b.page_number ?? 1e9) || String(a.created_at ?? "").localeCompare(String(b.created_at ?? "")) || String(a.id ?? "").localeCompare(String(b.id ?? "")));
-  // No stored source-order column exists: within one page the order is deterministic (created_at, then id) but not guaranteed to be reading order. The claim ID printed below is the durable reference.
+  const claims: any[] = [...(p.claims ?? [])].sort((a: any, b: any) => String(a.document_id ?? "").localeCompare(String(b.document_id ?? "")) || (a.page_number ?? 1e9) - (b.page_number ?? 1e9) || (a.source_seq ?? 1e9) - (b.source_seq ?? 1e9) || String(a.created_at ?? "").localeCompare(String(b.created_at ?? "")) || String(a.id ?? "").localeCompare(String(b.id ?? "")));
+  // No stored source-order column exists: within one page the order is reading order when source_seq is recorded, otherwise deterministic (created_at, then id) but not guaranteed reading order. The claim ID printed below is the durable reference.
   const statusRank = (s: string) => (s === "VERIFIED" ? 0 : s === "PENDING" ? 1 : 2);
   const shown: any[] = [...claims].sort((a, b) => statusRank(a.status) - statusRank(b.status));
   const claimNo = new Map<string, number>(shown.map((c: any, i: number) => [String(c.id), i + 1]));

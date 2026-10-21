@@ -122,6 +122,11 @@ describe("evidence pack layout and labels", () => {
     expect(txt.indexOf("EARLY")).toBeLessThan(txt.indexOf("TIMED")); expect(txt.indexOf("TIMED")).toBeLessThan(txt.indexOf("LATE"));
     expect(txt).toContain("2022-08-09 \\(time not stated\\)"); expect(txt).toContain("2022-08-09 10:30Z"); expect(txt).not.toContain("00:00Z");
   });
+  it("an incomplete analysis is printed and the empty contradiction list is not presented as a clean none", () => {
+    const pk: any = pack("DRAFT"); pk.pack_payload.analysis_notes = ["Optional model discrepancy check FAILED (FREE_GEMINI_503)."]; pk.pack_payload.contradictions = [];
+    const txt = Buffer.from(buildEvidencePackPdf(pk)).toString("latin1");
+    expect(txt).toContain("ANALYSIS INCOMPLETE"); expect(txt).toContain("not a finding of none"); expect(txt).not.toContain("No contradictions were detected");
+  });
 });
 
 describe("coverage audit", () => {

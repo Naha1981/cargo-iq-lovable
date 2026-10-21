@@ -1,3 +1,4 @@
+import { analysisStatus, candidateDateMismatches } from "./analysis-integrity";
 import { readPdfLines, readPdfPages } from "./pdf-text";
 import { assertDocumentSize, isPlainDocument, plainTextClaims, PDF_AI_UNAVAILABLE } from "./extraction-policy";
 import { createServerFn } from "@tanstack/react-start";
@@ -613,6 +614,17 @@ export async function extractDocumentClaimsForPath(input: {
   }
 
   let discrepancyFlags = 0;
+  let discrepancyPass: "ran" | "failed" | "skipped" = "skipped";
+  let discrepancyError: string | undefined;
+  for (const f of candidateDateMismatches(claims)) {
+    await input.supabase.from("contradictions").insert({
+      tenant_id: input.tenantId, case_id: input.caseId,
+      title: "Possible date mismatch (rule-based candidate, unverified)",
+      description: f.explanation + " (claim " + f.a + ", page " + (claims[f.a - 1]!.page_number ?? "?") + " vs claim " + f.b + ", page " + (claims[f.b - 1]!.page_number ?? "?") + ")",
+      claim_a_id: inserted[f.a - 1]?.id ?? null, claim_b_id: inserted[f.b - 1]?.id ?? null, status: "FLAGGED",
+    });
+    discrepancyFlags++;
+  }
   if (providerUsed === "gemini-test" && claims.length > 1) {
     try {
       for (const f of await findGeminiDiscrepancies(claims)) {
@@ -625,9 +637,11 @@ export async function extractDocumentClaimsForPath(input: {
         });
         discrepancyFlags++;
       }
-    } catch (e) { fallbackErrors.push("discrepancy pass: " + (e instanceof Error ? e.message : "failed").slice(0, 120)); }
+      discrepancyPass = "ran";
+    } catch (e) { discrepancyPass = "failed"; discrepancyError = (e instanceof Error ? e.message : "failed").slice(0, 120); fallbackErrors.push("discrepancy pass: " + discrepancyError); }
   }
 
+  const integrity = analysisStatus({ discrepancyPass, discrepancyError, fallbackErrors, coverageWarnings });
   await input.supabase.from("audit_log").insert({
     tenant_id: input.tenantId,
     case_id: input.caseId,
@@ -638,7 +652,7 @@ export async function extractDocumentClaimsForPath(input: {
     payload: { claims: inserted.length, filename: doc.name, mode, providerUsed, discrepancyFlags, ...(fallbackErrors.length ? { fallbackErrors } : {}), ...(coverageWarnings.length ? { coverageWarnings } : {}) },
   });
 
-  return { claims: inserted, count: inserted.length, mode, providerUsed, discrepancyFlags, ...(fallbackErrors.length ? { fallbackErrors } : {}), ...(coverageWarnings.length ? { coverageWarnings } : {}) };
+  return { claims: inserted, count: inserted.length, mode, providerUsed, discrepancyFlags, analysisStatus: integrity.status, analysisNotes: integrity.notes, ...(fallbackErrors.length ? { fallbackErrors } : {}), ...(coverageWarnings.length ? { coverageWarnings } : {}) };
 }
 
 export const extractionHealth = createServerFn({ method: "GET" }).handler(async () => {

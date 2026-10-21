@@ -102,18 +102,25 @@ describe("evidence pack layout and labels", () => {
   it("never starts a page with an orphaned source line", () => {
     const ps = pages(buildEvidencePackPdf(pack("DRAFT")));
     expect(ps.length).toBeGreaterThan(2);
-    for (const p of ps) { const first = (p.match(/\(([^)]*)\) Tj/) ?? [])[1] ?? ""; expect(first.startsWith("Source:")).toBe(false); }
+    for (const p of ps) { const first = (p.match(/\(((?:[^()\\]|\\.)*)\) Tj/) ?? [])[1] ?? ""; expect(first.startsWith("Source:")).toBe(false); }
   });
   it("keeps each timeline entry whole on one page", () => {
     const pk: any = pack("DRAFT"); pk.pack_payload.timeline = Array.from({ length: 80 }, (_, i) => ({ timestamp: "2013-02-01T00:00:00Z", nature: "OBSERVED", title: "Event " + i + " " + "word ".repeat(30), source: "Doc.pdf" }));
     const ps = pages(buildEvidencePackPdf(pk));
-    for (const p of ps) { const first = (p.match(/\(([^)]*)\) Tj/) ?? [])[1] ?? ""; expect(first.startsWith("Event")).toBe(false); expect(first.includes("- Source:")).toBe(false); }
+    for (const p of ps) { const first = (p.match(/\(((?:[^()\\]|\\.)*)\) Tj/) ?? [])[1] ?? ""; expect(first.startsWith("Event")).toBe(false); expect(first.includes("- Source:")).toBe(false); }
   });
-  it("labels a draft hash as a draft hash and omits map caveats for document-only packs", () => {
-    const txt = Buffer.from(buildEvidencePackPdf(pack("DRAFT"))).toString("latin1");
-    expect(txt).toContain("draft pack payload"); expect(txt).not.toContain("canonical pack payload"); expect(txt).not.toContain("AIS can contain");
-    expect(txt).toContain("document claims only");
-    expect(Buffer.from(buildEvidencePackPdf(pack("APPROVED"))).toString("latin1")).toContain("canonical pack payload");
+  it("real packs always say canonical (the database hashes the canonical payload at generation); test files say TEST HASH inside the file", () => {
+    const real = Buffer.from(buildEvidencePackPdf(pack("DRAFT"))).toString("latin1");
+    expect(real).toContain("canonical pack payload"); expect(real).not.toContain("TEST HASH"); expect(real).not.toContain("AIS can contain"); expect(real).toContain("document claims only");
+    const t = Buffer.from(buildEvidencePackPdf({ ...pack("DRAFT"), test_hash: true })).toString("latin1");
+    expect(t).toContain("TEST HASH - NOT A CARGOIQ HASH"); expect(t).toContain("TEST HASH \\(not a seal\\)"); expect(t).not.toContain("canonical pack payload:");
+  });
+  it("orders the timeline chronologically and does not present a date-only value as a known midnight", () => {
+    const pk: any = pack("DRAFT");
+    pk.pack_payload.timeline = [{ timestamp: "2025-07-14T00:00:00.000Z", nature: "REPORTED", title: "LATE", source: "d" }, { timestamp: "2022-08-09T00:00:00.000Z", nature: "OBSERVED", title: "EARLY", source: "d" }, { timestamp: "2022-08-09T10:30:00.000Z", nature: "OBSERVED", title: "TIMED", source: "d" }];
+    const txt = Buffer.from(buildEvidencePackPdf(pk)).toString("latin1");
+    expect(txt.indexOf("EARLY")).toBeLessThan(txt.indexOf("TIMED")); expect(txt.indexOf("TIMED")).toBeLessThan(txt.indexOf("LATE"));
+    expect(txt).toContain("2022-08-09 \\(time not stated\\)"); expect(txt).toContain("2022-08-09 10:30Z"); expect(txt).not.toContain("00:00Z");
   });
 });
 
@@ -134,5 +141,17 @@ describe("dedupe keeps distinct identifiers", () => {
     const b = "The payment schedule reports payment date 2022-08-09 for container CSNU8457610 with COSCO line reference 6336422770 and amount USD 825.00.";
     expect(isSemanticDuplicate(a, b)).toBe(false);
     expect(isSemanticDuplicate(a, "The payment schedule reports a payment date of 2022-08-09 for container CSNU8330251, COSCO line reference 6336422960, amount USD 825.00.")).toBe(true);
+  });
+});
+
+describe("day-precision guard", () => {
+  it("keeps a timestamp only when the claim states the day", async () => {
+    const { dayAnchored } = await import("./extraction.functions");
+    expect(dayAnchored("The warrant was issued on 1 February 2013.", "2013-02-01T00:00:00Z")).toBe(true);
+    expect(dayAnchored("Arrest on February 1, 2013", "2013-02-01")).toBe(true);
+    expect(dayAnchored("Paid 2022-08-09 for container X", "2022-08-09T00:00:00Z")).toBe(true);
+    expect(dayAnchored("Delivered in February 2014.", "2014-02-01T00:00:00Z")).toBe(false);
+    expect(dayAnchored("IT manager in 2012/2013.", "2012-01-01T00:00:00Z")).toBe(false);
+    expect(dayAnchored("Released on 8 February.", "2013-02-07T00:00:00Z")).toBe(false);
   });
 });

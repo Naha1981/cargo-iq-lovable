@@ -22,6 +22,23 @@ function inferClass(name: string) {
   return "CUSTOMER_PRIMARY";
 }
 
+const MONTHS = "jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?";
+// A model may turn "February 2014" or "2012/2013" into 2014-02-01 or 2012-01-01. Keep a timestamp only when the claim
+// itself states the day (an ISO date, "28 January", or "January 28"); otherwise the date stays in the text only.
+export function dayAnchored(claimText: string, iso: string): boolean {
+  const d = new Date(iso); if (Number.isNaN(d.getTime())) return false;
+  const day = d.getUTCDate(), mon = d.getUTCMonth();
+  const isoPart = d.toISOString().slice(0, 10);
+  if (claimText.includes(isoPart)) return true;
+  const re = new RegExp("\\b(?:(\\d{1,2})(?:st|nd|rd|th)?\\s+(" + MONTHS + ")\\b|(" + MONTHS + ")\\s+(\\d{1,2})(?:st|nd|rd|th)?\\b)", "gi");
+  const names = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+  for (const m of claimText.matchAll(re)) {
+    const dd = Number(m[1] ?? m[4]), mm = String(m[2] ?? m[3]).toLowerCase().slice(0, 3);
+    if (dd === day && names.indexOf(mm) === mon) return true;
+  }
+  return false;
+}
+
 function parseJsonModel(text: string): ClaimDraft[] {
   const cleaned = text.replace(/^\`\`\`json\s*/i, "").replace(/^\`\`\`\s*$/i, "").trim();
   const parsed = JSON.parse(cleaned);
@@ -36,7 +53,7 @@ function parseJsonModel(text: string): ClaimDraft[] {
     evidence_class: String(row.evidence_class ?? "CUSTOMER_PRIMARY"),
     nature: ["OBSERVED","REPORTED","DERIVED","INFERRED"].includes(row.nature) ? row.nature : "REPORTED",
     confidence: Number.isFinite(Number(row.confidence)) ? Math.max(0, Math.min(1, Number(row.confidence))) : 0.7,
-    timestamp_claimed: row.timestamp_claimed && !isNaN(Date.parse(row.timestamp_claimed)) ? new Date(row.timestamp_claimed).toISOString() : undefined,
+    timestamp_claimed: row.timestamp_claimed && !isNaN(Date.parse(row.timestamp_claimed)) && dayAnchored(String(row.claim_text ?? ""), String(row.timestamp_claimed)) ? new Date(row.timestamp_claimed).toISOString() : undefined,
   }));
   const kept = mapped.filter((row: ClaimDraft) => row.claim_text.length > 0);
   // A provider that answered with rows but none we can read broke the field contract. Fail loudly

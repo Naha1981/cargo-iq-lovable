@@ -1,5 +1,6 @@
 import { Route as CaseRoute } from "./cases.$caseId";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useRouter } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { liveHarbourHref } from "@/lib/live-harbour";
 
 export const Route = createFileRoute("/cases/$caseId/live-harbour")({
@@ -9,7 +10,23 @@ export const Route = createFileRoute("/cases/$caseId/live-harbour")({
 
 function LiveHarbourPage() {
   const data = CaseRoute.useLoaderData();
-  const src = liveHarbourHref(data.case.port_code);
+  const router = useRouter();
+  const base = liveHarbourHref(data.case.port_code);
+  const sample = data.case.reference_no === "DUR-2026-0412" ? "1" : "0";
+  const src = base + (base.includes("?") ? "&" : "?") + "embed=1&sample=" + sample;
+  const caseId = data.case.id as string;
+
+  // The embedded map's "Open case evidence pack" button navigates in-app,
+  // instead of opening a new browser tab that renders blank.
+  useEffect(() => {
+    function onMessage(ev: MessageEvent) {
+      if (ev.origin !== window.location.origin) return;
+      if (ev.data?.type !== "harbour-open-pack") return;
+      router.navigate({ to: "/cases/$caseId/pack", params: { caseId } });
+    }
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, [router, caseId]);
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-end justify-between gap-2">

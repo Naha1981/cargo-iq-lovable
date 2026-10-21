@@ -1,3 +1,4 @@
+import { insertClaimRow } from "./claim-insert";
 import { analysisStatus, candidateDateMismatches, encodeExtractionStatus } from "./analysis-integrity";
 import { readPdfLines, readPdfPages } from "./pdf-text";
 import { assertDocumentSize, isPlainDocument, plainTextClaims, PDF_AI_UNAVAILABLE } from "./extraction-policy";
@@ -619,10 +620,7 @@ export async function extractDocumentClaimsForPath(input: {
       timestamp_claimed: claim.timestamp_claimed ?? null,
     };
     // source_seq records reading order. If the column is not deployed yet, store without it rather than fail the analysis.
-    let { data: row, error } = await input.supabase.from("extracted_claims").insert({ ...base, source_seq: seq }).select("*").single();
-    if (error && (error.code === "42703" || error.code === "PGRST204" || /source_seq/.test(String(error.message ?? "")))) {
-      ({ data: row, error } = await input.supabase.from("extracted_claims").insert(base).select("*").single());
-    }
+    const { data: row, error } = await insertClaimRow(input.supabase, base, seq);
     if (error) throw error;
     inserted.push(row);
 

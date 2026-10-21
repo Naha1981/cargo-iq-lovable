@@ -1,17 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { analysisStatus, candidateDateMismatches } from "./analysis-integrity";
+import { analysisStatus, candidateDateMismatches, encodeExtractionStatus, parseExtractionStatus } from "./analysis-integrity";
 
 describe("analysisStatus", () => {
-  it("a failed discrepancy pass is INCOMPLETE and says absence is not a finding", () => {
+  it("a failed optional pass does not make a complete extraction incomplete, and is not a clean none", () => {
     const s = analysisStatus({ discrepancyPass: "failed", discrepancyError: "FREE_GEMINI_503" });
-    expect(s.status).toBe("INCOMPLETE");
-    expect(s.notes[0]).toMatch(/503/);
-    expect(s.notes[0]).toMatch(/does not mean/);
+    expect(s.extraction).toBe("COMPLETE"); expect(s.review).toBe("MODEL_FAILED"); expect(s.reviewNote).toMatch(/does not mean/);
   });
-  it("skipped pass is INCOMPLETE, ran with no issues is COMPLETE", () => {
-    expect(analysisStatus({ discrepancyPass: "skipped" }).status).toBe("INCOMPLETE");
-    expect(analysisStatus({ discrepancyPass: "ran" }).status).toBe("COMPLETE");
-    expect(analysisStatus({ discrepancyPass: "ran", coverageWarnings: ["page 9 re-read"] }).status).toBe("INCOMPLETE");
+  it("provider or coverage failures make extraction INCOMPLETE", () => {
+    expect(analysisStatus({ discrepancyPass: "ran", coverageWarnings: ["page 9 not read"] }).extraction).toBe("INCOMPLETE");
+    expect(analysisStatus({ discrepancyPass: "skipped", fallbackErrors: ["chunk 2 failed"] }).extraction).toBe("INCOMPLETE");
+    expect(analysisStatus({ discrepancyPass: "skipped" }).extraction).toBe("COMPLETE");
+  });
+  it("encodes and parses the stored status", () => {
+    const e = encodeExtractionStatus(analysisStatus({ discrepancyPass: "failed", discrepancyError: "x", coverageWarnings: ["p9 | gap"] }));
+    expect(parseExtractionStatus(e)).toMatchObject({ extraction: "INCOMPLETE", review: "MODEL_FAILED" });
+    expect(parseExtractionStatus("PENDING").extraction).toBe("UNKNOWN");
   });
 });
 

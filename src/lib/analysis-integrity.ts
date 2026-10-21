@@ -1,16 +1,34 @@
 // Provider-neutral integrity helpers. Rule-derived candidates are NOT verified findings.
 export type ClaimLite = { claim_text: string; page_number?: number | null; claim_type?: string | null };
 
-export type AnalysisStatus = { status: "COMPLETE" | "INCOMPLETE"; notes: string[] };
+export type ReviewCoverage = "MODEL_RAN" | "MODEL_FAILED" | "MODEL_NOT_RUN";
+export type AnalysisStatus = { extraction: "COMPLETE" | "INCOMPLETE"; review: ReviewCoverage; extractionNotes: string[]; reviewNote: string };
 
-/** Never let a failed or skipped check read as "0 contradictions". */
+/**
+ * Two separate questions. Extraction completeness: did we read the whole document without a failed, truncated or
+ * partial provider call? Discrepancy-review coverage: did the OPTIONAL model discrepancy check run? A missing
+ * optional check never makes a complete extraction incomplete, and a failed check never reads as a clean none.
+ */
 export function analysisStatus(o: { discrepancyPass: "ran" | "failed" | "skipped"; discrepancyError?: string; fallbackErrors?: string[]; coverageWarnings?: string[] }): AnalysisStatus {
-  const notes: string[] = [];
-  if (o.discrepancyPass === "failed") notes.push("Optional model discrepancy check FAILED (" + (o.discrepancyError ?? "error") + "). Absence of flags below does not mean no discrepancies exist.");
-  if (o.discrepancyPass === "skipped") notes.push("Optional model discrepancy check was not run for this provider. Only rule-based candidate flags were applied.");
-  for (const e of o.fallbackErrors ?? []) if (!/^discrepancy pass/.test(e)) notes.push("Provider issue: " + e);
-  for (const w of o.coverageWarnings ?? []) notes.push("Coverage: " + w);
-  return { status: o.discrepancyPass === "ran" && !notes.length ? "COMPLETE" : "INCOMPLETE", notes };
+  const extractionNotes: string[] = [];
+  for (const e of o.fallbackErrors ?? []) if (!/^discrepancy pass/.test(e)) extractionNotes.push("Provider issue: " + e);
+  for (const w of o.coverageWarnings ?? []) extractionNotes.push("Coverage: " + w);
+  const review: ReviewCoverage = o.discrepancyPass === "ran" ? "MODEL_RAN" : o.discrepancyPass === "failed" ? "MODEL_FAILED" : "MODEL_NOT_RUN";
+  const reviewNote = review === "MODEL_RAN" ? "Optional model discrepancy check ran. Its flags are candidates for human review, not findings."
+    : review === "MODEL_FAILED" ? "Optional model discrepancy check FAILED (" + (o.discrepancyError ?? "error") + "). No flags does not mean no discrepancies exist."
+    : "Optional model discrepancy check was not run for this provider. Only rule-based candidate flags were applied.";
+  return { extraction: extractionNotes.length ? "INCOMPLETE" : "COMPLETE", review, extractionNotes, reviewNote };
+}
+
+/** Stored in documents.extraction_status (already part of the canonical pack payload via the documents rows). */
+export function encodeExtractionStatus(s: AnalysisStatus): string {
+  return (s.extraction === "COMPLETE" ? "EXTRACTED" : "EXTRACTED_INCOMPLETE") + "|REVIEW:" + s.review + (s.extractionNotes.length ? "|NOTE:" + s.extractionNotes.join(" ; ").replace(/\|/g, "/").slice(0, 600) : "");
+}
+export function parseExtractionStatus(v: unknown): { extraction: "COMPLETE" | "INCOMPLETE" | "UNKNOWN"; review: ReviewCoverage | "UNKNOWN"; note: string } {
+  const t = String(v ?? "");
+  const extraction = t.startsWith("EXTRACTED_INCOMPLETE") ? "INCOMPLETE" : t.startsWith("EXTRACTED") ? "COMPLETE" : "UNKNOWN";
+  const review = (/\|REVIEW:(MODEL_RAN|MODEL_FAILED|MODEL_NOT_RUN)/.exec(t)?.[1] as ReviewCoverage | undefined) ?? "UNKNOWN";
+  return { extraction, review, note: /\|NOTE:(.*)$/.exec(t)?.[1] ?? "" };
 }
 
 const MONTHS = ["january","february","march","april","may","june","july","august","september","october","november","december"];

@@ -11,7 +11,7 @@ function db(blob: Blob, name: string, type: string) {
   const supabase = {
     storage: { from: () => ({ download: async () => ({ data: blob, error: null }) }) },
     from(table: string) {
-      const query: any = { data: [], error: null, eq: () => query, select: () => query,
+      const query: any = { data: [], error: null, eq: () => query, select: () => query, update: () => query,
         single: async () => ({ data: table === "documents" ? { name, file_type: type, file_path: "synthetic/test" } : { id: "claim-" + inserted.length }, error: null }),
         insert: (row: any) => { if (table === "extracted_claims") inserted.push(row); return query; },
       };

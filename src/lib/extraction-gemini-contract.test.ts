@@ -8,17 +8,17 @@ const keys = ["OPENAI_API_KEY", "ANTHROPIC_API_KEY", "LOVABLE_API_KEY", "CLAIM_A
 const saved = Object.fromEntries(keys.map((k) => [k, process.env[k]]));
 afterEach(() => { vi.unstubAllGlobals(); for (const k of keys) { if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k]; } });
 function db(blob: Blob, name: string, type: string) {
-  const inserted: any[] = []; const audits: any[] = [];
+  const inserted: any[] = []; const audits: any[] = []; const docUpdates: any[] = [];
   const supabase = {
     storage: { from: () => ({ download: async () => ({ data: blob, error: null }) }) },
     from(table: string) {
-      const q: any = { data: [], error: null, eq: () => q, select: () => q,
+      const q: any = { data: [], error: null, eq: () => q, select: () => q, update: (row: any) => { if (table === "documents") docUpdates.push(row); return q; },
         single: async () => ({ data: table === "documents" ? { name, file_type: type, file_path: "synthetic/test" } : { id: "r" + inserted.length }, error: null }),
         insert: (row: any) => { if (table === "extracted_claims") inserted.push(row); if (table === "audit_log") audits.push(row); return q; } };
       return q;
     },
   };
-  return { supabase: supabase as any, inserted, audits };
+  return { supabase: supabase as any, inserted, audits, docUpdates };
 }
 const base = { documentId: "d", caseId: "c", tenantId: "t", userId: "u" };
 function gates() { for (const k of keys) delete process.env[k]; process.env.GEMINI_API_KEY = "synthetic"; process.env.CLAIM_GEMINI_TEST_FALLBACK_ENABLED = "true"; process.env.CLAIM_GEMINI_FREE_TIER_CONFIRMED = "true"; }
@@ -122,10 +122,14 @@ describe("evidence pack layout and labels", () => {
     expect(txt.indexOf("EARLY")).toBeLessThan(txt.indexOf("TIMED")); expect(txt.indexOf("TIMED")).toBeLessThan(txt.indexOf("LATE"));
     expect(txt).toContain("2022-08-09 \\(time not stated\\)"); expect(txt).toContain("2022-08-09 10:30Z"); expect(txt).not.toContain("00:00Z");
   });
-  it("an incomplete analysis is printed and the empty contradiction list is not presented as a clean none", () => {
-    const pk: any = pack("DRAFT"); pk.pack_payload.analysis_notes = ["Optional model discrepancy check FAILED (FREE_GEMINI_503)."]; pk.pack_payload.contradictions = [];
-    const txt = Buffer.from(buildEvidencePackPdf(pk)).toString("latin1");
-    expect(txt).toContain("ANALYSIS INCOMPLETE"); expect(txt).toContain("not a finding of none"); expect(txt).not.toContain("No contradictions were detected");
+  it("extraction completeness and discrepancy-review coverage are reported separately", () => {
+    const mk = (status: string) => { const pk: any = pack("DRAFT"); pk.pack_payload.documents = [{ id: "d1", name: "Doc.pdf", sha256_hash: "abc", extraction_status: status }]; pk.pack_payload.contradictions = []; return Buffer.from(buildEvidencePackPdf(pk)).toString("latin1"); };
+    const partial = mk("EXTRACTED_INCOMPLETE|REVIEW:MODEL_RAN|NOTE:chunk 3 failed");
+    expect(partial).toContain("EXTRACTION INCOMPLETE"); expect(partial).toContain("chunk 3 failed"); expect(partial).toContain("not a finding of none");
+    const noReview = mk("EXTRACTED|REVIEW:MODEL_NOT_RUN");
+    expect(noReview).not.toContain("EXTRACTION INCOMPLETE"); expect(noReview).toContain("optional model check not run"); expect(noReview).toContain("not a finding of none");
+    const failed = mk("EXTRACTED|REVIEW:MODEL_FAILED"); expect(failed).not.toContain("EXTRACTION INCOMPLETE"); expect(failed).toContain("FAILED");
+    expect(mk("EXTRACTED|REVIEW:MODEL_RAN")).toContain("No contradictions were detected");
   });
 });
 

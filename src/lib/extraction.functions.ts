@@ -1,4 +1,4 @@
-import { analysisStatus, candidateDateMismatches } from "./analysis-integrity";
+import { analysisStatus, candidateDateMismatches, encodeExtractionStatus } from "./analysis-integrity";
 import { readPdfLines, readPdfPages } from "./pdf-text";
 import { assertDocumentSize, isPlainDocument, plainTextClaims, PDF_AI_UNAVAILABLE } from "./extraction-policy";
 import { createServerFn } from "@tanstack/react-start";
@@ -642,6 +642,9 @@ export async function extractDocumentClaimsForPath(input: {
   }
 
   const integrity = analysisStatus({ discrepancyPass, discrepancyError, fallbackErrors, coverageWarnings });
+  // documents.extraction_status is part of the canonical pack payload, so the status reaches the pack with no schema change.
+  const { error: statusError } = await input.supabase.from("documents").update({ extraction_status: encodeExtractionStatus(integrity) }).eq("id", input.documentId).eq("case_id", input.caseId);
+  if (statusError) fallbackErrors.push("status not recorded on document: " + String(statusError.message ?? "error").slice(0, 100));
   await input.supabase.from("audit_log").insert({
     tenant_id: input.tenantId,
     case_id: input.caseId,
@@ -652,7 +655,7 @@ export async function extractDocumentClaimsForPath(input: {
     payload: { claims: inserted.length, filename: doc.name, mode, providerUsed, discrepancyFlags, ...(fallbackErrors.length ? { fallbackErrors } : {}), ...(coverageWarnings.length ? { coverageWarnings } : {}) },
   });
 
-  return { claims: inserted, count: inserted.length, mode, providerUsed, discrepancyFlags, analysisStatus: integrity.status, analysisNotes: integrity.notes, ...(fallbackErrors.length ? { fallbackErrors } : {}), ...(coverageWarnings.length ? { coverageWarnings } : {}) };
+  return { claims: inserted, count: inserted.length, mode, providerUsed, discrepancyFlags, analysisExtraction: integrity.extraction, analysisReview: integrity.review, analysisNotes: integrity.extractionNotes, reviewNote: integrity.reviewNote, ...(fallbackErrors.length ? { fallbackErrors } : {}), ...(coverageWarnings.length ? { coverageWarnings } : {}) };
 }
 
 export const extractionHealth = createServerFn({ method: "GET" }).handler(async () => {

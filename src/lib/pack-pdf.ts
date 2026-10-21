@@ -1,3 +1,4 @@
+import { parseExtractionStatus } from "./analysis-integrity";
 import {frozenOperationalResults} from "./count-pack";
 // Dependency-free, deterministic PDF writer for the Evidence Pack.
 // Runs entirely in the browser: no network, no external service. Same pack in = same bytes out.
@@ -167,9 +168,14 @@ export function buildEvidencePackPdf(pack: any): Uint8Array {
 
   const contr: any[] = p.contradictions ?? [];
   d.heading("5. Contradictions and resolutions (" + contr.length + ")");
-  const notes: string[] = Array.isArray(p.analysis_notes) ? p.analysis_notes : [];
-  for (const n of notes) d.text("ANALYSIS INCOMPLETE: " + n, { indent: 4 });
-  if (!contr.length) d.text(notes.length ? "No contradictions were flagged, but see the incomplete-analysis notice above. This is not a finding of none." : "No contradictions were detected.", { indent: 4 });
+  const sts = docs.map((x: any) => ({ name: x.name, ...parseExtractionStatus(x.extraction_status) }));
+  for (const x of sts) {
+    if (x.extraction === "INCOMPLETE") d.text("EXTRACTION INCOMPLETE for " + x.name + ": " + (x.note || "a provider call was partial or failed") + ". Claims from this document may be missing.", { indent: 4 });
+    if (x.review === "MODEL_FAILED") d.text("Discrepancy review for " + x.name + ": optional model check FAILED. No flags does not mean no discrepancies exist.", { indent: 4 });
+    else if (x.review === "MODEL_NOT_RUN") d.text("Discrepancy review for " + x.name + ": optional model check not run. Only rule-based candidates were applied.", { indent: 4 });
+  }
+  const notAssessed = sts.some((x) => x.extraction === "INCOMPLETE" || x.review === "MODEL_FAILED" || x.review === "MODEL_NOT_RUN");
+  if (!contr.length) d.text(notAssessed ? "No contradictions were flagged, but see the notices above. This is not a finding of none." : "No contradictions were detected.", { indent: 4 });
   contr.forEach((x, i) => {
     d.text((i + 1) + ". " + x.title + "  [" + x.status + "]", { indent: 4, bold: true });
     if (x.description) d.text(x.description, { indent: 14 });

@@ -211,7 +211,8 @@ export async function extractChunked(call: (b: ArrayBuffer, mime: string, name: 
   return all;
 }
 
-async function extractWithGemini(bytes: ArrayBuffer, mimeType: string, filename: string, warnings: string[] = []) {
+/** Name kept for history: this runs the configured production provider route (openai, anthropic or gateway), chunked for long PDFs. */
+export async function extractWithGemini(bytes: ArrayBuffer, mimeType: string, filename: string, warnings: string[] = []) {
   const isPdf = mimeType === "application/pdf" || /\.pdf$/i.test(filename);
   if (isPdf) {
     const pages = await readPdfPages(bytes).catch(() => [] as string[]);

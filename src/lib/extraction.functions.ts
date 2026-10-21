@@ -176,11 +176,47 @@ async function extractViaAnthropic(bytes: ArrayBuffer, mimeType: string, filenam
   return parseJsonModel(start >= 0 && end > start ? text.slice(start, end + 1) : text).map((c) => ({ ...c, timestamp_claimed: c.timestamp_claimed || undefined }));
 }
 
-async function extractWithGemini(bytes: ArrayBuffer, mimeType: string, filename: string) {
+async function extractWholeDocument(bytes: ArrayBuffer, mimeType: string, filename: string) {
   const provider = resolveClaimAiProvider();
   if (provider.kind === "openai") return extractViaOpenAi(bytes, mimeType, filename);
   if (provider.kind === "anthropic") return extractViaAnthropic(bytes, mimeType, filename);
   return extractViaGateway(bytes, mimeType, filename);
+}
+
+/**
+ * Provider-neutral chunking for the configured production route. A long text PDF is read page by page in sections,
+ * each sent through the same route as plain text with page tags. A failed section is retried once; if it still fails
+ * its pages are reported in `warnings` (extraction INCOMPLETE) and the other sections are kept. Nothing is dropped silently.
+ * Documents that fit one section, scanned PDFs and images keep the whole-document path.
+ */
+export async function extractChunked(call: (b: ArrayBuffer, mime: string, name: string) => Promise<ClaimDraft[]>, pages: string[], filename: string, warnings: string[]): Promise<ClaimDraft[]> {
+  const chunks = chunkPages(pages);
+  if (chunks.length > GEMINI_MAX_CHUNKS) throw new Error("DOCUMENT_TOO_LONG_" + chunks.length);
+  const all: ClaimDraft[] = [];
+  for (let i = 0; i < chunks.length; i++) {
+    const text = "This is section " + (i + 1) + " of " + chunks.length + " of a longer document. Page numbers are in [page N] tags; use them as page_number.\n" + chunks[i];
+    const bytes = new TextEncoder().encode(text).buffer as ArrayBuffer;
+    const range = (chunks[i]!.match(/\[page (\d+)/g) ?? []).map((m) => m.replace("[page ", ""));
+    const label = "pages " + (range[0] ?? "?") + "-" + (range[range.length - 1] ?? "?");
+    let done = false;
+    for (let attempt = 0; attempt < 2 && !done; attempt++) {
+      try { all.push(...await call(bytes, "text/plain", filename)); done = true; }
+      catch (e) { if (attempt === 1) warnings.push("section " + (i + 1) + "/" + chunks.length + " (" + label + ") failed: " + (e instanceof Error ? e.message : "error").slice(0, 100)); }
+    }
+  }
+  if (!all.length) throw new Error("NO_SECTION_SUCCEEDED");
+  const gaps = missingContainerIds(pages, all);
+  if (gaps.length) warnings.push("Container IDs in the source but not in any claim: " + gaps.map((g) => g.id + " (p" + g.page + ")").join(", "));
+  return all;
+}
+
+async function extractWithGemini(bytes: ArrayBuffer, mimeType: string, filename: string, warnings: string[] = []) {
+  const isPdf = mimeType === "application/pdf" || /\.pdf$/i.test(filename);
+  if (isPdf) {
+    const pages = await readPdfPages(bytes).catch(() => [] as string[]);
+    if (pages.length && chunkPages(pages).length > 1) return extractChunked(extractWholeDocument, pages, filename, warnings);
+  }
+  return extractWholeDocument(bytes, mimeType, filename);
 }
 
 async function extractViaGateway(bytes: ArrayBuffer, mimeType: string, filename: string) {
@@ -517,7 +553,7 @@ export async function extractDocumentClaimsForPath(input: {
   const coverageWarnings: string[] = [];
   if (input.noAi) claims = await importLines();
   else {
-    try { claims = await extractWithGemini(bytes, doc.file_type, doc.name); }
+    try { claims = await extractWithGemini(bytes, doc.file_type, doc.name, coverageWarnings); }
     catch (error) {
       let recovered = false;
       for (const provider of enabledFreeFallbacks(input.allowTestFallback)) {

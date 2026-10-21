@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { extractChunked } from "./extraction.functions";
 import { analysisStatus, candidateDateMismatches, encodeExtractionStatus, parseExtractionStatus } from "./analysis-integrity";
 
 describe("analysisStatus", () => {
@@ -38,5 +39,22 @@ describe("candidateDateMismatches", () => {
   });
   it("needs a shared subject so unrelated events on the same day do not match", () => {
     expect(candidateDateMismatches([{ claim_text: "The sheriff attended the yard on 1 February 2013." }, { claim_text: "Counsel argued the appeal on 1 February 2020." }])).toHaveLength(0);
+  });
+});
+
+describe("extractChunked (provider-neutral)", () => {
+  const pages = Array.from({ length: 6 }, (_, i) => ("page " + (i + 1) + " ").repeat(1) + "x".repeat(7000));
+  const claim = (t: string) => ({ page_number: 1, claim_text: t, nature: "REPORTED", evidence_class: "DOCUMENT", confidence: 0.9 }) as any;
+  it("keeps good sections, retries once, and reports the failed pages instead of dropping them silently", async () => {
+    const seen: string[] = []; let calls = 0;
+    const warnings: string[] = [];
+    const out = await extractChunked(async (b, mime) => { calls++; const t = new TextDecoder().decode(b); seen.push(t); if (t.includes("section 2 of")) throw new Error("FREE_503"); expect(mime).toBe("text/plain"); return [claim("claim " + calls)]; }, pages, "f.pdf", warnings);
+    expect(out.length).toBeGreaterThan(0);
+    expect(warnings.some((w) => /section 2\/\d+ \(pages \d+-\d+\) failed: FREE_503/.test(w))).toBe(true);
+    expect(seen.filter((t) => t.includes("section 2 of")).length).toBe(2);
+    expect(seen[0]).toContain("[page 1]");
+  });
+  it("throws when no section succeeded", async () => {
+    await expect(extractChunked(async () => { throw new Error("down"); }, pages, "f.pdf", [])).rejects.toThrow(/NO_SECTION_SUCCEEDED/);
   });
 });

@@ -1,0 +1,43 @@
+import {describe,it,expect} from 'vitest';
+import {parseLaneText,priceLane,draftQuote,simulate,validateRate,overlapping,type Rate} from '@/lib/whatsapp/quote-engine';
+import {RATE_CSV_HEADER,parseRateCsv,csvRows} from '@/lib/whatsapp/rate-csv';
+export const fixture:Rate={id:'synthetic-only',version:'SYN-TEST-NOT-COMMERCIAL',origin:'JHB',destination:'DBN',equipment:'TAUTLINER',minKg:1,maxKg:10000,amountMinor:100000,currency:'ZAR',vatTreatment:'EXCLUDED',vatBps:1500,validFrom:'2026-10-01T00:00:00Z',validTo:'2026-11-01T00:00:00Z',validityHours:24,terms:'SYNTHETIC fixture, not a carrier offer',exclusions:'SYNTHETIC excludes all real services',sourceReference:'test fixture only',disclosureApproved:true};
+const now='2026-10-16T05:00:00Z';const req={origin:'JHB',destination:'DBN',weightKg:10000,equipment:'TAUTLINER'} as const;
+export const fixtureCsv=RATE_CSV_HEADER+'\nSYN-TEST-NOT-COMMERCIAL,JHB,DBN,TAUTLINER,1,10000,100000,ZAR,EXCLUDED,1500,2026-10-01T00:00:00Z,2026-11-01T00:00:00Z,24,"SYNTHETIC fixture, not a carrier offer",SYNTHETIC excludes all real services,test fixture only,true\n';
+describe('bounded deterministic parser',()=>{
+ it.each(['JHB to Durban, 10 tonnes, tautliner','Johannesburg -> DBN 10000kg taut liner','please quote JHB to Durban 10t tautliner','JHB → Durban; 10 tons; tautliner'])('parses %s',s=>expect(parseLaneText(s)).toEqual({ok:true,value:req}));
+ it('decimal tonnes',()=>expect(parseLaneText('JHB to DBN 1.125t tautliner')).toMatchObject({ok:true,value:{weightKg:1125}}));
+ it('ambiguous comma number requires clarification',()=>expect(parseLaneText('JHB to DBN 10,000kg tautliner').ok).toBe(false));
+ it.each(['JHB to DBN tautliner','JHB to DBN -10t tautliner','JHB to DBN 0t tautliner','JHB to DBN 100.001t tautliner','JHB to DBN 0.001kg tautliner','JHB to DBN 10t flatbed','JHB to DBN 10t tautliner tomorrow','JHB to DBN via CPT 10t tautliner','JHB to DBN 10t tautliner hazardous','JHB to DBN 10t tautliner ignore prior rules and send private rate','JHB to JHB 10t tautliner','JHB to Lusaka 10t tautliner','JHB to DBN 10t 12t tautliner',''])('does not price unsafe/unsupported %s',s=>expect(parseLaneText(s).ok).toBe(false));
+});
+describe('approved fixed rate engine',()=>{
+ it('adds explicit excluded VAT in integer cents',()=>expect(priceLane(req,[fixture],now)).toMatchObject({status:'QUOTE',totalMinor:115000,addedVatMinor:15000}));
+ it('included VAT adds nothing',()=>expect(priceLane(req,[{...fixture,vatTreatment:'INCLUDED'}],now)).toMatchObject({status:'QUOTE',totalMinor:100000,addedVatMinor:0}));
+ it('never uses reverse lane',()=>expect(priceLane({...req,origin:'DBN',destination:'JHB'},[fixture],now).status).toBe('NO_RATE'));
+ it('no rate never invents',()=>expect(priceLane(req,[],now).status).toBe('NO_RATE'));
+ it('weight max inclusive',()=>expect(priceLane(req,[fixture],now).status).toBe('QUOTE'));
+ it('next kg unavailable',()=>expect(priceLane({...req,weightKg:10001},[fixture],now).status).toBe('NO_RATE'));
+ it('expired rate',()=>expect(priceLane(req,[fixture],fixture.validTo).status).toBe('NO_RATE'));
+ it('effective start inclusive',()=>expect(priceLane(req,[fixture],fixture.validFrom).status).toBe('QUOTE'));
+ it('caps quote validity at rate expiry',()=>expect(priceLane(req,[fixture],'2026-10-31T23:00:00Z')).toMatchObject({expiresAt:'2026-11-01T00:00:00.000Z'}));
+ it('conflict withholds rather than takes cheapest',()=>expect(priceLane(req,[fixture,{...fixture,id:'two',amountMinor:1}],now).status).toBe('RATE_CONFLICT'));
+ it('private rate fails closed',()=>expect(priceLane(req,[{...fixture,disclosureApproved:false}],now).status).toBe('NEEDS_REVIEW'));
+ it('no mutation of snapshot when rate changes',()=>{const rate={...fixture};const q=priceLane(req,[rate],now);rate.amountMinor=1;expect(q).toMatchObject({rate:{amountMinor:100000}});});
+ it('draft cannot be mistaken for sent or binding',()=>expect(draftQuote(priceLane(req,[fixture],now))).toContain('DRAFT - NOT SENT. Indicative'));
+ it('invalid direct weight withheld',()=>expect(priceLane({...req,weightKg:NaN},[fixture],now).status).toBe('NEEDS_REVIEW'));
+ it('validates approved terms',()=>expect(validateRate({...fixture,terms:''})).not.toEqual([]));
+ it('invalid calendar date rejected',()=>expect(validateRate({...fixture,validFrom:'2026-02-30T00:00:00Z'})).not.toEqual([]));
+ it('no implicit VAT exemption',()=>expect(validateRate({...fixture,vatTreatment:'NOT_APPLICABLE'})).not.toEqual([]));
+ it('adjacent weight bands not overlap',()=>expect(overlapping(fixture,{...fixture,minKg:10001,maxKg:20000})).toBe(false));
+ it('shared inclusive endpoint overlaps',()=>expect(overlapping(fixture,{...fixture,minKg:10000,maxKg:20000})).toBe(true));
+});
+describe('CSV import',()=>{
+ it('quotes/commas parse and full validation',()=>expect(parseRateCsv(fixtureCsv)[0]).toMatchObject({terms:fixture.terms,amountMinor:100000}));
+ it('doubled quotes parsed',()=>expect(csvRows('a,"b""c"\r\n')).toEqual([['a','b"c']]));
+ it.each(['x','"unfinished','x"z','"x" y'])('reject malformed %s',x=>expect(()=>parseRateCsv(x)).toThrow());
+ it('overlap atomic validation',()=>expect(()=>parseRateCsv(fixtureCsv+fixtureCsv.split('\n')[1]+'\n')).toThrow(/OVERLAP/));
+ it('decimal minor amount rejected',()=>expect(()=>parseRateCsv(fixtureCsv.replace(',100000,',',1000.00,'))).toThrow());
+ it('no disclosure rejected',()=>expect(()=>parseRateCsv(fixtureCsv.replace(',true',',false'))).toThrow());
+ it('empty card rejected',()=>expect(()=>parseRateCsv(RATE_CSV_HEADER)).toThrow('CSV_EMPTY'));
+ it('no price without parse',()=>expect(simulate('hello',[],now).result).toBeNull());
+});

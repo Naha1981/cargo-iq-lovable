@@ -6,6 +6,7 @@ import { getCurrentUser } from "@/lib/auth.functions";
 import { listCases } from "@/lib/case.functions";
 import { fmtMoney } from "@/lib/case-data";
 import { cn } from "@/lib/utils";
+import { SiteFooter } from "@/components/SiteFooter";
 
 export const Route = createFileRoute("/")({
   ssr: false,
@@ -45,7 +46,7 @@ function Index() {
 
   const zar = cases.filter((c: any) => c.currency === "ZAR");
   const charged = zar.reduce((sum: number, c: any) => sum + c.exposure, 0);
-  const recoveryBlocked = zar.some((c: any) => c.contradictions > 0);
+  const recoveryBlocked = zar.some((c: any) => (c.contradictions > 0 || c.clockConflicts));
   const recovery = zar.reduce((sum: number, c: any) => sum + (c.recovery ?? 0), 0);
 
   if (!session.user) {
@@ -72,7 +73,7 @@ function Index() {
           <Link to="/new-case" className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">+ New investigation</Link>
         </div>
 
-        <a href="/demo/cuf" className="mt-6 inline-flex rounded-md border px-4 py-2 text-sm font-semibold">Open the interactive sample</a>
+        <a href="/demo/cuf" className="mt-6 inline-flex rounded-md border px-4 py-2 text-sm font-semibold">Explore a worked example</a>
         <div className="mt-8 grid grid-cols-2 gap-3 md:grid-cols-4">
           <Stat label="Open cases" value={cases.filter((c: any) => c.status !== "CLOSED").length} />
           <Stat label="Contradictions" value={cases.reduce((a: number, c: any) => a + c.contradictions, 0)} tone="disputed" />
@@ -111,7 +112,7 @@ function Index() {
                   </td>
                   <td className="px-4 py-3"><span className={cn("rounded px-2 py-1 text-xs", statusCls[c.status] ?? "bg-secondary")}>{c.status}</span></td>
                   <td className="px-4 py-3 text-right font-mono">{fmtMoney(c.exposure, c.currency)}</td>
-                  <td className="px-4 py-3 text-right font-mono text-observed">{c.contradictions > 0 ? "BLOCKED" : fmtMoney(c.recovery ?? 0, c.currency)}</td>
+                  <td className="px-4 py-3 text-right font-mono text-observed">{(c.contradictions > 0 || c.clockConflicts) ? "BLOCKED" : fmtMoney(c.recovery ?? 0, c.currency)}</td>
                 </tr>
               ))}
               {!rows.length && <tr><td colSpan={4} className="px-4 py-10 text-center text-sm text-muted-foreground">No investigations yet. Create the first case to begin.</td></tr>}
@@ -119,6 +120,7 @@ function Index() {
           </table>
         </div>
       </main>
+      <SiteFooter />
     </div>
   );
 }

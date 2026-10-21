@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { Button, Panel } from "@/components/ui-kit";
+import { SiteFooter } from "@/components/SiteFooter";
 import { createClient } from "@/lib/supabase/client";
 import { ensureOrganization } from "@/lib/auth.functions";
 
@@ -11,11 +12,12 @@ export const Route = createFileRoute("/auth")({
 
 function AuthPage() {
   const navigate = useNavigate();
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [mode, setMode] = useState<"signin" | "signup" | "reset">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [organization, setOrganization] = useState("");
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const supabase = createClient();
 
@@ -23,6 +25,7 @@ function AuthPage() {
     event.preventDefault();
     setBusy(true);
     setError("");
+    setNotice("");
 
     try {
       if (mode === "signup") {
@@ -39,6 +42,15 @@ function AuthPage() {
           setMode("signin");
           return;
         }
+      } else if (mode === "reset") {
+        const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}/reset-password`,
+        });
+        if (resetError) throw resetError;
+        setError("");
+        setNotice("If an account exists for this email, a reset link is on its way. Open it on this device.");
+        setMode("signin");
+        return;
       } else {
         const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
         if (signInError) throw signInError;
@@ -62,7 +74,7 @@ function AuthPage() {
           <p className="mt-2 text-sm text-muted-foreground">Secure case workspaces for freight, port and dispute investigations.</p>
         </div>
 
-        <Panel title={mode === "signin" ? "Sign in" : "Create workspace"}>
+        <Panel title={mode === "signin" ? "Sign in" : mode === "signup" ? "Create workspace" : "Reset password"}>
           <form className="space-y-4" onSubmit={submit}>
             {mode === "signup" && (
               <label className="block text-sm">
@@ -76,23 +88,35 @@ function AuthPage() {
               <input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="mt-1 w-full rounded-md border bg-background px-3 py-2" />
             </label>
 
-            <label className="block text-sm">
-              Password
-              <input required minLength={8} type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="mt-1 w-full rounded-md border bg-background px-3 py-2" />
-            </label>
+            {mode !== "reset" && (
+              <label className="block text-sm">
+                Password
+                <input required minLength={8} type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="mt-1 w-full rounded-md border bg-background px-3 py-2" />
+              </label>
+            )}
 
             {error && <div className="rounded border border-disputed/40 bg-disputed/10 p-3 text-sm text-disputed">{error}</div>}
-            <Button disabled={busy} className="w-full justify-center">{busy ? "Working…" : mode === "signin" ? "Sign in" : "Create workspace"}</Button>
+            {notice && <div className="rounded border border-observed/40 bg-observed/10 p-3 text-sm text-observed">{notice}</div>}
+            <Button disabled={busy} className="w-full justify-center">{busy ? "Working…" : mode === "signin" ? "Sign in" : mode === "signup" ? "Create workspace" : "Send reset link"}</Button>
           </form>
 
+          {mode === "signin" && (
+            <button
+              onClick={() => { setMode("reset"); setError(""); setNotice(""); }}
+              className="mt-3 w-full text-center text-xs text-muted-foreground hover:text-foreground"
+            >
+              Forgot password?
+            </button>
+          )}
           <button
-            onClick={() => { setMode(mode === "signin" ? "signup" : "signin"); setError(""); }}
+            onClick={() => { setMode(mode === "signin" ? "signup" : "signin"); setError(""); setNotice(""); }}
             className="mt-4 w-full text-center text-xs text-muted-foreground hover:text-foreground"
           >
             {mode === "signin" ? "Need a workspace? Create one." : "Already have an account? Sign in."}
           </button>
         </Panel>
       </div>
+      <SiteFooter />
     </div>
   );
 }

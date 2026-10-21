@@ -1,3 +1,4 @@
+import {frozenOperationalResults} from "./count-pack";
 // Dependency-free, deterministic PDF writer for the Evidence Pack.
 // Runs entirely in the browser: no network, no external service. Same pack in = same bytes out.
 
@@ -66,6 +67,7 @@ class Doc {
   private ensure(h: number) {
     if (this.y - h < BOTTOM) { this.pages.push({ ops: [], rules: [] }); this.y = PAGE_H - TOP; }
   }
+  reserve(h: number) { this.ensure(h); }
   gap(h: number) { this.y -= h; }
   rule() { this.ensure(8); this.page().rules.push({ y: this.y }); this.y -= 8; }
   text(t: string, o: { size?: number; bold?: boolean; indent?: number; gray?: number; keep?: boolean } = {}) {
@@ -153,6 +155,7 @@ export function buildEvidencePackPdf(pack: any): Uint8Array {
     if (x.description) d.text(x.description, { indent: 14 });
     d.text("Resolution: " + (x.resolution_note ? x.resolution_note : x.status === "RESOLVED" ? "Resolved (no note recorded)" : "UNRESOLVED") +
       (x.resolved_at ? "  |  Resolved " + stamp(x.resolved_at) : ""), { indent: 14, size: 8.5 });
+    if (x.resolution_document_id || x.resolution_evidence_reference) d.text("Resolution evidence: " + (docName.get(x.resolution_document_id) ?? x.resolution_document_id ?? "n/a") + ", " + (x.resolution_evidence_reference ?? "n/a"), {indent:14,size:8});
   });
 
   const calcs: any[] = p.financialCalculations ?? [];
@@ -168,7 +171,9 @@ export function buildEvidencePackPdf(pack: any): Uint8Array {
     if (parts.length) d.text("Inputs: " + parts.join(", ") + "  |  Calculated " + stamp(x.created_at), { indent: 14, size: 8, gray: 0.35 });
   });
 
-  const obs: any[] = p.externalObservations ?? [];
+  const allObs: any[] = p.externalObservations ?? [];
+  const snapshots = allObs.filter((o) => o.observation_type === "MAP_SNAPSHOT");
+  const obs = allObs.filter((o) => o.observation_type !== "MAP_SNAPSHOT");
   if (obs.length) {
     d.heading("7. Independent observations (" + obs.length + ")");
     d.text("These are corroboration only. " + String(p.truthRule ?? ""), { indent: 4, size: 8.5 });
@@ -176,7 +181,65 @@ export function buildEvidencePackPdf(pack: any): Uint8Array {
     if (obs.length > 40) d.text("... and " + (obs.length - 40) + " more in the JSON export.", { indent: 14, size: 8, gray: 0.35 });
   }
 
-  d.heading((obs.length ? "8" : "7") + ". Integrity and approval");
+  if (snapshots.length) {
+    d.heading("7b. Harbour map snapshots (" + snapshots.length + ")");
+    d.text("Sealed map views added by the investigator from the harbour evidence map. The image file is retained in the case documents; its SHA-256 below proves the image has not changed. " +
+      "A snapshot renders recorded AIS, satellite and case data at the chosen time - it corroborates recorded positions and coverage; it is not independent sensor data and does not by itself prove contractual liability.", { indent: 4, size: 8.5 });
+    snapshots.forEach((o, i) => {
+      const pl = o.payload ?? {};
+      d.text((i + 1) + ". Map view at " + stamp(o.observed_at) + (pl.inDisputedWindow ? "  [INSIDE THE DISPUTED WINDOW" + (pl.windowStart && pl.windowEnd ? " " + stamp(pl.windowStart) + " to " + stamp(pl.windowEnd) : "") + "]" : ""), { indent: 4, bold: true, size: 9 });
+      const parts = [
+        pl.vesselName && "Vessel: " + String(pl.vesselName) + (pl.mmsi ? " (MMSI " + String(pl.mmsi) + ")" : ""),
+        o.latitude != null && o.longitude != null && "Position: " + Number(o.latitude).toFixed(5) + " / " + Number(o.longitude).toFixed(5),
+        pl.sog != null && "Speed: " + String(pl.sog) + " kn",
+        pl.cog != null && "Course: " + String(pl.cog) + " deg",
+      ].filter(Boolean);
+      if (parts.length) d.text(parts.join("  |  "), { indent: 14, size: 8.5 });
+      if (pl.note) d.text("Note: " + String(pl.note), { indent: 14, size: 8.5 });
+      d.text("Image: " + (docName.get(pl.document_id) ?? "case document") + "  |  SHA-256 " + String(pl.sha256 ?? "n/a"), { indent: 14, size: 8, gray: 0.35 });
+    });
+  }
+
+  const operationalSections: [string, string, (x: any) => string][] = [
+    ["countSourceRecords", "Raw count source ledger (all versions)", (x) => x.party+" / "+x.physical_reference+" v"+x.version+"\nReported: "+x.quantity+" "+x.basis+"; metric "+x.metric+"; gate "+x.gate_kind+"\n20ft: "+(x.containers20??"unknown")+"; 40ft: "+(x.containers40??"unknown")+"; occurred "+x.occurred_at+"\nLimitations: "+x.limitations],
+    ["countRuleVersions", "Executable local count rules (all versions)", (x) => x.name+" v"+x.version+" ["+x.acceptance+"]\n"+x.input_basis+" to "+x.output_unit+": "+x.calculation+" x "+x.numerator+"/"+x.denominator+"\nEffective: "+x.effective_from+" to "+(x.effective_to??"open")+"; gates "+x.gate_kinds.join(", ")+"\nRationale: "+x.rationale],
+    ["countComparisons", "Explicit common-unit scopes and productivity definitions", (x) => x.name+" v"+x.version+" ["+x.acceptance+"]\nPhysical scope: "+x.physical_references.join(", ")+"\nMappings: "+x.rule_ids.join(", ")+"; duration definition "+(x.kpi_definition_id??"none")+"\nAgreement / limitations: "+x.rationale],
+    ["appointmentLifecycle", "Appointment revisions, attendance and human causal review", (x) => x.appointment_reference+" / "+x.physical_reference+" / "+x.record_type+" v"+x.version+"\nIssuer: "+x.issuer+"; source party "+x.party+"\nEvent: "+x.occurred_at+"; window "+(x.start_at??"n/a")+" to "+(x.end_at??"n/a")+"\nClaim target: "+(x.claim_target||"not assessed")+" ["+x.outcome+"]\n"+x.explanation+"\nTerms / causal basis: "+x.terms_reference],
+    ["authorisedImports", "Authorised export provenance (operator assertion, not access proof)", (x) => x.dataset+" / "+x.row_count+" rows; source party "+x.source_party+"\nExported: "+x.exported_at+"; imported: "+x.created_at+"; actor "+x.created_by+"\nRaw CSV SHA256: "+x.raw_sha256+"\nAuthority basis: "+x.authorization_basis+"\nOriginal CSV and typed mapping retained in frozen JSON. Hash proves integrity, not truth."],
+    ["operationalDefinitions", "Operational counting definitions (all versions)", (x) => x.party + " / " + x.metric + " v" + x.version + " [" + x.acceptance + "]\nUnit: " + x.unit + "\nRule: " + x.rule + "\nOriginal: " + x.original_source_text + "\nEffective: " + x.effective_from + " to " + (x.effective_to ?? "open-ended") + "\nAcceptance basis: " + x.acceptance_basis],
+    ["operationalClocks", "Separate source clocks", (x) => x.physical_reference + " / " + x.kind + "\nOriginal time: " + x.timestamp_original + " (" + x.time_zone + ")\nSource organization: " + x.source_party + "\nLocation/event basis: " + x.location_basis + (x.appointment_issuer ? "\nAppointment issuer: " + x.appointment_issuer + "; ref " + x.appointment_reference + "\nParties: " + x.appointment_parties + "\nTerms: " + x.appointment_terms : "")],
+    ["appointmentAttributions", "Appointment-to-claim attribution (not liability)", (x) => "Appointment clock " + x.appointment_clock_id + "\nClaimant: " + x.claimant + "; target: " + x.claim_target + "\nAssertion: " + x.assertion + "\nTerms reference: " + x.terms_reference],
+    ["kpiDefinitions", "Per-party KPI definitions (no universal benchmark)", (x) => x.party + " / " + x.name + " v" + x.version + " [" + x.acceptance + "]\nScope: " + x.physical_reference + "\nClock: " + x.start_kind + " to " + x.end_kind + "\nDefinition: " + x.definition + "\nBenchmark hours: " + (x.benchmark_hours ?? "not supplied") + "\nBenchmark basis: " + x.benchmark_basis],
+    ["crossPartyMatches", "Human-confirmed physical-event matches", (x) => x.event_reference + " [" + x.result + "]\nSource claims: " + x.claim_a_id + " / " + x.claim_b_id + "\nIdentity rationale: " + x.rationale],
+    ["eventIdentityReviews", "Event-identity corrections (history retained)", (x) => "Match " + x.match_id + " v" + x.version + " [" + x.status + "]\nEvidence explanation: " + x.explanation],
+    ["clockReconciliations", "Evidenced clock reconciliation decisions", (x) => x.physical_reference + " / " + x.kind + " v" + x.version + "\nSelected clock: " + x.selected_clock_id + "\nConsidered source IDs: " + (x.considered_clock_ids ?? []).join(", ") + "\nEvidence explanation: " + x.explanation],
+    ["evidenceGapHistory", "Required evidence and gaps (not proof of non-occurrence)", (x) => x.physical_reference + " / " + x.required_event + " v" + x.version + " [" + x.status + "]\nRequirement basis: " + x.requirement_basis + "\nExplanation: " + x.explanation + "\nSource documents: " + (x.document_ids ?? []).map((id: string) => docName.get(id) ?? id).join(", ") + "\nEvidence reference: " + x.evidence_reference],
+  ];
+  for (const [key, title, describe] of operationalSections) {
+    const records: any[] = p[key] ?? [];
+    if (!records.length) continue;
+    d.heading(title + " (" + records.length + ")");
+    for (const x of records) {
+      d.text(describe(x), {indent:4});
+      if (x.source_document_id) d.text("Source: " + (docName.get(x.source_document_id) ?? x.source_document_id) + ", " + (x.source_reference ?? "n/a"), {indent:14,size:8,gray:0.35});
+      d.gap(6);
+    }
+  }
+  // Keep approval lines and limitations together instead of orphaning the caveat.
+  d.reserve(245);
+  const frozen=frozenOperationalResults(p);
+  if(frozen.counts.length||frozen.appointments.length){
+    d.heading("Frozen operational calculations (engine v1)");
+    d.text("Derived only from this frozen payload. Different count bases and lateness are not factual contradictions or proof of liability.",{indent:4,size:8});
+    for(const {definition,result} of frozen.counts){
+      d.text(definition.name+": "+(result.comparable?"COMPARABLE DERIVED VALUES":"COMPARISON WITHHELD"),{indent:4,bold:true});
+      for(const issue of result.issues)d.text(issue,{indent:14});
+      for(const r of result.results){d.text(r.party+": "+(r.total===null?"WITHHELD":r.total+" "+definition.outputUnit)+(definition.kpiDefinitionId?"; productivity "+(r.perHour===null?"WITHHELD":r.perHour.toFixed(3)+" "+definition.outputUnit+"/hour")+"; evidenced hours "+(r.hours??"unknown"):""),{indent:14});for(const reason of [...r.reasons,...r.productivityReasons])d.text(reason,{indent:24,size:8});}
+    }
+    for(const a of frozen.appointments){d.text(a.reference+": "+a.timing+"; minutes after slot end "+(a.minutesLate??"withheld"),{indent:4});for(const reason of a.reasons)d.text(reason,{indent:14,size:8});d.text(a.disclaimer,{indent:14,size:8});}
+  }
+
+  d.heading("Integrity and approval");
   d.text("SHA-256 of the canonical pack payload:", { indent: 4 });
   d.text(String(pack.sha256_hash ?? "n/a"), { indent: 4, bold: true, size: 9 });
   d.text("The JSON export of this same pack version carries the full payload this hash was calculated over.", { indent: 4, size: 8.5, gray: 0.35 });

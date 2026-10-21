@@ -13,16 +13,29 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as DiagnosticsRouteImport } from './routes/diagnostics'
 import { Route as NewCaseRouteImport } from './routes/new-case'
+import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as TermsRouteImport } from './routes/terms'
 import { Route as WhatsappQuotesRouteImport } from './routes/whatsapp-quotes'
 import { Route as CasesCaseIdRouteImport } from './routes/cases.$caseId'
 import { Route as DemoCufRouteImport } from './routes/demo.cuf'
 import { Route as ApiCctvIngestRouteImport } from './routes/api/cctv/ingest'
 import { Route as ApiWhatsappWebhookRouteImport } from './routes/api/whatsapp/webhook'
 import { Route as CasesCaseIdIndexRouteImport } from './routes/cases.$caseId.index'
+import { Route as CasesCaseIdAppointmentsRouteImport } from './routes/cases.$caseId.appointments'
 import { Route as CasesCaseIdCctvRouteImport } from './routes/cases.$caseId.cctv'
+import { Route as CasesCaseIdClocksRouteImport } from './routes/cases.$caseId.clocks'
+import { Route as CasesCaseIdCountsRouteImport } from './routes/cases.$caseId.counts'
+import { Route as CasesCaseIdDefinitionsRouteImport } from './routes/cases.$caseId.definitions'
 import { Route as CasesCaseIdDocumentsRouteImport } from './routes/cases.$caseId.documents'
 import { Route as CasesCaseIdFinancialsRouteImport } from './routes/cases.$caseId.financials'
+import { Route as CasesCaseIdGapsRouteImport } from './routes/cases.$caseId.gaps'
+import { Route as CasesCaseIdImportsRouteImport } from './routes/cases.$caseId.imports'
+import { Route as CasesCaseIdKpisRouteImport } from './routes/cases.$caseId.kpis'
+import { Route as CasesCaseIdLiveHarbourRouteImport } from './routes/cases.$caseId.live-harbour'
 import { Route as CasesCaseIdMapRouteImport } from './routes/cases.$caseId.map'
+import { Route as CasesCaseIdMatchesRouteImport } from './routes/cases.$caseId.matches'
 import { Route as CasesCaseIdPackRouteImport } from './routes/cases.$caseId.pack'
 
 const IndexRoute = IndexRouteImport.update({
@@ -43,6 +56,26 @@ const DiagnosticsRoute = DiagnosticsRouteImport.update({
 const NewCaseRoute = NewCaseRouteImport.update({
   id: '/new-case',
   path: '/new-case',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
   getParentRoute: () => rootRouteImport,
 } as any)
 const WhatsappQuotesRoute = WhatsappQuotesRouteImport.update({
@@ -75,9 +108,29 @@ const CasesCaseIdIndexRoute = CasesCaseIdIndexRouteImport.update({
   path: '/',
   getParentRoute: () => CasesCaseIdRoute,
 } as any)
+const CasesCaseIdAppointmentsRoute = CasesCaseIdAppointmentsRouteImport.update({
+  id: '/appointments',
+  path: '/appointments',
+  getParentRoute: () => CasesCaseIdRoute,
+} as any)
 const CasesCaseIdCctvRoute = CasesCaseIdCctvRouteImport.update({
   id: '/cctv',
   path: '/cctv',
+  getParentRoute: () => CasesCaseIdRoute,
+} as any)
+const CasesCaseIdClocksRoute = CasesCaseIdClocksRouteImport.update({
+  id: '/clocks',
+  path: '/clocks',
+  getParentRoute: () => CasesCaseIdRoute,
+} as any)
+const CasesCaseIdCountsRoute = CasesCaseIdCountsRouteImport.update({
+  id: '/counts',
+  path: '/counts',
+  getParentRoute: () => CasesCaseIdRoute,
+} as any)
+const CasesCaseIdDefinitionsRoute = CasesCaseIdDefinitionsRouteImport.update({
+  id: '/definitions',
+  path: '/definitions',
   getParentRoute: () => CasesCaseIdRoute,
 } as any)
 const CasesCaseIdDocumentsRoute = CasesCaseIdDocumentsRouteImport.update({
@@ -90,9 +143,34 @@ const CasesCaseIdFinancialsRoute = CasesCaseIdFinancialsRouteImport.update({
   path: '/financials',
   getParentRoute: () => CasesCaseIdRoute,
 } as any)
+const CasesCaseIdGapsRoute = CasesCaseIdGapsRouteImport.update({
+  id: '/gaps',
+  path: '/gaps',
+  getParentRoute: () => CasesCaseIdRoute,
+} as any)
+const CasesCaseIdImportsRoute = CasesCaseIdImportsRouteImport.update({
+  id: '/imports',
+  path: '/imports',
+  getParentRoute: () => CasesCaseIdRoute,
+} as any)
+const CasesCaseIdKpisRoute = CasesCaseIdKpisRouteImport.update({
+  id: '/kpis',
+  path: '/kpis',
+  getParentRoute: () => CasesCaseIdRoute,
+} as any)
+const CasesCaseIdLiveHarbourRoute = CasesCaseIdLiveHarbourRouteImport.update({
+  id: '/live-harbour',
+  path: '/live-harbour',
+  getParentRoute: () => CasesCaseIdRoute,
+} as any)
 const CasesCaseIdMapRoute = CasesCaseIdMapRouteImport.update({
   id: '/map',
   path: '/map',
+  getParentRoute: () => CasesCaseIdRoute,
+} as any)
+const CasesCaseIdMatchesRoute = CasesCaseIdMatchesRouteImport.update({
+  id: '/matches',
+  path: '/matches',
   getParentRoute: () => CasesCaseIdRoute,
 } as any)
 const CasesCaseIdPackRoute = CasesCaseIdPackRouteImport.update({
@@ -106,15 +184,28 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/diagnostics': typeof DiagnosticsRoute
   '/new-case': typeof NewCaseRoute
+  '/privacy': typeof PrivacyRoute
+  '/reset-password': typeof ResetPasswordRoute
+  '/settings': typeof SettingsRoute
+  '/terms': typeof TermsRoute
   '/whatsapp-quotes': typeof WhatsappQuotesRoute
   '/cases/$caseId': typeof CasesCaseIdRouteWithChildren
   '/demo/cuf': typeof DemoCufRoute
   '/api/cctv/ingest': typeof ApiCctvIngestRoute
   '/api/whatsapp/webhook': typeof ApiWhatsappWebhookRoute
+  '/cases/$caseId/appointments': typeof CasesCaseIdAppointmentsRoute
   '/cases/$caseId/cctv': typeof CasesCaseIdCctvRoute
+  '/cases/$caseId/clocks': typeof CasesCaseIdClocksRoute
+  '/cases/$caseId/counts': typeof CasesCaseIdCountsRoute
+  '/cases/$caseId/definitions': typeof CasesCaseIdDefinitionsRoute
   '/cases/$caseId/documents': typeof CasesCaseIdDocumentsRoute
   '/cases/$caseId/financials': typeof CasesCaseIdFinancialsRoute
+  '/cases/$caseId/gaps': typeof CasesCaseIdGapsRoute
+  '/cases/$caseId/imports': typeof CasesCaseIdImportsRoute
+  '/cases/$caseId/kpis': typeof CasesCaseIdKpisRoute
+  '/cases/$caseId/live-harbour': typeof CasesCaseIdLiveHarbourRoute
   '/cases/$caseId/map': typeof CasesCaseIdMapRoute
+  '/cases/$caseId/matches': typeof CasesCaseIdMatchesRoute
   '/cases/$caseId/pack': typeof CasesCaseIdPackRoute
   '/cases/$caseId/': typeof CasesCaseIdIndexRoute
 }
@@ -123,14 +214,27 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/diagnostics': typeof DiagnosticsRoute
   '/new-case': typeof NewCaseRoute
+  '/privacy': typeof PrivacyRoute
+  '/reset-password': typeof ResetPasswordRoute
+  '/settings': typeof SettingsRoute
+  '/terms': typeof TermsRoute
   '/whatsapp-quotes': typeof WhatsappQuotesRoute
   '/demo/cuf': typeof DemoCufRoute
   '/api/cctv/ingest': typeof ApiCctvIngestRoute
   '/api/whatsapp/webhook': typeof ApiWhatsappWebhookRoute
+  '/cases/$caseId/appointments': typeof CasesCaseIdAppointmentsRoute
   '/cases/$caseId/cctv': typeof CasesCaseIdCctvRoute
+  '/cases/$caseId/clocks': typeof CasesCaseIdClocksRoute
+  '/cases/$caseId/counts': typeof CasesCaseIdCountsRoute
+  '/cases/$caseId/definitions': typeof CasesCaseIdDefinitionsRoute
   '/cases/$caseId/documents': typeof CasesCaseIdDocumentsRoute
   '/cases/$caseId/financials': typeof CasesCaseIdFinancialsRoute
+  '/cases/$caseId/gaps': typeof CasesCaseIdGapsRoute
+  '/cases/$caseId/imports': typeof CasesCaseIdImportsRoute
+  '/cases/$caseId/kpis': typeof CasesCaseIdKpisRoute
+  '/cases/$caseId/live-harbour': typeof CasesCaseIdLiveHarbourRoute
   '/cases/$caseId/map': typeof CasesCaseIdMapRoute
+  '/cases/$caseId/matches': typeof CasesCaseIdMatchesRoute
   '/cases/$caseId/pack': typeof CasesCaseIdPackRoute
   '/cases/$caseId': typeof CasesCaseIdIndexRoute
 }
@@ -140,15 +244,28 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/diagnostics': typeof DiagnosticsRoute
   '/new-case': typeof NewCaseRoute
+  '/privacy': typeof PrivacyRoute
+  '/reset-password': typeof ResetPasswordRoute
+  '/settings': typeof SettingsRoute
+  '/terms': typeof TermsRoute
   '/whatsapp-quotes': typeof WhatsappQuotesRoute
   '/cases/$caseId': typeof CasesCaseIdRouteWithChildren
   '/demo/cuf': typeof DemoCufRoute
   '/api/cctv/ingest': typeof ApiCctvIngestRoute
   '/api/whatsapp/webhook': typeof ApiWhatsappWebhookRoute
+  '/cases/$caseId/appointments': typeof CasesCaseIdAppointmentsRoute
   '/cases/$caseId/cctv': typeof CasesCaseIdCctvRoute
+  '/cases/$caseId/clocks': typeof CasesCaseIdClocksRoute
+  '/cases/$caseId/counts': typeof CasesCaseIdCountsRoute
+  '/cases/$caseId/definitions': typeof CasesCaseIdDefinitionsRoute
   '/cases/$caseId/documents': typeof CasesCaseIdDocumentsRoute
   '/cases/$caseId/financials': typeof CasesCaseIdFinancialsRoute
+  '/cases/$caseId/gaps': typeof CasesCaseIdGapsRoute
+  '/cases/$caseId/imports': typeof CasesCaseIdImportsRoute
+  '/cases/$caseId/kpis': typeof CasesCaseIdKpisRoute
+  '/cases/$caseId/live-harbour': typeof CasesCaseIdLiveHarbourRoute
   '/cases/$caseId/map': typeof CasesCaseIdMapRoute
+  '/cases/$caseId/matches': typeof CasesCaseIdMatchesRoute
   '/cases/$caseId/pack': typeof CasesCaseIdPackRoute
   '/cases/$caseId/': typeof CasesCaseIdIndexRoute
 }
@@ -159,15 +276,28 @@ export interface FileRouteTypes {
     | '/auth'
     | '/diagnostics'
     | '/new-case'
+    | '/privacy'
+    | '/reset-password'
+    | '/settings'
+    | '/terms'
     | '/whatsapp-quotes'
     | '/cases/$caseId'
     | '/demo/cuf'
     | '/api/cctv/ingest'
     | '/api/whatsapp/webhook'
+    | '/cases/$caseId/appointments'
     | '/cases/$caseId/cctv'
+    | '/cases/$caseId/clocks'
+    | '/cases/$caseId/counts'
+    | '/cases/$caseId/definitions'
     | '/cases/$caseId/documents'
     | '/cases/$caseId/financials'
+    | '/cases/$caseId/gaps'
+    | '/cases/$caseId/imports'
+    | '/cases/$caseId/kpis'
+    | '/cases/$caseId/live-harbour'
     | '/cases/$caseId/map'
+    | '/cases/$caseId/matches'
     | '/cases/$caseId/pack'
     | '/cases/$caseId/'
   fileRoutesByTo: FileRoutesByTo
@@ -176,14 +306,27 @@ export interface FileRouteTypes {
     | '/auth'
     | '/diagnostics'
     | '/new-case'
+    | '/privacy'
+    | '/reset-password'
+    | '/settings'
+    | '/terms'
     | '/whatsapp-quotes'
     | '/demo/cuf'
     | '/api/cctv/ingest'
     | '/api/whatsapp/webhook'
+    | '/cases/$caseId/appointments'
     | '/cases/$caseId/cctv'
+    | '/cases/$caseId/clocks'
+    | '/cases/$caseId/counts'
+    | '/cases/$caseId/definitions'
     | '/cases/$caseId/documents'
     | '/cases/$caseId/financials'
+    | '/cases/$caseId/gaps'
+    | '/cases/$caseId/imports'
+    | '/cases/$caseId/kpis'
+    | '/cases/$caseId/live-harbour'
     | '/cases/$caseId/map'
+    | '/cases/$caseId/matches'
     | '/cases/$caseId/pack'
     | '/cases/$caseId'
   id:
@@ -192,15 +335,28 @@ export interface FileRouteTypes {
     | '/auth'
     | '/diagnostics'
     | '/new-case'
+    | '/privacy'
+    | '/reset-password'
+    | '/settings'
+    | '/terms'
     | '/whatsapp-quotes'
     | '/cases/$caseId'
     | '/demo/cuf'
     | '/api/cctv/ingest'
     | '/api/whatsapp/webhook'
+    | '/cases/$caseId/appointments'
     | '/cases/$caseId/cctv'
+    | '/cases/$caseId/clocks'
+    | '/cases/$caseId/counts'
+    | '/cases/$caseId/definitions'
     | '/cases/$caseId/documents'
     | '/cases/$caseId/financials'
+    | '/cases/$caseId/gaps'
+    | '/cases/$caseId/imports'
+    | '/cases/$caseId/kpis'
+    | '/cases/$caseId/live-harbour'
     | '/cases/$caseId/map'
+    | '/cases/$caseId/matches'
     | '/cases/$caseId/pack'
     | '/cases/$caseId/'
   fileRoutesById: FileRoutesById
@@ -210,6 +366,10 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   DiagnosticsRoute: typeof DiagnosticsRoute
   NewCaseRoute: typeof NewCaseRoute
+  PrivacyRoute: typeof PrivacyRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
+  SettingsRoute: typeof SettingsRoute
+  TermsRoute: typeof TermsRoute
   WhatsappQuotesRoute: typeof WhatsappQuotesRoute
   CasesCaseIdRoute: typeof CasesCaseIdRouteWithChildren
   DemoCufRoute: typeof DemoCufRoute
@@ -245,6 +405,34 @@ declare module '@tanstack/react-router' {
       path: '/new-case'
       fullPath: '/new-case'
       preLoaderRoute: typeof NewCaseRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/whatsapp-quotes': {
@@ -289,11 +477,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CasesCaseIdIndexRouteImport
       parentRoute: typeof CasesCaseIdRoute
     }
+    '/cases/$caseId/appointments': {
+      id: '/cases/$caseId/appointments'
+      path: '/appointments'
+      fullPath: '/cases/$caseId/appointments'
+      preLoaderRoute: typeof CasesCaseIdAppointmentsRouteImport
+      parentRoute: typeof CasesCaseIdRoute
+    }
     '/cases/$caseId/cctv': {
       id: '/cases/$caseId/cctv'
       path: '/cctv'
       fullPath: '/cases/$caseId/cctv'
       preLoaderRoute: typeof CasesCaseIdCctvRouteImport
+      parentRoute: typeof CasesCaseIdRoute
+    }
+    '/cases/$caseId/clocks': {
+      id: '/cases/$caseId/clocks'
+      path: '/clocks'
+      fullPath: '/cases/$caseId/clocks'
+      preLoaderRoute: typeof CasesCaseIdClocksRouteImport
+      parentRoute: typeof CasesCaseIdRoute
+    }
+    '/cases/$caseId/counts': {
+      id: '/cases/$caseId/counts'
+      path: '/counts'
+      fullPath: '/cases/$caseId/counts'
+      preLoaderRoute: typeof CasesCaseIdCountsRouteImport
+      parentRoute: typeof CasesCaseIdRoute
+    }
+    '/cases/$caseId/definitions': {
+      id: '/cases/$caseId/definitions'
+      path: '/definitions'
+      fullPath: '/cases/$caseId/definitions'
+      preLoaderRoute: typeof CasesCaseIdDefinitionsRouteImport
       parentRoute: typeof CasesCaseIdRoute
     }
     '/cases/$caseId/documents': {
@@ -310,11 +526,46 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CasesCaseIdFinancialsRouteImport
       parentRoute: typeof CasesCaseIdRoute
     }
+    '/cases/$caseId/gaps': {
+      id: '/cases/$caseId/gaps'
+      path: '/gaps'
+      fullPath: '/cases/$caseId/gaps'
+      preLoaderRoute: typeof CasesCaseIdGapsRouteImport
+      parentRoute: typeof CasesCaseIdRoute
+    }
+    '/cases/$caseId/imports': {
+      id: '/cases/$caseId/imports'
+      path: '/imports'
+      fullPath: '/cases/$caseId/imports'
+      preLoaderRoute: typeof CasesCaseIdImportsRouteImport
+      parentRoute: typeof CasesCaseIdRoute
+    }
+    '/cases/$caseId/kpis': {
+      id: '/cases/$caseId/kpis'
+      path: '/kpis'
+      fullPath: '/cases/$caseId/kpis'
+      preLoaderRoute: typeof CasesCaseIdKpisRouteImport
+      parentRoute: typeof CasesCaseIdRoute
+    }
+    '/cases/$caseId/live-harbour': {
+      id: '/cases/$caseId/live-harbour'
+      path: '/live-harbour'
+      fullPath: '/cases/$caseId/live-harbour'
+      preLoaderRoute: typeof CasesCaseIdLiveHarbourRouteImport
+      parentRoute: typeof CasesCaseIdRoute
+    }
     '/cases/$caseId/map': {
       id: '/cases/$caseId/map'
       path: '/map'
       fullPath: '/cases/$caseId/map'
       preLoaderRoute: typeof CasesCaseIdMapRouteImport
+      parentRoute: typeof CasesCaseIdRoute
+    }
+    '/cases/$caseId/matches': {
+      id: '/cases/$caseId/matches'
+      path: '/matches'
+      fullPath: '/cases/$caseId/matches'
+      preLoaderRoute: typeof CasesCaseIdMatchesRouteImport
       parentRoute: typeof CasesCaseIdRoute
     }
     '/cases/$caseId/pack': {
@@ -328,19 +579,37 @@ declare module '@tanstack/react-router' {
 }
 
 interface CasesCaseIdRouteChildren {
+  CasesCaseIdAppointmentsRoute: typeof CasesCaseIdAppointmentsRoute
   CasesCaseIdCctvRoute: typeof CasesCaseIdCctvRoute
+  CasesCaseIdClocksRoute: typeof CasesCaseIdClocksRoute
+  CasesCaseIdCountsRoute: typeof CasesCaseIdCountsRoute
+  CasesCaseIdDefinitionsRoute: typeof CasesCaseIdDefinitionsRoute
   CasesCaseIdDocumentsRoute: typeof CasesCaseIdDocumentsRoute
   CasesCaseIdFinancialsRoute: typeof CasesCaseIdFinancialsRoute
+  CasesCaseIdGapsRoute: typeof CasesCaseIdGapsRoute
+  CasesCaseIdImportsRoute: typeof CasesCaseIdImportsRoute
+  CasesCaseIdKpisRoute: typeof CasesCaseIdKpisRoute
+  CasesCaseIdLiveHarbourRoute: typeof CasesCaseIdLiveHarbourRoute
   CasesCaseIdMapRoute: typeof CasesCaseIdMapRoute
+  CasesCaseIdMatchesRoute: typeof CasesCaseIdMatchesRoute
   CasesCaseIdPackRoute: typeof CasesCaseIdPackRoute
   CasesCaseIdIndexRoute: typeof CasesCaseIdIndexRoute
 }
 
 const CasesCaseIdRouteChildren: CasesCaseIdRouteChildren = {
+  CasesCaseIdAppointmentsRoute: CasesCaseIdAppointmentsRoute,
   CasesCaseIdCctvRoute: CasesCaseIdCctvRoute,
+  CasesCaseIdClocksRoute: CasesCaseIdClocksRoute,
+  CasesCaseIdCountsRoute: CasesCaseIdCountsRoute,
+  CasesCaseIdDefinitionsRoute: CasesCaseIdDefinitionsRoute,
   CasesCaseIdDocumentsRoute: CasesCaseIdDocumentsRoute,
   CasesCaseIdFinancialsRoute: CasesCaseIdFinancialsRoute,
+  CasesCaseIdGapsRoute: CasesCaseIdGapsRoute,
+  CasesCaseIdImportsRoute: CasesCaseIdImportsRoute,
+  CasesCaseIdKpisRoute: CasesCaseIdKpisRoute,
+  CasesCaseIdLiveHarbourRoute: CasesCaseIdLiveHarbourRoute,
   CasesCaseIdMapRoute: CasesCaseIdMapRoute,
+  CasesCaseIdMatchesRoute: CasesCaseIdMatchesRoute,
   CasesCaseIdPackRoute: CasesCaseIdPackRoute,
   CasesCaseIdIndexRoute: CasesCaseIdIndexRoute,
 }
@@ -354,6 +623,10 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   DiagnosticsRoute: DiagnosticsRoute,
   NewCaseRoute: NewCaseRoute,
+  PrivacyRoute: PrivacyRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
+  SettingsRoute: SettingsRoute,
+  TermsRoute: TermsRoute,
   WhatsappQuotesRoute: WhatsappQuotesRoute,
   CasesCaseIdRoute: CasesCaseIdRouteWithChildren,
   DemoCufRoute: DemoCufRoute,

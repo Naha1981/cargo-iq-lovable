@@ -74,8 +74,8 @@ function ErrorComponent({ error, reset }: ErrorComponentProps) {
   );
 }
 
-// Runs before first paint: dark is the default; only an explicit stored "light" choice switches it.
-const THEME_INIT = `try{if(localStorage.getItem("cargoiq-theme")==="light"){document.documentElement.classList.add("light")}}catch(e){}`;
+// Runs before first paint: light is the default; only an explicit stored "dark" choice switches to dark.
+const THEME_INIT = `try{if(localStorage.getItem("cargoiq-theme")!=="dark"){document.documentElement.classList.add("light")}}catch(e){document.documentElement.classList.add("light")}`;
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
@@ -89,6 +89,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:description", content: "Investigative evidence platform for freight, port and logistics disputes." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "theme-color", content: "#f4f5f7" },
+      { name: "mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-title", content: "CargoIQ" },
     ],
     scripts: [{ children: THEME_INIT }],
     links: [
@@ -99,6 +103,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         href: appCss,
       },
       { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+      { rel: "manifest", href: "/manifest.webmanifest" },
+      { rel: "apple-touch-icon", href: "/icon-192.png" },
     ],
   }),
   shellComponent: RootShell,
@@ -126,6 +132,9 @@ function RootComponent() {
 
   useEffect(() => {
     initTelemetry();
+    if ("serviceWorker" in navigator && import.meta.env.PROD) {
+      navigator.serviceWorker.register("/sw.js").catch(() => {});
+    }
   }, []);
 
   return (

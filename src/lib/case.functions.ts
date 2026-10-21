@@ -1,8 +1,9 @@
+import { assertDocumentSize } from "./extraction-policy";
 import { createServerFn } from "@tanstack/react-start";
-import { resolvePortCenter } from "@/lib/port-centers";
 import { z } from "zod";
 import { tenantMiddleware } from "@/lib/auth-middleware";
 import { sha256Hex, stableCanonical } from "@/lib/hash";
+import { resolvePortCenter } from "@/lib/port-centers";
 import { caseRecovery } from "@/lib/recovery-gate";
 import { calculateDemurrage } from "@/lib/investigation-engine";
 import { buildAisBoundingBox, fetchAisSnapshot } from "@/lib/adapters/ais-adapter";
@@ -11,6 +12,15 @@ import { fetchPortConditions } from "@/lib/adapters/weather-port-adapter";
 import { extractDocumentClaimsForPath } from "@/lib/extraction.functions";
 
 const idInput = z.object({ caseId: z.string().uuid() });
+async function clockBlocked(db: any, caseId: string): Promise<boolean> {
+  const { data, error } = await db.rpc("has_unresolved_operational_clocks", { _case_id: caseId });
+  if (error) throw error;
+  return Boolean(data);
+}
+async function assertClockGate(db: any, caseId: string) {
+  if (await clockBlocked(db, caseId)) throw new Error("BLOCKED: reconcile conflicting operational clock evidence first.");
+}
+
 
 export const listCases = createServerFn({ method: "GET" }).middleware([tenantMiddleware]).handler(async ({ context }) => {
   const { data: cases, error } = await context.supabase.from("cases").select("*").order("created_at", { ascending: false });
@@ -26,13 +36,14 @@ export const listCases = createServerFn({ method: "GET" }).middleware([tenantMid
   const latestCalc = new Map<string, any>();
   for (const row of calcs ?? []) if (!latestCalc.has(row.case_id)) latestCalc.set(row.case_id, row);
 
-  return (cases ?? []).map((c: any) => {
+  return Promise.all((cases ?? []).map(async (c: any) => {
     const calc = latestCalc.get(c.id);
     const openContradictions = (contradictions ?? []).filter((x: any) => x.case_id === c.id && x.status === "FLAGGED").length;
+    const unresolvedClocks = await clockBlocked(context.supabase, c.id);
     const charged = calc?.charged_amount_minor ? Number(calc.charged_amount_minor) / 100 : 0;
     const calculated = calc?.calculated_amount_minor ? Number(calc.calculated_amount_minor) / 100 : 0;
-    return { ...c, currency: calc?.currency ?? "ZAR", exposure: charged, recovery: caseRecovery(charged, calculated, openContradictions), contradictions: openContradictions };
-  });
+    return { ...c, currency: calc?.currency ?? "ZAR", exposure: charged, recovery: caseRecovery(charged, calculated, openContradictions + (unresolvedClocks ? 1 : 0)), contradictions: openContradictions, clockConflicts: unresolvedClocks };
+  }));
 });
 
 export const getCase = createServerFn({ method: "GET" }).validator(idInput).middleware([tenantMiddleware]).handler(async ({ data, context }) => {
@@ -51,6 +62,7 @@ export const createCase = createServerFn({ method: "POST" })
   }))
   .middleware([tenantMiddleware])
   .handler(async ({ data, context }) => {
+    if (!["admin", "investigator"].includes(context.role)) throw new Error("Investigator access required");
     const { data: row, error } = await context.supabase.from("cases").insert({
       tenant_id: context.tenantId,
       reference_no: data.referenceNo,
@@ -89,6 +101,7 @@ export const getCaseWorkspace = createServerFn({ method: "GET" }).validator(idIn
   for (const item of [caseRow, documents, claims, contradictions, timeline, observations, calcs, packs]) if (item.error) throw item.error;
   return {
     tenantId: context.tenantId,
+    clockBlocked: await clockBlocked(db, data.caseId),
     case: caseRow.data,
     documents: documents.data ?? [],
     claims: claims.data ?? [],
@@ -110,12 +123,14 @@ export const registerDocument = createServerFn({ method: "POST" })
   }))
   .middleware([tenantMiddleware])
   .handler(async ({ data, context }) => {
+    if (!["admin", "investigator"].includes(context.role)) throw new Error("Investigator access required");
     const expectedPrefix = context.tenantId + "/" + data.caseId + "/";
     if (!data.filePath.startsWith(expectedPrefix)) throw new Error("INVALID_STORAGE_PATH");
 
     const { data: blob, error: downloadError } = await context.supabase.storage.from("case-documents").download(data.filePath);
     if (downloadError || !blob) throw downloadError ?? new Error("DOCUMENT_DOWNLOAD_FAILED");
 
+    assertDocumentSize(blob.size);
     const sha256 = await sha256Hex(await blob.arrayBuffer());
     const { data: row, error } = await context.supabase.from("documents").insert({
       tenant_id: context.tenantId,
@@ -132,19 +147,23 @@ export const registerDocument = createServerFn({ method: "POST" })
   });
 
 export const runDocumentExtraction = createServerFn({ method: "POST" })
-  .validator(z.object({ documentId: z.string().uuid(), caseId: z.string().uuid() }))
+  .validator(z.object({ documentId: z.string().uuid(), caseId: z.string().uuid(), noAi: z.boolean().optional(), allowTestFallback: z.boolean().optional() }))
   .middleware([tenantMiddleware])
-  .handler(({ data, context }) => extractDocumentClaimsForPath({
-    ...data,
-    tenantId: context.tenantId,
-    supabase: context.supabase,
-    userId: context.user.id,
-  }));
+  .handler(async ({ data, context }) => {
+    if (!["admin", "investigator"].includes(context.role)) throw new Error("Investigator access required");
+    return extractDocumentClaimsForPath({
+      ...data,
+      tenantId: context.tenantId,
+      supabase: context.supabase,
+      userId: context.user.id,
+    });
+  });
 
 export const reviewClaim = createServerFn({ method: "POST" })
   .validator(z.object({ claimId: z.string().uuid(), caseId: z.string().uuid(), decision: z.enum(["VERIFIED","DISPUTED"]) }))
   .middleware([tenantMiddleware])
   .handler(async ({ data, context }) => {
+    if (!["admin", "investigator"].includes(context.role)) throw new Error("Investigator access required");
     const { data: row, error } = await context.supabase.from("extracted_claims").update({
       status: data.decision,
       updated_at: new Date().toISOString(),
@@ -164,14 +183,18 @@ export const reviewClaim = createServerFn({ method: "POST" })
   });
 
 export const resolveContradiction = createServerFn({ method: "POST" })
-  .validator(z.object({ contradictionId: z.string().uuid(), caseId: z.string().uuid() }))
+  .validator(z.object({ contradictionId: z.string().uuid(), caseId: z.string().uuid(),
+    explanation: z.string().trim().min(10).max(4000),
+    supportingDocumentId: z.string().uuid(), evidenceReference: z.string().trim().min(3).max(1000) }))
   .middleware([tenantMiddleware])
   .handler(async ({ data, context }) => {
+    if (!["admin", "investigator"].includes(context.role)) throw new Error("Investigator access required");
+    // Database trigger validates same-case evidence and records the audit atomically.
     const { data: row, error } = await context.supabase.from("contradictions").update({
-      status: "RESOLVED",
-      resolved_by: context.user.id,
-      resolved_at: new Date().toISOString(),
-    }).eq("id", data.contradictionId).eq("case_id", data.caseId).select("*").single();
+      status: "RESOLVED", resolution_note: data.explanation,
+      resolution_document_id: data.supportingDocumentId,
+      resolution_evidence_reference: data.evidenceReference,
+    }).eq("id", data.contradictionId).eq("case_id", data.caseId).eq("status", "FLAGGED").select("*").single();
     if (error) throw error;
     return row;
   });
@@ -180,6 +203,7 @@ export const corroborateCase = createServerFn({ method: "POST" })
   .validator(z.object({ caseId: z.string().uuid(), start: z.string(), end: z.string() }))
   .middleware([tenantMiddleware])
   .handler(async ({ data, context }) => {
+    if (!["admin", "investigator"].includes(context.role)) throw new Error("Investigator access required");
     const { data: row, error } = await context.supabase.from("cases").select("vessel_name,port_code").eq("id", data.caseId).single();
     if (error || !row) throw error ?? new Error("CASE_NOT_FOUND");
 
@@ -236,10 +260,12 @@ export const calculateCaseDemurrage = createServerFn({ method: "POST" })
   }))
   .middleware([tenantMiddleware])
   .handler(async ({ data, context }) => {
+    if (!["admin", "investigator"].includes(context.role)) throw new Error("Investigator access required");
     const { data: flaggedRows, error: flaggedError } = await context.supabase
       .from("contradictions").select("id").eq("case_id", data.caseId).eq("status", "FLAGGED").limit(1);
     if (flaggedError) throw flaggedError;
     if (flaggedRows?.length) throw new Error("BLOCKED: resolve open contradictions first.");
+    await assertClockGate(context.supabase, data.caseId);
     const result = calculateDemurrage(data);
     const calculatedMinor = Math.round(result.total * 100);
     const chargedMinor = data.chargedAmount == null ? null : Math.round(data.chargedAmount * 100);
@@ -277,8 +303,9 @@ export const generateEvidencePack = createServerFn({ method: "POST" })
   .validator(idInput)
   .middleware([tenantMiddleware])
   .handler(async ({ data, context }) => {
+    if (!["admin", "investigator"].includes(context.role)) throw new Error("Investigator access required");
     const db = context.supabase;
-    const [c, docs, claims, contradictions, timeline, observations, calculations, existing] = await Promise.all([
+    const [c, docs, claims, contradictions, timeline, observations, calculations, existing, definitions, clocks, attributions, kpis, matches, gaps, identityReviews, clockDecisions, countSources, countRules, countComparisons, appointmentLifecycle, authorisedImports] = await Promise.all([
       db.from("cases").select("*").eq("id", data.caseId).single(),
       db.from("documents").select("*").eq("case_id", data.caseId).order("uploaded_at", { ascending: true }),
       db.from("extracted_claims").select("*").eq("case_id", data.caseId).order("created_at", { ascending: true }),
@@ -287,11 +314,25 @@ export const generateEvidencePack = createServerFn({ method: "POST" })
       db.from("external_observations").select("*").eq("case_id", data.caseId).order("observed_at", { ascending: true }),
       db.from("financial_calculations").select("*").eq("case_id", data.caseId).order("created_at", { ascending: true }),
       db.from("evidence_packs").select("version,status").eq("case_id", data.caseId).order("version", { ascending: false }),
+      db.from("operational_definitions").select("*").eq("case_id", data.caseId).order("created_at", { ascending: true }),
+      db.from("operational_clocks").select("*").eq("case_id", data.caseId).order("created_at", { ascending: true }),
+      db.from("appointment_attributions").select("*").eq("case_id", data.caseId).order("created_at", { ascending: true }),
+      db.from("kpi_definitions").select("*").eq("case_id", data.caseId).order("created_at", { ascending: true }),
+      db.from("cross_party_matches").select("*").eq("case_id", data.caseId).order("created_at", { ascending: true }),
+      db.from("evidence_gap_entries").select("*").eq("case_id", data.caseId).order("created_at", { ascending: true }),
+      db.from("cross_party_match_reviews").select("*").eq("case_id", data.caseId).order("created_at", { ascending: true }),
+      db.from("clock_reconciliations").select("*").eq("case_id", data.caseId).order("created_at", { ascending: true }),
+      db.from("count_source_records").select("*").eq("case_id", data.caseId).order("created_at", { ascending: true }),
+      db.from("count_rule_versions").select("*").eq("case_id", data.caseId).order("created_at", { ascending: true }),
+      db.from("count_comparison_definitions").select("*").eq("case_id", data.caseId).order("created_at", { ascending: true }),
+      db.from("appointment_lifecycle").select("*").eq("case_id", data.caseId).order("created_at", { ascending: true }),
+      db.from("authorised_imports").select("*").eq("case_id", data.caseId).order("created_at", { ascending: true }),
     ]);
-    for (const x of [c, docs, claims, contradictions, timeline, observations, calculations, existing]) if (x.error) throw x.error;
+    for (const x of [c, docs, claims, contradictions, timeline, observations, calculations, existing, definitions, clocks, attributions, kpis, matches, gaps, identityReviews, clockDecisions, countSources, countRules, countComparisons, appointmentLifecycle, authorisedImports]) if (x.error) throw x.error;
 
     const unresolved = (contradictions.data ?? []).filter((x: any) => x.status === "FLAGGED").length;
     if (unresolved > 0) throw new Error("Resolve the flagged contradictions before generating an evidence pack.");
+    await assertClockGate(db, data.caseId);
 
     const version = ((existing.data?.[0]?.version as number | undefined) ?? 0) + 1;
     const payload = {
@@ -299,6 +340,20 @@ export const generateEvidencePack = createServerFn({ method: "POST" })
       version,
       case: c.data,
       documents: docs.data ?? [],
+      operationalDefinitions: definitions.data ?? [],
+      operationalClocks: clocks.data ?? [],
+      appointmentAttributions: attributions.data ?? [],
+      kpiDefinitions: kpis.data ?? [],
+      crossPartyMatches: matches.data ?? [],
+      evidenceGapHistory: gaps.data ?? [],
+      eventIdentityReviews: identityReviews.data ?? [],
+      clockReconciliations: clockDecisions.data ?? [],
+      countSourceRecords: countSources.data ?? [],
+      countRuleVersions: countRules.data ?? [],
+      countComparisons: countComparisons.data ?? [],
+      appointmentLifecycle: appointmentLifecycle.data ?? [],
+      authorisedImports: authorisedImports.data ?? [],
+      countEngineVersion: "1",
       verifiedClaims: (claims.data ?? []).filter((x: any) => x.status === "VERIFIED"),
       claims: claims.data ?? [],
       contradictions: contradictions.data ?? [],
@@ -308,31 +363,14 @@ export const generateEvidencePack = createServerFn({ method: "POST" })
       approvals: [],
       truthRule: "Public and independent observations are corroboration unless the source directly proves the event. Inference remains inference until human review.",
     };
-    const hash = await sha256Hex(stableCanonical(payload));
-
-    if (existing.data?.[0]) {
-      await db.from("evidence_packs").update({ status: "SUPERSEDED" }).eq("case_id", data.caseId).eq("status", "DRAFT");
-    }
-
-    const { data: pack, error } = await db.from("evidence_packs").insert({
-      tenant_id: context.tenantId,
-      case_id: data.caseId,
-      version,
-      pack_payload: payload,
-      sha256_hash: hash,
-      status: "DRAFT",
-    }).select("*").single();
-    if (error) throw error;
-
-    await db.from("audit_log").insert({
-      tenant_id: context.tenantId,
-      case_id: data.caseId,
-      actor_user_id: context.user.id,
-      action: "EVIDENCE_PACK_GENERATED",
-      entity_type: "evidence_pack",
-      entity_id: pack.id,
-      payload: { version, sha256_hash: hash },
+    const { data: packResult, error: persistError } = await db.rpc("persist_evidence_pack_atomic", {
+      _case_id: data.caseId,
+      _canonical: stableCanonical(payload),
     });
+    if (persistError) throw persistError;
+    const pack = Array.isArray(packResult) ? packResult[0] : packResult;
+    if (!pack?.id) throw new Error("Atomic evidence-pack persistence returned no pack.");
+    const hash = pack.sha256_hash as string;
 
     const summary = [
       "# CargoIQ Investigation " + (c.data?.reference_no ?? ""),
@@ -346,6 +384,40 @@ export const generateEvidencePack = createServerFn({ method: "POST" })
       "## Timeline",
       ...(timeline.data ?? []).map((e: any) => "- " + e.timestamp + " — " + e.title + " [" + e.nature + "] — " + e.source),
       "",
+      "## Count source records and executable mappings (engine v1)",
+      ...(countSources.data ?? []).map((x:any)=>"- "+x.party+" / "+x.physical_reference+" v"+x.version+": "+x.quantity+" "+x.basis+"; evidence "+x.source_document_id+", "+x.source_reference),
+      ...(countRules.data ?? []).map((x:any)=>"- Rule "+x.name+" v"+x.version+": "+x.input_basis+" -> "+x.output_unit+", "+x.calculation+" x "+x.numerator+"/"+x.denominator+" ["+x.acceptance+"]"),
+      ...(countComparisons.data ?? []).map((x:any)=>"- Common scope "+x.name+" v"+x.version+": "+x.physical_references.join(", ")+"; mappings "+x.rule_ids.join(", ")+"; duration definition "+(x.kpi_definition_id??"none")+" ["+x.acceptance+"]"),
+      "",
+      "## Appointment lifecycle and human causal review",
+      ...(appointmentLifecycle.data ?? []).map((x:any)=>"- "+x.appointment_reference+" / "+x.record_type+" v"+x.version+": "+x.explanation+"; issuer "+x.issuer+"; claim target "+(x.claim_target||"not assessed")+" ["+x.outcome+"]; terms "+x.terms_reference),
+      "",
+      "## Authorised export provenance (permission is an operator assertion)",
+      ...(authorisedImports.data ?? []).map((x:any)=>"- "+x.dataset+" / "+x.row_count+" rows; exported "+x.exported_at+"; SHA256 "+x.raw_sha256+"; authority basis "+x.authorization_basis),
+      "",
+      "## Operational definitions",
+      ...(definitions.data ?? []).map((x: any) => "- " + x.party + " / " + x.metric + " v" + x.version + ": " + x.unit + " [" + x.acceptance + "] - " + x.rule + " (source " + x.source_document_id + ", " + x.source_reference + ")"),
+      "",
+      "## Clock evidence and appointment attribution",
+      ...(clocks.data ?? []).map((x: any) => "- " + x.physical_reference + " " + x.kind + ": " + x.timestamp_original + " (" + x.time_zone + ") - source " + x.source_party + ", " + x.source_document_id + ", " + x.source_reference),
+      ...(attributions.data ?? []).map((x: any) => "- Appointment source " + x.appointment_clock_id + ": claimant " + x.claimant + ", target " + x.claim_target + ", assertion " + x.assertion + " - evidence " + x.source_document_id + ", " + x.source_reference),
+      "",
+      "## KPI definitions and benchmarks",
+      ...(kpis.data ?? []).map((x: any) => "- " + x.party + " / " + x.name + " v" + x.version + ": " + x.start_kind + " to " + x.end_kind + " [" + x.acceptance + "] - scope " + x.physical_reference + ", benchmark " + (x.benchmark_hours ?? "not supplied") + "h; " + x.benchmark_basis),
+      "",
+      "## Cross-party physical-event matches",
+      ...(matches.data ?? []).map((x: any) => "- " + x.event_reference + ": " + x.result + ", claims " + x.claim_a_id + " / " + x.claim_b_id + ", rationale " + x.rationale),
+      "",
+      "## Match review history (retractions and reaffirmations)",
+      ...(identityReviews.data ?? []).map((x: any) => "- match " + x.match_id + " v" + x.version + ": " + x.status + " - " + x.explanation + " (evidence " + x.source_document_id + ", " + x.source_reference + ")"),
+      "",
+      "## Evidenced clock reconciliation decisions",
+      ...(clockDecisions.data ?? []).map((x: any) => "- " + x.physical_reference + " / " + x.kind + " v" + x.version + ": selected " + x.selected_clock_id + "; considered " + x.considered_clock_ids.join(", ") + " - " + x.explanation + " (evidence " + x.source_document_id + ", " + x.source_reference + ")"),
+      "",
+      "## Required evidence and gaps (history, not proof of non-occurrence)",
+      ...(gaps.data ?? []).map((x: any) => "- " + x.physical_reference + " / " + x.required_event + " v" + x.version + ": " + x.status + " - " + x.explanation),
+      "",
+
       "## Contradictions",
       ...(contradictions.data ?? []).map((x: any) => "- " + x.title + ": " + x.description),
       "",
@@ -366,6 +438,7 @@ export const approveEvidencePack = createServerFn({ method: "POST" })
   .validator(z.object({ caseId: z.string().uuid(), packId: z.string().uuid() }))
   .middleware([tenantMiddleware])
   .handler(async ({ data, context }) => {
+    if (!["admin", "investigator"].includes(context.role)) throw new Error("Investigator access required");
     const { data: flagged, error: contradictionError } = await context.supabase
       .from("contradictions")
       .select("id")
@@ -374,23 +447,15 @@ export const approveEvidencePack = createServerFn({ method: "POST" })
       .limit(1);
     if (contradictionError) throw contradictionError;
     if (flagged?.length) throw new Error("Resolve the flagged contradictions before generating an evidence pack.");
+    await assertClockGate(context.supabase, data.caseId);
 
-    const { data: pack, error } = await context.supabase.from("evidence_packs").update({
-      status: "APPROVED",
-      approved_by: context.user.id,
-    }).eq("id", data.packId).eq("case_id", data.caseId).eq("status", "DRAFT").select("*").single();
-    if (error) throw error;
-
-    await context.supabase.from("cases").update({ status: "APPROVED" }).eq("id", data.caseId);
-    await context.supabase.from("audit_log").insert({
-      tenant_id: context.tenantId,
-      case_id: data.caseId,
-      actor_user_id: context.user.id,
-      action: "EVIDENCE_PACK_APPROVED",
-      entity_type: "evidence_pack",
-      entity_id: data.packId,
-      payload: {},
+    const { data: packResult, error } = await context.supabase.rpc("approve_evidence_pack_atomic", {
+      _case_id: data.caseId,
+      _pack_id: data.packId,
     });
+    if (error) throw error;
+    const pack = Array.isArray(packResult) ? packResult[0] : packResult;
+    if (!pack?.id) throw new Error("Atomic evidence-pack approval returned no pack.");
 
     return pack;
   });

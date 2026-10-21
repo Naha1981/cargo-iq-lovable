@@ -1,0 +1,9 @@
+import {describe,it,expect} from "vitest";import {countHeaders,parseCsv,previewImport,type ImportInput} from "./authorised-import";
+const id="11111111-1111-4111-8111-111111111111";const line='HATCH-001,HATCH_COVER,INDIVIDUAL_LIFT,4,2026-10-16T10:00:00Z,,,NOT_APPLICABLE,row1,"Two lids, two operations: source assertion"';const d:ImportInput={caseId:id,sourceDocumentId:id,sourceParty:"Synthetic terminal",dataset:"COUNTS",authorizationBasis:"Synthetic permission for testing only",exportedAt:"2026-10-16T10:00:00Z",confirmed:true,rawCsv:countHeaders.join(",")+"\r\n"+line};
+describe("authorised export validation",()=>{
+ it("handles quoted commas, escaped quotes, CRLF, BOM and linebreaks",()=>{expect(parseCsv('\uFEFFa,b\r\n"a,b","two""quotes\nline"')).toEqual([["a","b"],["a,b",'two"quotes\nline']]);});
+ it("validates typed records without inventing missing composition",()=>{const rows=previewImport(d);expect(rows[0]).toMatchObject({quantity:4,containers20:null,party:"Synthetic terminal",supersedesId:null});});
+ it("rejects schema drift, malformed quotes, incompatible units and unzoned times",()=>{expect(()=>previewImport({...d,rawCsv:d.rawCsv.replace("quantity,","qty,")})).toThrow();expect(()=>parseCsv('a\n"bad')).toThrow();expect(()=>parseCsv('a\n"a"bad')).toThrow();expect(()=>previewImport({...d,rawCsv:d.rawCsv.replace("INDIVIDUAL_LIFT","TEU")})).toThrow();expect(()=>previewImport({...d,rawCsv:d.rawCsv.replace("10:00:00Z","10:00:00")})).toThrow();});
+ it("rejects duplicate source identity and absent permission context",()=>{expect(()=>previewImport({...d,rawCsv:d.rawCsv+"\n"+line})).toThrow(/duplicate/);expect(()=>previewImport({...d,authorizationBasis:""})).toThrow();});
+ it("caps rows and never evaluates spreadsheet formulas",()=>{expect(()=>parseCsv('a\n'+Array(502).fill('b').join('\n'))).toThrow();expect(parseCsv('a\n=1+1')[1][0]).toBe('=1+1');});
+});

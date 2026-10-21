@@ -1,5 +1,5 @@
 import { createFileRoute, Link, Outlet, notFound, redirect } from "@tanstack/react-router";
-import { AppHeader } from "@/components/ui-kit";
+import { AppHeader, DisputeBadge } from "@/components/ui-kit";
 import { getCaseWorkspace } from "@/lib/case.functions";
 
 export const Route = createFileRoute("/cases/$caseId")({
@@ -29,14 +29,25 @@ export const Route = createFileRoute("/cases/$caseId")({
 const tabs = [
   { to: "/cases/$caseId", label: "Timeline", exact: true },
   { to: "/cases/$caseId/map", label: "Harbour Map" },
+  { to: "/cases/$caseId/live-harbour", label: "Live Harbour View" },
   { to: "/cases/$caseId/documents", label: "Documents & Contradictions" },
+  { to: "/cases/$caseId/definitions", label: "Definitions" },
+  { to: "/cases/$caseId/counts", label: "Count reconciliation" },
+  { to: "/cases/$caseId/imports", label: "Authorised imports" },
+  { to: "/cases/$caseId/clocks", label: "Clocks" },
+  { to: "/cases/$caseId/appointments", label: "Appointments" },
+  { to: "/cases/$caseId/kpis", label: "KPIs" },
+  { to: "/cases/$caseId/matches", label: "Matches" },
+  { to: "/cases/$caseId/gaps", label: "Gaps" },
   // CCTV stays off the demo navigation until server encryption is configured.
   { to: "/cases/$caseId/financials", label: "Financials" },
   { to: "/cases/$caseId/pack", label: "Evidence Pack" },
 ] as const;
 
 function CaseLayout() {
-  const c = Route.useLoaderData().case;
+  const data = Route.useLoaderData();
+  const c = data.case;
+  const openDisputes = data.contradictions.filter((x: any) => x.status === "FLAGGED").length;
 
   return (
     <div className="min-h-screen">
@@ -49,6 +60,11 @@ function CaseLayout() {
               <div className="font-mono text-xs text-primary">{c.reference_no} · {c.port_code ?? "—"} · {c.status}</div>
               <h1 className="mt-1 text-2xl font-semibold tracking-tight">{c.vessel_name || "Unnamed vessel"} {c.voyage_no ? "· " + c.voyage_no : ""}</h1>
               <p className="text-sm text-muted-foreground">{c.container_no ? "Container " + c.container_no : "Multiple containers"} · Opened {new Date(c.created_at).toLocaleDateString("en-GB")}</p>
+              {openDisputes > 0 && (
+                <Link to="/cases/$caseId/documents" params={{ caseId: c.id }} className="mt-2 inline-block" aria-label="Open the disputed items">
+                  <DisputeBadge label={openDisputes + " open dispute" + (openDisputes === 1 ? "" : "s") + " · review"} />
+                </Link>
+              )}
             </div>
           </div>
 
@@ -66,6 +82,14 @@ function CaseLayout() {
                 {t.label}
               </Link>
             ))}
+            <a
+              href="https://canvas.nahalabs.co.za/#/t/cargoiq"
+              target="_blank"
+              rel="noopener"
+              className="rounded-sm border-b-2 border-transparent px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground sm:whitespace-nowrap"
+            >
+              Case map ↗
+            </a>
           </nav>
         </div>
       </div>

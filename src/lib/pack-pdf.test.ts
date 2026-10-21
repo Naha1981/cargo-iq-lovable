@@ -31,6 +31,28 @@ describe("evidence pack pdf", () => {
   });
 });
 
+describe("map snapshots in the pack pdf", () => {
+  it("lists sealed snapshots with source, dispute status and limits", () => {
+    const withSnap = {
+      ...pack,
+      pack_payload: {
+        ...pack.pack_payload,
+        externalObservations: [
+          { observation_type: "AIS_POSITION", observed_at: "2026-10-02T06:00:00Z", source: "AISStream", payload: {} },
+          { observation_type: "MAP_SNAPSHOT", observed_at: "2026-10-02T08:00:00Z", source: "CargoIQ harbour map snapshot", latitude: -29.88, longitude: 31.04,
+            payload: { vesselName: "MSC Test", mmsi: "123456789", sog: 0.2, cog: 90, inDisputedWindow: true, windowStart: "2026-10-02T00:00:00Z", windowEnd: "2026-10-06T14:20:00Z", document_id: "d1", sha256: "c".repeat(64) } },
+        ],
+      },
+    };
+    const out = Buffer.from(buildEvidencePackPdf(withSnap)).toString("latin1");
+    expect(out).toContain("HARBOUR MAP SNAPSHOTS \\(1\\)");
+    expect(out).toContain("INSIDE THE DISPUTED WINDOW");
+    expect(out).toContain("MSC Test");
+    expect(out).toContain("not independent sensor data");
+    expect(out).toContain("INDEPENDENT OBSERVATIONS \\(1\\)");
+  });
+});
+
 import { writeFileSync } from "node:fs";
 it.skipIf(!process.env.PDF_OUT)("writes a sample", () => {
   writeFileSync(process.env.PDF_OUT!, buildEvidencePackPdf({ ...pack, status: "APPROVED", approved_by: "user-123" }));

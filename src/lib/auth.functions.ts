@@ -47,3 +47,11 @@ export const runDiagnostics = createServerFn({ method: "GET" }).handler(async ()
   }
   return checks;
 });
+
+export const deleteOwnAccount = createServerFn({ method: "POST" }).handler(async () => {
+  const { supabase, user } = await getAuthed();
+  if (!user) throw new Error("UNAUTHENTICATED");
+  const { error } = await (supabase.rpc as any)("delete_own_account");
+  if (error) throw new Error(error.message);
+  return { deleted: true };
+});

@@ -154,6 +154,23 @@ body {
   cursor: pointer; backdrop-filter: blur(8px);
 }
 
+.pack-chip {
+  pointer-events: auto; flex: none; margin: 4px 10px 0;
+  padding: 8px 12px; border-radius: 12px; border: 1px solid rgba(34,197,94,0.45);
+  background: var(--panel); color: var(--green); font-size: 12px; font-weight: 700;
+  cursor: pointer; backdrop-filter: blur(8px);
+}
+body.embedded #hud-top { flex-wrap: wrap; align-items: flex-start; row-gap: 6px; }
+@media (max-width: 768px) { body.embedded .pack-chip { flex-basis: 100%; margin-left: 0; } }
+
+/* embed: right action stack starts below the (taller, wrapping) header */
+body.embedded #cond-btn    { top: calc(var(--hdr-h, 130px) + env(safe-area-inset-top)) !important; }
+body.embedded #scrub-chip  { top: calc(var(--hdr-h, 130px) + 46px + env(safe-area-inset-top)) !important; }
+body.embedded #risk-btn    { top: calc(var(--hdr-h, 130px) + 92px + env(safe-area-inset-top)) !important; }
+body.embedded #recon-btn   { top: calc(var(--hdr-h, 130px) + 138px + env(safe-area-inset-top)) !important; }
+body.embedded #ev-add      { top: calc(var(--hdr-h, 130px) + 184px + env(safe-area-inset-top)) !important; }
+body.embedded #ev-tray-btn { top: calc(var(--hdr-h, 130px) + 230px + env(safe-area-inset-top)) !important; }
+
 .replay-chip {
   position: absolute; left: 14px; bottom: calc(62px + env(safe-area-inset-bottom)); z-index: 10;
   padding: 8px 12px; border-radius: 12px; border: 1px solid rgba(34,197,94,0.45);
@@ -368,3 +385,8 @@ body {
 .purpose-line { background: rgba(255,255,255,0.92); border: 1px solid var(--line); border-radius: 10px; padding: 5px 9px; margin-top: 5px; font-size: 11px; color: var(--text); }
 .purpose-line b { font-weight: 700; }
 .purpose b { font-weight: 700; }
+
+/* real (non-sample) cases: no fictional case UI */
+body.real-case #case-card, body.real-case #dispute-card { display: none !important; }
+body.embedded #case-pdf { display: none !important; }
+body.real-case .flybtn-alert, body.real-case #replay-btn, body.real-case #replay-card { display: none !important; }

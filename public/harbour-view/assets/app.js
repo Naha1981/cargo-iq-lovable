@@ -4,6 +4,9 @@
   var WS_URL = 'wss://cargoiq-gods-eye.onrender.com/stream';
   var DATA_BASE = 'https://naha1981.github.io/cargoiq-gods-eye/';
   var SNAPSHOT_URL = DATA_BASE + 'data/vessels-snapshot.json';
+  var qs0 = new URLSearchParams(location.search);
+  var EMBED = qs0.get('embed') === '1';          // running inside a CargoIQ case tab
+  var SAMPLE_CASE = !EMBED || qs0.get('sample') === '1';  // fictional sample case UI only for the sample case
   var MAX_VESSELS = 400;
 
   var VIEW = {
@@ -198,6 +201,27 @@
       disableDepthTestDistance: Number.POSITIVE_INFINITY
     }
   });
+
+  if (!SAMPLE_CASE) {
+    disputeEntity.show = false;
+    document.body.classList.add('real-case');
+  }
+  if (EMBED) {
+    document.body.classList.add('embedded');
+    var hudTop = document.getElementById('hud-top');
+    var placeStack = function () {
+      if (hudTop) document.body.style.setProperty('--hdr-h', (hudTop.offsetHeight + 8) + 'px');
+    };
+    placeStack();
+    if (window.ResizeObserver && hudTop) new ResizeObserver(placeStack).observe(hudTop);
+    window.addEventListener('resize', placeStack);
+    window.addEventListener('load', placeStack);
+    var cp = $('case-pack');
+    if (cp) {
+      cp.classList.remove('hidden');
+      cp.addEventListener('click', function () { window.parent.postMessage({ type: 'harbour-open-pack' }, location.origin); });
+    }
+  }
 
   // ---------- picking ----------
   var handler = new Cesium.ScreenSpaceEventHandler(scene.canvas);
@@ -918,6 +942,7 @@
   fetch(DATA_BASE + 'data/scrub-index.json').then(function (r) { return r.json(); }).then(function (j) { SCRUB.index = j; }).catch(function () {});
   var evidenceEntities = [];
   fetch(DATA_BASE + 'data/evidence.json').then(function (r) { return r.json(); }).then(function (j) {
+    if (!SAMPLE_CASE) return;
     SCRUB.evidence = j;
     j.items.forEach(function (item) {
       var ent = viewer.entities.add({

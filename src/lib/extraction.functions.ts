@@ -656,7 +656,7 @@ export async function extractDocumentClaimsForPath(input: {
     await input.supabase.from("contradictions").insert({
       tenant_id: input.tenantId, case_id: input.caseId,
       title: "Possible date mismatch (rule-based candidate, unverified)",
-      description: f.explanation + " (claim " + f.a + ", page " + (claims[f.a - 1]!.page_number ?? "?") + " vs claim " + f.b + ", page " + (claims[f.b - 1]!.page_number ?? "?") + ")",
+      description: f.explanation + " (page " + (claims[f.a - 1]!.page_number ?? "?") + " vs page " + (claims[f.b - 1]!.page_number ?? "?") + ")",
       claim_a_id: inserted[f.a - 1]?.id ?? null, claim_b_id: inserted[f.b - 1]?.id ?? null, status: "FLAGGED",
     });
     discrepancyFlags++;
@@ -668,7 +668,7 @@ export async function extractDocumentClaimsForPath(input: {
         await input.supabase.from("contradictions").insert({
           tenant_id: input.tenantId, case_id: input.caseId,
           title: "Different figures or dates in the file: " + (f.kind === "DIFFERENT_DATES" ? "dates" : "figures"),
-          description: f.explanation + " (claim " + f.a + ", page " + (a.page_number ?? "?") + " vs claim " + f.b + ", page " + (b.page_number ?? "?") + ")",
+          description: f.explanation + " (page " + (a.page_number ?? "?") + " vs page " + (b.page_number ?? "?") + ")",
           claim_a_id: inserted[f.a - 1]?.id ?? null, claim_b_id: inserted[f.b - 1]?.id ?? null, status: "FLAGGED",
         });
         discrepancyFlags++;

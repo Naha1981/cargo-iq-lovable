@@ -113,7 +113,9 @@ export function buildEvidencePackPdf(pack: any): Uint8Array {
   const c = p.case ?? {};
   const docs: any[] = p.documents ?? [];
   const docName = new Map<string, string>(docs.map((d: any) => [d.id, d.name]));
-  const claims: any[] = p.claims ?? [];
+  // Database order is by id (random). Read in document, then page order so claim numbers follow the source.
+  const claims: any[] = [...(p.claims ?? [])].sort((a: any, b: any) => String(a.document_id ?? "").localeCompare(String(b.document_id ?? "")) || (a.page_number ?? 1e9) - (b.page_number ?? 1e9) || String(a.id ?? "").localeCompare(String(b.id ?? "")));
+  const claimNo = new Map<string, number>(claims.map((c: any, i: number) => [String(c.id), i + 1]));
   const d = new Doc();
 
   d.text("CargoIQ", { size: 10, bold: true, gray: 0.4 });
@@ -180,6 +182,8 @@ export function buildEvidencePackPdf(pack: any): Uint8Array {
   contr.forEach((x, i) => {
     d.text((i + 1) + ". " + x.title + "  [" + x.status + "]", { indent: 4, bold: true });
     if (x.description) d.text(x.description, { indent: 14 });
+    const refs = [x.claim_a_id, x.claim_b_id].filter(Boolean).map((id: string) => claimNo.has(String(id)) ? "claim " + claimNo.get(String(id)) + " (page " + (claims.find((c: any) => String(c.id) === String(id))?.page_number ?? "?") + ")" : "claim " + id);
+    if (refs.length) d.text("Claims in this pack: " + refs.join(" vs "), { indent: 14, size: 8.5 });
     d.text("Resolution: " + (x.resolution_note ? x.resolution_note : x.status === "RESOLVED" ? "Resolved (no note recorded)" : "UNRESOLVED") +
       (x.resolved_at ? "  |  Resolved " + stamp(x.resolved_at) : ""), { indent: 14, size: 8.5 });
     if (x.resolution_document_id || x.resolution_evidence_reference) d.text("Resolution evidence: " + (docName.get(x.resolution_document_id) ?? x.resolution_document_id ?? "n/a") + ", " + (x.resolution_evidence_reference ?? "n/a"), {indent:14,size:8});

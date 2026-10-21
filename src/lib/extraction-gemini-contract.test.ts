@@ -129,7 +129,8 @@ describe("evidence pack layout and labels", () => {
     const noReview = mk("EXTRACTED|REVIEW:MODEL_NOT_RUN");
     expect(noReview).not.toContain("EXTRACTION INCOMPLETE"); expect(noReview).toContain("optional model check not run"); expect(noReview).toContain("not a finding of none");
     const failed = mk("EXTRACTED|REVIEW:MODEL_FAILED"); expect(failed).not.toContain("EXTRACTION INCOMPLETE"); expect(failed).toContain("FAILED");
-    expect(mk("EXTRACTED|REVIEW:MODEL_RAN")).toContain("No contradictions were detected");
+    const ok = mk("EXTRACTED|REVIEW:MODEL_RAN"); expect(ok).toContain("flagged by these checks"); expect(ok).toContain("not proof that none exist"); expect(ok).not.toContain("not a finding of none");
+    for (const legacy of ["PENDING", "", "COMPLETE"]) { const u = mk(legacy); expect(u).toContain("EXTRACTION STATUS NOT RECORDED"); expect(u).toContain("not a finding of none"); }
   });
 });
 

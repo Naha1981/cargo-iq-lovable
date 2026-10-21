@@ -170,12 +170,13 @@ export function buildEvidencePackPdf(pack: any): Uint8Array {
   d.heading("5. Contradictions and resolutions (" + contr.length + ")");
   const sts = docs.map((x: any) => ({ name: x.name, ...parseExtractionStatus(x.extraction_status) }));
   for (const x of sts) {
+    if (x.extraction === "UNKNOWN") d.text("EXTRACTION STATUS NOT RECORDED for " + x.name + ". Completeness is unknown (legacy or unrecorded status). Do not treat this document as fully analysed.", { indent: 4 });
     if (x.extraction === "INCOMPLETE") d.text("EXTRACTION INCOMPLETE for " + x.name + ": " + (x.note || "a provider call was partial or failed") + ". Claims from this document may be missing.", { indent: 4 });
     if (x.review === "MODEL_FAILED") d.text("Discrepancy review for " + x.name + ": optional model check FAILED. No flags does not mean no discrepancies exist.", { indent: 4 });
     else if (x.review === "MODEL_NOT_RUN") d.text("Discrepancy review for " + x.name + ": optional model check not run. Only rule-based candidates were applied.", { indent: 4 });
   }
-  const notAssessed = sts.some((x) => x.extraction === "INCOMPLETE" || x.review === "MODEL_FAILED" || x.review === "MODEL_NOT_RUN");
-  if (!contr.length) d.text(notAssessed ? "No contradictions were flagged, but see the notices above. This is not a finding of none." : "No contradictions were detected.", { indent: 4 });
+  const notAssessed = sts.some((x) => x.extraction !== "COMPLETE" || x.review === "MODEL_FAILED" || x.review === "MODEL_NOT_RUN");
+  if (!contr.length) d.text(notAssessed ? "No contradictions were flagged by these checks, but see the notices above. This is not a finding of none." : "No contradictions were flagged by these checks. This is not proof that none exist; human review of the sources is still required.", { indent: 4 });
   contr.forEach((x, i) => {
     d.text((i + 1) + ". " + x.title + "  [" + x.status + "]", { indent: 4, bold: true });
     if (x.description) d.text(x.description, { indent: 14 });

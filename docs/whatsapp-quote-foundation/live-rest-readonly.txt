@@ -1,0 +1,14 @@
+AUTH 200 true
+user_roles 200 { rows: 1, role: 'admin' }
+wa_channels 404 {
+  code: 'PGRST205',
+  message: "Could not find the table 'public.wa_channels' in the schema cache"
+}
+wa_quote_rates 404 {
+  code: 'PGRST205',
+  message: "Could not find the table 'public.wa_quote_rates' in the schema cache"
+}
+wa_rate_revocations 404 {
+  code: 'PGRST205',
+  message: "Could not find the table 'public.wa_rate_revocations' in the schema cache"
+}

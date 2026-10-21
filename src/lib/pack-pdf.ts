@@ -80,6 +80,10 @@ class Doc {
       this.page().ops.push({ x: MX + indent, y: this.y, text: line, size, bold, gray: o.gray });
     }
   }
+  height(t: string, o: { size?: number; bold?: boolean; indent?: number } = {}) {
+    const size = o.size ?? 9.5;
+    return wrap(t, size, o.bold ?? false, PAGE_W - 2 * MX - (o.indent ?? 0)).length * size * 1.32;
+  }
   heading(t: string) {
     this.gap(10); this.ensure(40);
     this.text(t.toUpperCase(), { size: 11, bold: true });
@@ -124,6 +128,7 @@ export function buildEvidencePackPdf(pack: any): Uint8Array {
   d.heading("2. Source documents (" + docs.length + ")");
   if (!docs.length) d.text("No documents recorded.", { indent: 4 });
   docs.forEach((x, i) => {
+    d.reserve(32);
     d.text((i + 1) + ". " + x.name + (x.source_party ? " (" + x.source_party + ")" : ""), { indent: 4, bold: true });
     d.text("Uploaded " + stamp(x.uploaded_at) + "  |  SHA-256 " + (x.sha256_hash ?? "n/a"), { indent: 14, size: 8, gray: 0.35 });
   });
@@ -132,8 +137,11 @@ export function buildEvidencePackPdf(pack: any): Uint8Array {
   d.heading("3. Timeline (" + nEv + (nEv === 1 ? " event)" : " events)"));
   if (!(p.timeline ?? []).length) d.text("No timeline events recorded.", { indent: 4 });
   for (const e of p.timeline ?? []) {
-    d.text(stamp(e.timestamp) + "  [" + String(e.nature ?? "").toUpperCase() + "]", { indent: 4, size: 8.5, bold: true });
-    d.text(String(e.title ?? "") + "  - Source: " + String(e.source ?? "n/a"), { indent: 14 });
+    const evHead = stamp(e.timestamp) + "  [" + String(e.nature ?? "").toUpperCase() + "]";
+    const evBody = String(e.title ?? "") + "  - Source: " + String(e.source ?? "n/a");
+    d.reserve(d.height(evHead, { indent: 4, size: 8.5, bold: true }) + d.height(evBody, { indent: 14 }));
+    d.text(evHead, { indent: 4, size: 8.5, bold: true });
+    d.text(evBody, { indent: 14 });
   }
 
   const verified = claims.filter((x) => x.status === "VERIFIED");
@@ -141,10 +149,14 @@ export function buildEvidencePackPdf(pack: any): Uint8Array {
   if (!claims.length) d.text("No claims recorded.", { indent: 4 });
   const order = (s: string) => (s === "VERIFIED" ? 0 : s === "PENDING" ? 1 : 2);
   [...claims].sort((a, b) => order(a.status) - order(b.status)).forEach((x, i) => {
-    d.text((i + 1) + ". [" + String(x.status ?? "").toUpperCase() + " / " + String(x.nature ?? "").toUpperCase() + "] " + x.claim_text, { indent: 4 });
+    const claimLine = (i + 1) + ". [" + String(x.status ?? "").toUpperCase() + " / " + String(x.nature ?? "").toUpperCase() + "] " + x.claim_text;
     const src = (docName.get(x.document_id) ?? "unknown document") + (x.page_number ? ", page " + x.page_number : "");
-    d.text("Source: " + src + (x.timestamp_claimed ? "  |  Claimed time: " + stamp(x.timestamp_claimed) : "") +
-      (x.confidence != null ? "  |  Confidence: " + Math.round(Number(x.confidence) * 100) + "%" : ""), { indent: 14, size: 8, gray: 0.35 });
+    const srcLine = "Source: " + src + (x.timestamp_claimed ? "  |  Claimed time: " + stamp(x.timestamp_claimed) : "") +
+      (x.confidence != null ? "  |  Confidence: " + Math.round(Number(x.confidence) * 100) + "%" : "");
+    // A claim and its source line stay on the same page.
+    d.reserve(d.height(claimLine, { indent: 4 }) + d.height(srcLine, { indent: 14, size: 8 }));
+    d.text(claimLine, { indent: 4 });
+    d.text(srcLine, { indent: 14, size: 8, gray: 0.35 });
   });
 
   const contr: any[] = p.contradictions ?? [];
@@ -240,7 +252,7 @@ export function buildEvidencePackPdf(pack: any): Uint8Array {
   }
 
   d.heading("Integrity and approval");
-  d.text("SHA-256 of the canonical pack payload:", { indent: 4 });
+  d.text(pack.status === "APPROVED" ? "SHA-256 of the canonical pack payload:" : "SHA-256 of this draft pack payload (final hash is set when the pack is approved):", { indent: 4 });
   d.text(String(pack.sha256_hash ?? "n/a"), { indent: 4, bold: true, size: 9 });
   d.text("The JSON export of this same pack version carries the full payload this hash was calculated over.", { indent: 4, size: 8.5, gray: 0.35 });
   d.gap(6);
@@ -251,7 +263,9 @@ export function buildEvidencePackPdf(pack: any): Uint8Array {
     d.gap(10);
   }
   d.gap(4);
-  d.text("Limitations: AIS can contain gaps, spoofing or stale identity data. Satellite scene availability is not cargo-level proof. Weather provides context only. Human review is required for disputed claims.", { size: 8, gray: 0.35 });
+  const hasMapData = allObs.length > 0;
+  d.text((hasMapData ? "Limitations: AIS can contain gaps, spoofing or stale identity data. Satellite scene availability is not cargo-level proof. Weather provides context only. " : "Limitations: this pack contains document claims only. ") +
+    "Claims marked PENDING have not been verified. Human review is required for disputed claims.", { size: 8, gray: 0.35 });
 
   return serialize(d.pages, pack);
 }

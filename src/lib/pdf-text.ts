@@ -11,3 +11,15 @@ export async function readPdfLines(bytes: ArrayBuffer) {
     return lines;
   } finally { await pdf.destroy(); }
 }
+
+// Page-tagged text for AI chunking. No 20-page cap here (that cap belongs to the no-AI line import);
+// a size cap is enforced upstream by assertDocumentSize. Returns [] when the PDF has no text layer.
+export async function readPdfPages(bytes: ArrayBuffer): Promise<string[]> {
+  const { getDocumentProxy, extractText } = await import("unpdf");
+  const pdf = await getDocumentProxy(new Uint8Array(bytes.slice(0)));
+  try {
+    const { text } = await extractText(pdf, { mergePages: false });
+    const pages = text.map((page) => page.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).join("\n"));
+    return pages.some((page) => page.length > 0) ? pages : [];
+  } finally { await pdf.destroy(); }
+}

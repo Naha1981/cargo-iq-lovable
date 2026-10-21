@@ -1,4 +1,4 @@
-import { readPdfLines } from "./pdf-text";
+import { readPdfLines, readPdfPages } from "./pdf-text";
 import { assertDocumentSize, isPlainDocument, plainTextClaims, PDF_AI_UNAVAILABLE } from "./extraction-policy";
 import { createServerFn } from "@tanstack/react-start";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -27,7 +27,7 @@ function parseJsonModel(text: string): ClaimDraft[] {
   const parsed = JSON.parse(cleaned);
   const rows = Array.isArray(parsed) ? parsed : parsed.claims;
   if (!Array.isArray(rows)) throw new Error("EXTRACTION_JSON_SHAPE");
-  return rows.map((row: any) => ({
+  const mapped = rows.map((row: any) => ({
     page_number: Number.isFinite(Number(row.page_number)) ? Number(row.page_number) : undefined,
     claim_text: String(row.claim_text ?? "").trim(),
     claim_type: row.claim_type ? String(row.claim_type) : undefined,
@@ -37,7 +37,12 @@ function parseJsonModel(text: string): ClaimDraft[] {
     nature: ["OBSERVED","REPORTED","DERIVED","INFERRED"].includes(row.nature) ? row.nature : "REPORTED",
     confidence: Number.isFinite(Number(row.confidence)) ? Math.max(0, Math.min(1, Number(row.confidence))) : 0.7,
     timestamp_claimed: row.timestamp_claimed && !isNaN(Date.parse(row.timestamp_claimed)) ? new Date(row.timestamp_claimed).toISOString() : undefined,
-  })).filter((row: ClaimDraft) => row.claim_text.length > 0);
+  }));
+  const kept = mapped.filter((row: ClaimDraft) => row.claim_text.length > 0);
+  // A provider that answered with rows but none we can read broke the field contract. Fail loudly
+  // instead of silently dropping everything and falling back to raw text lines.
+  if (mapped.length > 0 && kept.length === 0) throw new Error("EXTRACTION_SCHEMA_MISMATCH");
+  return kept;
 }
 
 function bytesToBase64(bytes: Uint8Array) {
@@ -57,6 +62,9 @@ function claimPrompt(filename: string) {
     "Use OBSERVED for explicit facts, REPORTED for a party assertion, DERIVED only for arithmetic shown, INFERRED only where inference is explicit.",
     "Dates ISO-8601 when confident, else empty string. Confidence 0..1. page_number is the 1-based page the fact appears on.",
     "event_reference: only an explicit unique operation or visit ID in the source, else empty. A reusable vehicle/container ID alone does not identify one event. Never invent a cross-document identity.",
+    "Be exhaustive for a dispute file: extract every dated event, every container or vehicle identifier, every count, quantity, rate and amount, and every statement that a contract, invoice, statement or record was or was not produced or is missing.",
+    "Attribute each claim to whoever asserts it inside claim_text (for example 'The court found...', 'The witness X testified...', 'The pleadings allege...', 'MSC demanded...'). Never present a witness allegation, pleading or party demand as a finding. A court or tribunal's own conclusion is a separate claim from the allegations it weighs.",
+    "When the source gives different figures for the same thing (for example different container counts or different invoice dates), keep each figure as its own claim with its own page. Do not pick one and do not say which is wrong unless the source does.",
     "Filename: " + filename,
   ].join("\n");
 }
@@ -216,20 +224,126 @@ export function enabledFreeFallbacks(allowTestFallback = false) {
   if (allowTestFallback && process.env.CLAIM_GEMINI_TEST_FALLBACK_ENABLED === "true" && process.env.CLAIM_GEMINI_FREE_TIER_CONFIRMED === "true" && process.env.GEMINI_API_KEY) providers.push("gemini-test");
   return providers;
 }
-async function extractFreeFallback(provider: "openrouter" | "groq" | "gemini-test", bytes: ArrayBuffer, mimeType: string, filename: string) {
-  const plain = isPlainDocument(mimeType, filename);
-  if (provider === "gemini-test") {
-    const parts: any[] = [{ text: claimPrompt(filename) + '\nReturn only JSON: {"claims": [...]}.' }];
-    if (plain) parts.push({ text: "DOCUMENT (page 1):\n" + new TextDecoder().decode(bytes) });
-    else parts.push({ inline_data: { mime_type: mimeType || "application/pdf", data: bytesToBase64(new Uint8Array(bytes)) } });
-    const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent", {
-      method: "POST", signal: AbortSignal.timeout(30000), headers: { "Content-Type": "application/json", "x-goog-api-key": process.env.GEMINI_API_KEY! },
-      body: JSON.stringify({ contents: [{ role: "user", parts }], generationConfig: { temperature: 0, maxOutputTokens: 8000, responseMimeType: "application/json" } }),
-    });
-    if (!res.ok) throw new Error("FREE_GEMINI_" + res.status);
-    const json: any = await res.json();
-    return parseJsonModel((json.candidates?.[0]?.content?.parts ?? []).map((p: any) => p.text ?? "").join(""));
+
+// Free Gemini test path. Model is configurable and defaults to Google's own "latest" alias for the
+// flash-lite tier, so a retired dated model name cannot silently break extraction.
+export const GEMINI_TEST_MODEL_DEFAULT = "gemini-flash-lite-latest";
+export function geminiTestModel() { return (process.env.CLAIM_GEMINI_TEST_MODEL || GEMINI_TEST_MODEL_DEFAULT).replace(/^models\//, ""); }
+const GEMINI_CHUNK_CHARS = 12000;
+const GEMINI_MAX_CHUNKS = 12;
+export function chunkPages(pages: string[], maxChars = GEMINI_CHUNK_CHARS): string[] {
+  const chunks: string[] = []; let cur = "";
+  pages.forEach((text, i) => {
+    const tagged = "[page " + (i + 1) + "]\n" + text + "\n";
+    // A single oversized page is split on line boundaries but keeps its page tag.
+    const parts: string[] = [];
+    if (tagged.length <= maxChars) parts.push(tagged);
+    else { let buf = "[page " + (i + 1) + "]\n"; for (const line of text.split("\n")) { if (buf.length + line.length + 1 > maxChars && buf.length > 20) { parts.push(buf); buf = "[page " + (i + 1) + " continued]\n"; } buf += line + "\n"; } parts.push(buf); }
+    for (const part of parts) { if (cur && cur.length + part.length > maxChars) { chunks.push(cur); cur = ""; } cur += part; }
+  });
+  if (cur) chunks.push(cur);
+  return chunks;
+}
+const GEMINI_KEYS = 'Return ONLY a JSON object {"claims": [...]} where each claim has exactly these keys: page_number (integer), claim_text (string, one self-contained sentence naming who asserts it), claim_type (string), value (string), evidence_class (CUSTOMER_PRIMARY|CONTRACTUAL|OFFICIAL_PUBLIC), nature (OBSERVED|REPORTED|DERIVED|INFERRED), confidence (0..1), timestamp_claimed (ISO-8601 date or empty string), event_reference (string).';
+const GEMINI_RESPONSE_SCHEMA = { type: "OBJECT", required: ["claims"], properties: { claims: { type: "ARRAY", items: { type: "OBJECT",
+  required: ["page_number", "claim_text", "claim_type", "value", "evidence_class", "nature", "confidence", "timestamp_claimed", "event_reference"],
+  properties: { page_number: { type: "INTEGER" }, claim_text: { type: "STRING" }, claim_type: { type: "STRING" }, value: { type: "STRING" },
+    evidence_class: { type: "STRING", enum: ["CUSTOMER_PRIMARY", "CONTRACTUAL", "OFFICIAL_PUBLIC"] },
+    nature: { type: "STRING", enum: ["OBSERVED", "REPORTED", "DERIVED", "INFERRED"] },
+    confidence: { type: "NUMBER" }, timestamp_claimed: { type: "STRING" }, event_reference: { type: "STRING" } } } } } };
+async function geminiCall(parts: any[], attempt = 0): Promise<ClaimDraft[]> {
+  try { return await geminiCallOnce(parts); }
+  catch (e) { if (attempt < 1 && e instanceof SyntaxError) return geminiCall(parts, attempt + 1); throw e; }
+}
+async function geminiCallOnce(parts: any[]) {
+  const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + geminiTestModel() + ":generateContent", {
+    method: "POST", signal: AbortSignal.timeout(60000), headers: { "Content-Type": "application/json", "x-goog-api-key": process.env.GEMINI_API_KEY! },
+    body: JSON.stringify({ contents: [{ role: "user", parts }], generationConfig: { temperature: 0, maxOutputTokens: 8192, responseMimeType: "application/json", responseSchema: GEMINI_RESPONSE_SCHEMA } }),
+  });
+  if (!res.ok) throw new Error("FREE_GEMINI_" + res.status);
+  const json: any = await res.json();
+  const reason = json.candidates?.[0]?.finishReason;
+  // A cut-off answer is invalid JSON; never accept a partial chunk as if it were complete.
+  if (reason && reason !== "STOP") throw new Error("FREE_GEMINI_FINISH_" + reason);
+  return parseJsonModel((json.candidates?.[0]?.content?.parts ?? []).map((p: any) => p.text ?? "").join(""));
+}
+
+// Completeness audit. A model can silently skip a table row, so every ISO-6346 shaped container ID that appears in
+// the source text must appear in at least one extracted claim. Missing ones get one targeted re-read of just their lines.
+const CONTAINER_IN_TEXT = /\b([A-Z]{4})\s?(\d{6}\s?\d)\b/g;
+const normId = (x: string) => x.toUpperCase().replace(/\s+/g, "");
+export function missingContainerIds(pages: string[], claims: { claim_text: string; normalized_value?: unknown }[]): { id: string; page: number; lines: string[] }[] {
+  const haystack = normId(claims.map((c) => c.claim_text + " " + (typeof c.normalized_value === "string" ? c.normalized_value : "")).join(" "));
+  const found = new Map<string, { page: number; lines: string[] }>();
+  pages.forEach((text, i) => text.split("\n").forEach((line) => {
+    for (const m of line.matchAll(CONTAINER_IN_TEXT)) {
+      const id = normId(m[1]! + m[2]!);
+      const e = found.get(id) ?? { page: i + 1, lines: [] }; if (!e.lines.includes(line)) e.lines.push(line); found.set(id, e);
+    }
+  }));
+  return [...found].filter(([id]) => !haystack.includes(id)).map(([id, v]) => ({ id, ...v }));
+}
+async function extractViaGeminiTest(bytes: ArrayBuffer, mimeType: string, filename: string, plain: boolean, warnings: string[] = []): Promise<ClaimDraft[]> {
+  const head = claimPrompt(filename) + "\n" + GEMINI_KEYS;
+  if (plain) return geminiCall([{ text: head }, { text: "DOCUMENT (page 1):\n" + new TextDecoder().decode(bytes) }]);
+  const pages = mimeType === "application/pdf" || /\.pdf$/i.test(filename) || !mimeType ? await readPdfPages(bytes).catch(() => [] as string[]) : [];
+  if (!pages.length) return geminiCall([{ text: head }, { inline_data: { mime_type: mimeType || "application/pdf", data: bytesToBase64(new Uint8Array(bytes)) } }]);
+  const chunks = chunkPages(pages);
+  if (chunks.length > GEMINI_MAX_CHUNKS) throw new Error("FREE_GEMINI_DOCUMENT_TOO_LONG_" + chunks.length);
+  const all: ClaimDraft[] = [];
+  for (const chunk of chunks) all.push(...await geminiCall([{ text: head + "\nThis is one section of a longer document. Page numbers are given in [page N] tags." }, { text: "DOCUMENT SECTION:\n" + chunk }]));
+  const gaps = missingContainerIds(pages, all);
+  if (gaps.length) {
+    const lines = gaps.map((g) => "[page " + g.page + "]\n" + g.lines.join("\n")).join("\n");
+    all.push(...await geminiCall([{ text: head + "\nThese lines were skipped in a first pass. Extract every fact in them, one claim per row or statement." }, { text: "DOCUMENT LINES:\n" + lines }]));
+    const still = missingContainerIds(pages, all);
+    if (still.length) warnings.push("Container IDs in the source but not in any claim: " + still.map((g) => g.id + " (p" + g.page + ")").join(", "));
   }
+  return all;
+}
+
+// Second pass over the extracted claims: ask which pairs give DIFFERENT figures or dates for the same thing.
+// Every flag cites two real claim numbers; invalid or self-pairs are dropped, so nothing is invented.
+// Flags stay FLAGGED for human review. Ledger lines (separate payments, invoices, charges) are not conflicts.
+export type DiscrepancyFlag = { a: number; b: number; kind: string; explanation: string };
+export function parseDiscrepancies(text: string, claimCount: number): DiscrepancyFlag[] {
+  const parsed = JSON.parse(text.replace(/^```json\s*/i, "").replace(/```\s*$/i, "").trim());
+  const rows = Array.isArray(parsed) ? parsed : parsed.discrepancies;
+  if (!Array.isArray(rows)) throw new Error("DISCREPANCY_JSON_SHAPE");
+  const seen = new Set<string>(); const out: DiscrepancyFlag[] = [];
+  for (const r of rows) {
+    const a = Number(r.claim_a), b = Number(r.claim_b);
+    if (!Number.isInteger(a) || !Number.isInteger(b) || a === b || a < 1 || b < 1 || a > claimCount || b > claimCount) continue;
+    const key = [Math.min(a, b), Math.max(a, b)].join("-"); if (seen.has(key)) continue; seen.add(key);
+    const explanation = String(r.explanation ?? "").trim(); if (!explanation) continue;
+    out.push({ a, b, kind: String(r.kind ?? "DIFFERENT_FIGURES").slice(0, 40), explanation: explanation.slice(0, 400) });
+  }
+  return out;
+}
+async function findGeminiDiscrepancies(claims: ClaimDraft[]): Promise<DiscrepancyFlag[]> {
+  const list = claims.map((c, i) => (i + 1) + ". [p" + (c.page_number ?? "?") + "] " + c.claim_text).join("\n").slice(0, 60000);
+  const prompt = [
+    "You review extracted claims from a freight or shipping dispute file.",
+    "Find every pair of claims where two figures, counts, dates or amounts are in tension: they are about the same group of items, the same document or the same event, but the numbers or dates differ, OR the source itself says it cannot reconcile them. Work through the claims carefully: list the container counts, invoice dates, amounts and event dates, then compare them.",
+    "Do NOT flag separate ledger lines such as different payments, invoices or charges that merely have different dates or amounts. Do NOT flag claims that describe different events or different people's evidence on different subjects.",
+    "Use only the numbered claims below. Never use outside knowledge. Say plainly what differs; do not say which is right unless a claim itself says so.",
+    'Return ONLY JSON {"discrepancies":[{"claim_a":int,"claim_b":int,"kind":"DIFFERENT_FIGURES|DIFFERENT_DATES","explanation":"one sentence"}]}. Return an empty list when there are none.',
+    "CLAIMS:\n" + list,
+  ].join("\n");
+  // Comparing many claims needs a stronger reasoning tier than extraction. Model is configurable; the default is Google's own alias.
+  const model = (process.env.CLAIM_GEMINI_TEST_REVIEW_MODEL || "gemini-flash-latest").replace(/^models\//, "");
+  const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent", {
+    method: "POST", signal: AbortSignal.timeout(110000), headers: { "Content-Type": "application/json", "x-goog-api-key": process.env.GEMINI_API_KEY! },
+    body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { temperature: 0, maxOutputTokens: 16000, responseMimeType: "application/json" } }),
+  });
+  if (!res.ok) throw new Error("FREE_GEMINI_" + res.status);
+  const json: any = await res.json();
+  if (json.candidates?.[0]?.finishReason && json.candidates[0].finishReason !== "STOP") throw new Error("FREE_GEMINI_FINISH_" + json.candidates[0].finishReason);
+  return parseDiscrepancies((json.candidates?.[0]?.content?.parts ?? []).map((p: any) => p.text ?? "").join(""), claims.length);
+}
+async function extractFreeFallback(provider: "openrouter" | "groq" | "gemini-test", bytes: ArrayBuffer, mimeType: string, filename: string, warnings: string[] = []) {
+  const plain = isPlainDocument(mimeType, filename);
+  if (provider === "gemini-test") return extractViaGeminiTest(bytes, mimeType, filename, plain, warnings);
   const text = plain ? new TextDecoder().decode(bytes) : (await readPdfLines(bytes)).map(line => `[page ${line.page_number}] ${line.text}`).join("\n");
   plainTextClaims(text);
   const isRouter = provider === "openrouter";
@@ -247,14 +361,20 @@ async function extractFreeFallback(provider: "openrouter" | "groq" | "gemini-tes
   return parseJsonModel(json.choices?.[0]?.message?.content ?? "");
 }
 
-function timestampConflict(a: ClaimDraft, b: ClaimDraft) {
+const CONTAINER_ID = /^[A-Z]{4}\s?\d{6,7}$/i;
+const LEDGER_TYPES = /payment|invoice|charge|fee|receipt|tariff|rate|amount/i;
+export function timestampConflict(a: ClaimDraft, b: ClaimDraft) {
   if (!a.timestamp_claimed || !b.timestamp_claimed) return null;
   const delta = Math.abs(Date.parse(a.timestamp_claimed) - Date.parse(b.timestamp_claimed));
   if (!Number.isFinite(delta) || delta < 60 * 60 * 1000) return null;
   // Only the SAME fact (same claim type) with different times is a conflict.
   // Different event types (e.g. container_release vs container_collection) are sequential and expected to differ.
-  const sameEvent = !!a.event_reference && a.event_reference === b.event_reference;
-  const sameFact = sameEvent && !!a.claim_type && a.claim_type === b.claim_type && a.claim_type !== "TEXT_RECORD";
+  // A reusable container ID is not one event, and separate ledger lines (payments, invoices, charges) legitimately
+  // carry different dates, so neither may raise a conflict.
+  const ref = (a.event_reference ?? "").trim();
+  const sameEvent = !!ref && ref === (b.event_reference ?? "").trim() && !CONTAINER_ID.test(ref);
+  const type = a.claim_type ?? "";
+  const sameFact = sameEvent && !!type && type === b.claim_type && type !== "TEXT_RECORD" && !LEDGER_TYPES.test(type);
   return sameFact ? "Conflicting timestamps differ by " + Math.round(delta / 3600000) + " hour(s)." : null;
 }
 
@@ -290,7 +410,9 @@ function contentTokens(text: string): Set<string> {
     if (!t) continue;
     if (/^[0-9][0-9,]*(\.[0-9]+)?$/.test(t)) t = t.replace(/,/g, "");
     if (CLAIM_FILLER_TOKENS.has(t)) continue;
-    out.add(t.length > 5 ? t.slice(0, 5) : t);
+    // Only plain words are stemmed. Identifiers and numbers (container IDs, line references) keep every character,
+    // otherwise two different containers such as CSNU8330251 and CSNU8457610 collapse into one token.
+    out.add(t.length > 5 && !/\d/.test(t) ? t.slice(0, 5) : t);
   }
   return out;
 }
@@ -373,19 +495,21 @@ export async function extractDocumentClaimsForPath(input: {
       evidence_class: inferClass(doc.name), nature: "REPORTED", confidence: 0.55 }));
   };
   let claims: ClaimDraft[] = [];
+  const fallbackErrors: string[] = [];
+  const coverageWarnings: string[] = [];
   if (input.noAi) claims = await importLines();
   else {
     try { claims = await extractWithGemini(bytes, doc.file_type, doc.name); }
     catch (error) {
       let recovered = false;
       for (const provider of enabledFreeFallbacks(input.allowTestFallback)) {
-        try { claims = await extractFreeFallback(provider, bytes, doc.file_type, doc.name); if (claims.length) { providerUsed = provider; recovered = true; break; } }
-        catch { /* bounded one attempt per enabled free provider, never paid retry */ }
+        try { claims = await extractFreeFallback(provider, bytes, doc.file_type, doc.name, coverageWarnings); if (claims.length) { providerUsed = provider; recovered = true; break; } }
+        catch (e) { fallbackErrors.push(provider + ": " + (e instanceof Error ? e.message : "failed").slice(0, 120)); /* bounded one attempt per enabled free provider, never paid retry */ }
       }
       if (!recovered) {
         if (plain || pdf) {
           try { claims = await importLines(); mode = pdf ? "pdf-text-fallback" : "text-fallback"; providerUsed = "none"; }
-          catch (parseError) { throw new Error(PDF_AI_UNAVAILABLE + " " + (parseError instanceof Error ? parseError.message : "Could not read text.")); }
+          catch (parseError) { throw new Error(PDF_AI_UNAVAILABLE + " " + (parseError instanceof Error ? parseError.message : "Could not read text.") + (fallbackErrors.length ? " [free provider: " + fallbackErrors.join("; ") + "]" : "")); }
         } else throw error;
       }
     }
@@ -471,6 +595,22 @@ export async function extractDocumentClaimsForPath(input: {
     }
   }
 
+  let discrepancyFlags = 0;
+  if (providerUsed === "gemini-test" && claims.length > 1) {
+    try {
+      for (const f of await findGeminiDiscrepancies(claims)) {
+        const a = claims[f.a - 1]!, b = claims[f.b - 1]!;
+        await input.supabase.from("contradictions").insert({
+          tenant_id: input.tenantId, case_id: input.caseId,
+          title: "Different figures or dates in the file: " + (f.kind === "DIFFERENT_DATES" ? "dates" : "figures"),
+          description: f.explanation + " (claim " + f.a + ", page " + (a.page_number ?? "?") + " vs claim " + f.b + ", page " + (b.page_number ?? "?") + ")",
+          claim_a_id: inserted[f.a - 1]?.id ?? null, claim_b_id: inserted[f.b - 1]?.id ?? null, status: "FLAGGED",
+        });
+        discrepancyFlags++;
+      }
+    } catch (e) { fallbackErrors.push("discrepancy pass: " + (e instanceof Error ? e.message : "failed").slice(0, 120)); }
+  }
+
   await input.supabase.from("audit_log").insert({
     tenant_id: input.tenantId,
     case_id: input.caseId,
@@ -478,10 +618,10 @@ export async function extractDocumentClaimsForPath(input: {
     action: "DOCUMENT_EXTRACTED",
     entity_type: "document",
     entity_id: input.documentId,
-    payload: { claims: inserted.length, filename: doc.name, mode, providerUsed },
+    payload: { claims: inserted.length, filename: doc.name, mode, providerUsed, discrepancyFlags, ...(fallbackErrors.length ? { fallbackErrors } : {}), ...(coverageWarnings.length ? { coverageWarnings } : {}) },
   });
 
-  return { claims: inserted, count: inserted.length, mode, providerUsed };
+  return { claims: inserted, count: inserted.length, mode, providerUsed, discrepancyFlags, ...(fallbackErrors.length ? { fallbackErrors } : {}), ...(coverageWarnings.length ? { coverageWarnings } : {}) };
 }
 
 export const extractionHealth = createServerFn({ method: "GET" }).handler(async () => {

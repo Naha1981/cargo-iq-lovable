@@ -114,8 +114,11 @@ export function buildEvidencePackPdf(pack: any): Uint8Array {
   const docs: any[] = p.documents ?? [];
   const docName = new Map<string, string>(docs.map((d: any) => [d.id, d.name]));
   // Database order is by id (random). Read in document, then page order so claim numbers follow the source.
-  const claims: any[] = [...(p.claims ?? [])].sort((a: any, b: any) => String(a.document_id ?? "").localeCompare(String(b.document_id ?? "")) || (a.page_number ?? 1e9) - (b.page_number ?? 1e9) || String(a.id ?? "").localeCompare(String(b.id ?? "")));
-  const claimNo = new Map<string, number>(claims.map((c: any, i: number) => [String(c.id), i + 1]));
+  const claims: any[] = [...(p.claims ?? [])].sort((a: any, b: any) => String(a.document_id ?? "").localeCompare(String(b.document_id ?? "")) || (a.page_number ?? 1e9) - (b.page_number ?? 1e9) || String(a.created_at ?? "").localeCompare(String(b.created_at ?? "")) || String(a.id ?? "").localeCompare(String(b.id ?? "")));
+  // No stored source-order column exists: within one page the order is deterministic (created_at, then id) but not guaranteed to be reading order. The claim ID printed below is the durable reference.
+  const statusRank = (s: string) => (s === "VERIFIED" ? 0 : s === "PENDING" ? 1 : 2);
+  const shown: any[] = [...claims].sort((a, b) => statusRank(a.status) - statusRank(b.status));
+  const claimNo = new Map<string, number>(shown.map((c: any, i: number) => [String(c.id), i + 1]));
   const d = new Doc();
 
   d.text("CargoIQ", { size: 10, bold: true, gray: 0.4 });
@@ -156,12 +159,11 @@ export function buildEvidencePackPdf(pack: any): Uint8Array {
   const verified = claims.filter((x) => x.status === "VERIFIED");
   d.heading("4. Claims with sources (" + verified.length + " verified of " + claims.length + ")");
   if (!claims.length) d.text("No claims recorded.", { indent: 4 });
-  const order = (s: string) => (s === "VERIFIED" ? 0 : s === "PENDING" ? 1 : 2);
-  [...claims].sort((a, b) => order(a.status) - order(b.status)).forEach((x, i) => {
+  shown.forEach((x, i) => {
     const claimLine = (i + 1) + ". [" + String(x.status ?? "").toUpperCase() + " / " + String(x.nature ?? "").toUpperCase() + "] " + x.claim_text;
     const src = (docName.get(x.document_id) ?? "unknown document") + (x.page_number ? ", page " + x.page_number : "");
     const srcLine = "Source: " + src + (x.timestamp_claimed ? "  |  Claimed time: " + stamp(x.timestamp_claimed) : "") +
-      (x.confidence != null ? "  |  Confidence: " + Math.round(Number(x.confidence) * 100) + "%" : "");
+      (x.confidence != null ? "  |  Confidence: " + Math.round(Number(x.confidence) * 100) + "%" : "") + (x.id ? "  |  Claim ID: " + x.id : "");
     // A claim and its source line stay on the same page.
     d.reserve(d.height(claimLine, { indent: 4 }) + d.height(srcLine, { indent: 14, size: 8 }));
     d.text(claimLine, { indent: 4 });
@@ -182,7 +184,7 @@ export function buildEvidencePackPdf(pack: any): Uint8Array {
   contr.forEach((x, i) => {
     d.text((i + 1) + ". " + x.title + "  [" + x.status + "]", { indent: 4, bold: true });
     if (x.description) d.text(x.description, { indent: 14 });
-    const refs = [x.claim_a_id, x.claim_b_id].filter(Boolean).map((id: string) => claimNo.has(String(id)) ? "claim " + claimNo.get(String(id)) + " (page " + (claims.find((c: any) => String(c.id) === String(id))?.page_number ?? "?") + ")" : "claim " + id);
+    const refs = [x.claim_a_id, x.claim_b_id].filter(Boolean).map((id: string) => claimNo.has(String(id)) ? "claim " + claimNo.get(String(id)) + " (page " + (claims.find((c: any) => String(c.id) === String(id))?.page_number ?? "?") + ", ID " + id + ")" : "claim ID " + id);
     if (refs.length) d.text("Claims in this pack: " + refs.join(" vs "), { indent: 14, size: 8.5 });
     d.text("Resolution: " + (x.resolution_note ? x.resolution_note : x.status === "RESOLVED" ? "Resolved (no note recorded)" : "UNRESOLVED") +
       (x.resolved_at ? "  |  Resolved " + stamp(x.resolved_at) : ""), { indent: 14, size: 8.5 });

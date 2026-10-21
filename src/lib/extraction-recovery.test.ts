@@ -11,7 +11,7 @@ function db(blob: Blob, name: string, type: string) {
   const supabase = {
     storage: { from: () => ({ download: async () => ({ data: blob, error: null }) }) },
     from(table: string) {
-      const query: any = { data: [], error: null, eq: () => query, select: () => query,
+      const query: any = { data: [], error: null, eq: () => query, select: () => query, update: () => query,
         single: async () => ({ data: table === "documents" ? { name, file_type: type, file_path: "synthetic/test" } : { id: "claim-" + inserted.length }, error: null }),
         insert: (row: any) => { if (table === "extracted_claims") inserted.push(row); return query; },
       };
@@ -44,8 +44,9 @@ describe("bounded extraction recovery", () => {
     vi.stubGlobal("fetch", fetch); const mock = db(new Blob([fs.readFileSync("tests/fixtures/synthetic-recovery.pdf")]), "test.pdf", "application/pdf");
     const result = await extractDocumentClaimsForPath({ ...base, supabase: mock.supabase, allowTestFallback: true });
     expect(result.providerUsed).toBe("gemini-test"); expect(result.mode).toBe("ai"); expect(fetch).toHaveBeenCalledTimes(2);
-    const [url, init] = fetch.mock.calls[1]; expect(url).toContain("gemini-2.5-flash-lite:generateContent");
-    expect(JSON.parse(init.body).contents[0].parts[1].inline_data.mime_type).toBe("application/pdf");
+    const [url, init] = fetch.mock.calls[1]; expect(url).toContain("gemini-flash-lite-latest:generateContent");
+    // PDFs with a text layer are sent as page-tagged text so page provenance survives and long files are chunked.
+    expect(JSON.parse(init.body).contents[0].parts[1].text).toContain("[page 1]");
   });
   it("OpenRouter cannot select a paid model or weaken privacy", async () => {
     clear(); process.env.LOVABLE_API_KEY = "synthetic-primary"; process.env.OPENROUTER_API_KEY = "synthetic-router"; process.env.CLAIM_OPENROUTER_FREE_FALLBACK_ENABLED = "true";

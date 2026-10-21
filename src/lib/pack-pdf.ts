@@ -1,3 +1,4 @@
+import { parseExtractionStatus } from "./analysis-integrity";
 import {frozenOperationalResults} from "./count-pack";
 // Dependency-free, deterministic PDF writer for the Evidence Pack.
 // Runs entirely in the browser: no network, no external service. Same pack in = same bytes out.
@@ -80,6 +81,10 @@ class Doc {
       this.page().ops.push({ x: MX + indent, y: this.y, text: line, size, bold, gray: o.gray });
     }
   }
+  height(t: string, o: { size?: number; bold?: boolean; indent?: number } = {}) {
+    const size = o.size ?? 9.5;
+    return wrap(t, size, o.bold ?? false, PAGE_W - 2 * MX - (o.indent ?? 0)).length * size * 1.32;
+  }
   heading(t: string) {
     this.gap(10); this.ensure(40);
     this.text(t.toUpperCase(), { size: 11, bold: true });
@@ -97,7 +102,10 @@ function money(minor: unknown, currency: unknown) {
 
 function stamp(s: unknown) {
   const t = Date.parse(String(s ?? ""));
-  return Number.isFinite(t) ? new Date(t).toISOString().replace("T", " ").slice(0, 16) + "Z" : String(s ?? "n/a");
+  if (!Number.isFinite(t)) return String(s ?? "n/a");
+  const iso = new Date(t).toISOString();
+  // A time of exactly 00:00:00 means a date without a stated time, not a known midnight.
+  return iso.endsWith("T00:00:00.000Z") ? iso.slice(0, 10) + " (time not stated)" : iso.replace("T", " ").slice(0, 16) + "Z";
 }
 
 export function buildEvidencePackPdf(pack: any): Uint8Array {
@@ -105,7 +113,12 @@ export function buildEvidencePackPdf(pack: any): Uint8Array {
   const c = p.case ?? {};
   const docs: any[] = p.documents ?? [];
   const docName = new Map<string, string>(docs.map((d: any) => [d.id, d.name]));
-  const claims: any[] = p.claims ?? [];
+  // Database order is by id (random). Read in document, then page order so claim numbers follow the source.
+  const claims: any[] = [...(p.claims ?? [])].sort((a: any, b: any) => String(a.document_id ?? "").localeCompare(String(b.document_id ?? "")) || (a.page_number ?? 1e9) - (b.page_number ?? 1e9) || (a.source_seq ?? 1e9) - (b.source_seq ?? 1e9) || String(a.created_at ?? "").localeCompare(String(b.created_at ?? "")) || String(a.id ?? "").localeCompare(String(b.id ?? "")));
+  // No stored source-order column exists: within one page the order is reading order when source_seq is recorded, otherwise deterministic (created_at, then id) but not guaranteed reading order. The claim ID printed below is the durable reference.
+  const statusRank = (s: string) => (s === "VERIFIED" ? 0 : s === "PENDING" ? 1 : 2);
+  const shown: any[] = [...claims].sort((a, b) => statusRank(a.status) - statusRank(b.status));
+  const claimNo = new Map<string, number>(shown.map((c: any, i: number) => [String(c.id), i + 1]));
   const d = new Doc();
 
   d.text("CargoIQ", { size: 10, bold: true, gray: 0.4 });
@@ -124,6 +137,7 @@ export function buildEvidencePackPdf(pack: any): Uint8Array {
   d.heading("2. Source documents (" + docs.length + ")");
   if (!docs.length) d.text("No documents recorded.", { indent: 4 });
   docs.forEach((x, i) => {
+    d.reserve(32);
     d.text((i + 1) + ". " + x.name + (x.source_party ? " (" + x.source_party + ")" : ""), { indent: 4, bold: true });
     d.text("Uploaded " + stamp(x.uploaded_at) + "  |  SHA-256 " + (x.sha256_hash ?? "n/a"), { indent: 14, size: 8, gray: 0.35 });
   });
@@ -131,28 +145,47 @@ export function buildEvidencePackPdf(pack: any): Uint8Array {
   const nEv = (p.timeline ?? []).length;
   d.heading("3. Timeline (" + nEv + (nEv === 1 ? " event)" : " events)"));
   if (!(p.timeline ?? []).length) d.text("No timeline events recorded.", { indent: 4 });
-  for (const e of p.timeline ?? []) {
-    d.text(stamp(e.timestamp) + "  [" + String(e.nature ?? "").toUpperCase() + "]", { indent: 4, size: 8.5, bold: true });
-    d.text(String(e.title ?? "") + "  - Source: " + String(e.source ?? "n/a"), { indent: 14 });
+  // Chronological, stable for equal times; undated or unreadable times go last.
+  const orderedTimeline = (p.timeline ?? []).map((e: any, i: number) => ({ e, i, t: Date.parse(String(e.timestamp ?? "")) }))
+    .sort((a: any, b: any) => (Number.isFinite(a.t) ? a.t : Infinity) - (Number.isFinite(b.t) ? b.t : Infinity) || a.i - b.i).map((x: any) => x.e);
+  for (const e of orderedTimeline) {
+    const evHead = stamp(e.timestamp) + "  [" + String(e.nature ?? "").toUpperCase() + "]";
+    const evBody = String(e.title ?? "") + "  - Source: " + String(e.source ?? "n/a");
+    d.reserve(d.height(evHead, { indent: 4, size: 8.5, bold: true }) + d.height(evBody, { indent: 14 }));
+    d.text(evHead, { indent: 4, size: 8.5, bold: true });
+    d.text(evBody, { indent: 14 });
   }
 
   const verified = claims.filter((x) => x.status === "VERIFIED");
   d.heading("4. Claims with sources (" + verified.length + " verified of " + claims.length + ")");
   if (!claims.length) d.text("No claims recorded.", { indent: 4 });
-  const order = (s: string) => (s === "VERIFIED" ? 0 : s === "PENDING" ? 1 : 2);
-  [...claims].sort((a, b) => order(a.status) - order(b.status)).forEach((x, i) => {
-    d.text((i + 1) + ". [" + String(x.status ?? "").toUpperCase() + " / " + String(x.nature ?? "").toUpperCase() + "] " + x.claim_text, { indent: 4 });
+  shown.forEach((x, i) => {
+    const claimLine = (i + 1) + ". [" + String(x.status ?? "").toUpperCase() + " / " + String(x.nature ?? "").toUpperCase() + "] " + x.claim_text;
     const src = (docName.get(x.document_id) ?? "unknown document") + (x.page_number ? ", page " + x.page_number : "");
-    d.text("Source: " + src + (x.timestamp_claimed ? "  |  Claimed time: " + stamp(x.timestamp_claimed) : "") +
-      (x.confidence != null ? "  |  Confidence: " + Math.round(Number(x.confidence) * 100) + "%" : ""), { indent: 14, size: 8, gray: 0.35 });
+    const srcLine = "Source: " + src + (x.timestamp_claimed ? "  |  Claimed time: " + stamp(x.timestamp_claimed) : "") +
+      (x.confidence != null ? "  |  Confidence: " + Math.round(Number(x.confidence) * 100) + "%" : "") + (x.id ? "  |  Claim ID: " + x.id : "");
+    // A claim and its source line stay on the same page.
+    d.reserve(d.height(claimLine, { indent: 4 }) + d.height(srcLine, { indent: 14, size: 8 }));
+    d.text(claimLine, { indent: 4 });
+    d.text(srcLine, { indent: 14, size: 8, gray: 0.35 });
   });
 
   const contr: any[] = p.contradictions ?? [];
   d.heading("5. Contradictions and resolutions (" + contr.length + ")");
-  if (!contr.length) d.text("No contradictions were detected.", { indent: 4 });
+  const sts = docs.map((x: any) => ({ name: x.name, ...parseExtractionStatus(x.extraction_status) }));
+  for (const x of sts) {
+    if (x.extraction === "UNKNOWN") d.text("EXTRACTION STATUS NOT RECORDED for " + x.name + ". Completeness is unknown (legacy or unrecorded status). Do not treat this document as fully analysed.", { indent: 4 });
+    if (x.extraction === "INCOMPLETE") d.text("EXTRACTION INCOMPLETE for " + x.name + ": " + (x.note || "a provider call was partial or failed") + ". Claims from this document may be missing.", { indent: 4 });
+    if (x.review === "MODEL_FAILED") d.text("Discrepancy review for " + x.name + ": optional model check FAILED. No flags does not mean no discrepancies exist.", { indent: 4 });
+    else if (x.review === "MODEL_NOT_RUN") d.text("Discrepancy review for " + x.name + ": optional model check not run. Only rule-based candidates were applied.", { indent: 4 });
+  }
+  const notAssessed = sts.some((x) => x.extraction !== "COMPLETE" || x.review === "MODEL_FAILED" || x.review === "MODEL_NOT_RUN");
+  if (!contr.length) d.text(notAssessed ? "No contradictions were flagged by these checks, but see the notices above. This is not a finding of none." : "No contradictions were flagged by these checks. This is not proof that none exist; human review of the sources is still required.", { indent: 4 });
   contr.forEach((x, i) => {
     d.text((i + 1) + ". " + x.title + "  [" + x.status + "]", { indent: 4, bold: true });
     if (x.description) d.text(x.description, { indent: 14 });
+    const refs = [x.claim_a_id, x.claim_b_id].filter(Boolean).map((id: string) => claimNo.has(String(id)) ? "claim " + claimNo.get(String(id)) + " (page " + (claims.find((c: any) => String(c.id) === String(id))?.page_number ?? "?") + ", ID " + id + ")" : "claim ID " + id);
+    if (refs.length) d.text("Claims in this pack: " + refs.join(" vs "), { indent: 14, size: 8.5 });
     d.text("Resolution: " + (x.resolution_note ? x.resolution_note : x.status === "RESOLVED" ? "Resolved (no note recorded)" : "UNRESOLVED") +
       (x.resolved_at ? "  |  Resolved " + stamp(x.resolved_at) : ""), { indent: 14, size: 8.5 });
     if (x.resolution_document_id || x.resolution_evidence_reference) d.text("Resolution evidence: " + (docName.get(x.resolution_document_id) ?? x.resolution_document_id ?? "n/a") + ", " + (x.resolution_evidence_reference ?? "n/a"), {indent:14,size:8});
@@ -240,9 +273,13 @@ export function buildEvidencePackPdf(pack: any): Uint8Array {
   }
 
   d.heading("Integrity and approval");
-  d.text("SHA-256 of the canonical pack payload:", { indent: 4 });
+  // The database computes this hash over the canonical payload when the pack is generated (draft or approved).
+  // A preview or test file that did not come from that path must say so inside the file.
+  const testHash = pack.test_hash === true;
+  d.text(testHash ? "TEST HASH - NOT A CARGOIQ HASH. SHA-256 of a JSON payload calculated by a test script outside the database:" : "SHA-256 of the canonical pack payload:", { indent: 4, bold: testHash });
   d.text(String(pack.sha256_hash ?? "n/a"), { indent: 4, bold: true, size: 9 });
-  d.text("The JSON export of this same pack version carries the full payload this hash was calculated over.", { indent: 4, size: 8.5, gray: 0.35 });
+  d.text(testHash ? "This file was not generated by the evidence-pack save path, so this value is not a seal and cannot be checked against a stored pack. A real pack's hash is calculated by the database over the canonical payload when the pack is generated."
+    : "The JSON export of this same pack version carries the full payload this hash was calculated over.", { indent: 4, size: 8.5, gray: 0.35 });
   d.gap(6);
   d.text("Status: " + pack.status + (pack.status === "APPROVED" && pack.approved_by ? "  |  Approved by user ID " + pack.approved_by : "  |  Not yet approved"), { indent: 4 });
   d.gap(18);
@@ -251,7 +288,9 @@ export function buildEvidencePackPdf(pack: any): Uint8Array {
     d.gap(10);
   }
   d.gap(4);
-  d.text("Limitations: AIS can contain gaps, spoofing or stale identity data. Satellite scene availability is not cargo-level proof. Weather provides context only. Human review is required for disputed claims.", { size: 8, gray: 0.35 });
+  const hasMapData = allObs.length > 0;
+  d.text((hasMapData ? "Limitations: AIS can contain gaps, spoofing or stale identity data. Satellite scene availability is not cargo-level proof. Weather provides context only. " : "Limitations: this pack contains document claims only. ") +
+    "Claims marked PENDING have not been verified. Human review is required for disputed claims.", { size: 8, gray: 0.35 });
 
   return serialize(d.pages, pack);
 }
@@ -273,7 +312,7 @@ function serialize(pages: { ops: Op[]; rules: Rule[] }[], pack: any): Uint8Array
       const g = o.gray ?? 0;
       s += "BT " + g + " g /" + (o.bold ? "F2" : "F1") + " " + f(o.size) + " Tf " + f(o.x) + " " + f(o.y) + " Td (" + esc(o.text) + ") Tj ET\n";
     }
-    const foot = "CargoIQ Evidence Pack v" + pack.version + "  |  SHA-256 " + String(pack.sha256_hash ?? "").slice(0, 16) + "...  |  Page " + (i + 1) + " of " + total;
+    const foot = "CargoIQ Evidence Pack v" + pack.version + "  |  " + (pack.test_hash === true ? "TEST HASH (not a seal) " : "SHA-256 ") + String(pack.sha256_hash ?? "").slice(0, 16) + "...  |  Page " + (i + 1) + " of " + total;
     s += "0.75 G 0.5 w " + MX + " 44 m " + (PAGE_W - MX) + " 44 l S\nBT 0.35 g /F1 7.5 Tf " + MX + " 32 Td (" + esc(clean(foot)) + ") Tj ET\n";
     const content = add("<< /Length " + s.length + " >>\nstream\n" + s + "endstream");
     kids.push(add("<< /Type /Page /Parent " + pagesRoot + " 0 R /MediaBox [0 0 " + PAGE_W + " " + PAGE_H + "] /Resources << /Font << /F1 " + fReg + " 0 R /F2 " + fBold + " 0 R >> >> /Contents " + content + " 0 R >>"));

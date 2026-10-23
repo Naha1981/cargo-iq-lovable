@@ -6,13 +6,18 @@ import { createClient } from "@/lib/supabase/client";
 import { ensureOrganization } from "@/lib/auth.functions";
 
 export const Route = createFileRoute("/auth")({
+  validateSearch: (search: Record<string, unknown>): { mode?: "signup" } => ({
+    mode: search.mode === "signup" ? "signup" : undefined,
+  }),
   head: () => ({ meta: [{ title: "CargoIQ — Sign in" }] }),
   component: AuthPage,
 });
 
 function AuthPage() {
   const navigate = useNavigate();
-  const [mode, setMode] = useState<"signin" | "signup" | "reset">("signin");
+  const { mode: requestedMode } = Route.useSearch();
+  // New customers arrive via "Create an account" (?mode=signup); default stays sign-in.
+  const [mode, setMode] = useState<"signin" | "signup" | "reset">(requestedMode === "signup" ? "signup" : "signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [organization, setOrganization] = useState("");

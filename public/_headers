@@ -1,0 +1,11 @@
+# Security headers for all responses. CSP intentionally deferred: a policy needs an
+# audited allow-list (Supabase, CDN scripts on /harbour-view, map tiles) and testing
+# against the deployed build before it can ship without breaking the app.
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Frame-Options: DENY
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), interest-cohort=()
+
+/assets/*
+  cache-control: public, max-age=31536000, immutable

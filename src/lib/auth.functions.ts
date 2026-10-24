@@ -32,15 +32,19 @@ export const ensureOrganization = createServerFn({ method: "POST" }).inputValida
 });
 
 export const runDiagnostics = createServerFn({ method: "GET" }).handler(async () => {
+  const { supabase, user } = await getAuthed();
+  if (!user) {
+    // Setup diagnostics reveal backend configuration; only signed-in users may see them.
+    return [{ name: "Signed in", ok: false, detail: "Not signed in.", fix: "Sign in on the sign-in page." }];
+  }
   const checks: { name: string; ok: boolean; detail: string; fix?: string }[] = [];
   const url = process.env["SUPABASE_URL"];
   checks.push({ name: "Backend connection settings", ok: Boolean(url && process.env["SUPABASE_PUBLISHABLE_KEY"]), detail: url ? "Connection details found." : "Connection details missing.", fix: "Reconnect Lovable Cloud for this project." });
   const ai = resolveClaimAiProvider();
   checks.push({ name: "AI document reading", ok: ai.kind !== "none", detail: ai.kind === "none" ? "AI key missing." : ai.label + ".", fix: "Add OPENAI_API_KEY or ANTHROPIC_API_KEY as a project secret, or ask the assistant to add the Lovable AI key." });
-  const { supabase, user } = await getAuthed();
   const { error: dbErr } = await supabase.from("tenants").select("id", { head: true, count: "exact" });
-  checks.push({ name: "Database ready", ok: !dbErr, detail: dbErr ? dbErr.message : "Tables reachable.", fix: "Ask the assistant to re-apply the database setup." });
-  checks.push({ name: "Signed in", ok: Boolean(user), detail: user ? `Signed in as ${user.email}` : "Not signed in.", fix: "Sign in on the sign-in page." });
+  checks.push({ name: "Database ready", ok: !dbErr, detail: dbErr ? "Database check failed; see server logs." : "Tables reachable.", fix: "Ask the assistant to re-apply the database setup." });
+  checks.push({ name: "Signed in", ok: true, detail: `Signed in as ${user.email}` });
   if (user) {
     const { data: m } = await supabase.from("user_roles").select("tenant_id, role").eq("user_id", user.id).limit(1).maybeSingle();
     checks.push({ name: "Workspace access", ok: Boolean(m), detail: m ? `Role: ${m.role}` : "No workspace yet.", fix: "Sign out and sign in again — a workspace is created automatically." });

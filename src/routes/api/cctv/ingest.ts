@@ -2,12 +2,35 @@ import { createFileRoute } from "@tanstack/react-router";
 import { cctvIngestSchema, defaultCctvLimitation } from "@/lib/cctv-contract";
 import { constantTimeEqual, decryptSecret, hmacSha256Base64Url, sha256Hex } from "@/lib/cctv-crypto";
 
+// Returns the decoded body, or null when the stream exceeds maxBytes.
+export async function readBodyWithCap(request: Request, maxBytes: number): Promise<string | null> {
+  if (!request.body) return "";
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maxBytes) { await reader.cancel().catch(() => undefined); return null; }
+    chunks.push(value);
+  }
+  const merged = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) { merged.set(chunk, offset); offset += chunk.byteLength; }
+  return new TextDecoder().decode(merged);
+}
+
 export const Route = createFileRoute("/api/cctv/ingest")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const rawBody = await request.text();
-        if (rawBody.length > 8500000) return Response.json({ error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
+        const declaredLength = Number(request.headers.get("content-length") ?? "0");
+        if (Number.isFinite(declaredLength) && declaredLength > 8500000) return Response.json({ error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
+        // Read the body as a stream with a hard byte cap: a missing or lying Content-Length
+        // (or chunked encoding) must not let an unbounded body into memory.
+        const rawBody = await readBodyWithCap(request, 8500000);
+        if (rawBody === null) return Response.json({ error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
 
         const sourceId = request.headers.get("x-cargoiq-source-id");
         const timestampHeader = request.headers.get("x-cargoiq-timestamp");
@@ -30,9 +53,11 @@ export const Route = createFileRoute("/api/cctv/ingest")({
 
         const { error: nonceError } = await db.from("cctv_ingest_nonces").insert({ source_id: source.id, nonce, observed_at: new Date(timestamp * 1000).toISOString() });
         if (nonceError) {
-          if (String(nonceError.code) === "23505") return Response.json({ error: "REPLAYED_NONCE" }, { status: 409 });
+          if (String(nonceError.code) === "23509" || String(nonceError.code) === "23505") return Response.json({ error: "REPLAYED_NONCE" }, { status: 409 });
           return Response.json({ error: "INGEST_UNAVAILABLE" }, { status: 503 });
         }
+        // Nonces only need to outlive the 300-second replay window; purge older rows so the table cannot grow without bound.
+        await db.from("cctv_ingest_nonces").delete().lt("observed_at", new Date(Date.now() - 15 * 60 * 1000).toISOString());
 
         let event: any;
         try { event = cctvIngestSchema.parse(JSON.parse(rawBody)); }

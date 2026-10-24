@@ -43,6 +43,7 @@ export const createCctvSource = createServerFn({ method: "POST" })
   }))
   .middleware([tenantMiddleware])
   .handler(async ({ data, context }) => {
+    if (!["admin", "investigator"].includes(context.role)) throw new Error("Investigator access required");
     const { db, masterKey } = await service();
     const ingestSecret = randomSecret(32);
     const encrypted = await encryptSecret(ingestSecret, masterKey);
@@ -67,6 +68,7 @@ export const createCctvCamera = createServerFn({ method: "POST" })
   }))
   .middleware([tenantMiddleware])
   .handler(async ({ data, context }) => {
+    if (!["admin", "investigator"].includes(context.role)) throw new Error("Investigator access required");
     const { db } = await service();
     const { data: source } = await db.from("cctv_sources").select("id").eq("id", data.sourceId).eq("tenant_id", context.tenantId).maybeSingle();
     if (!source) throw new Error("CCTV_SOURCE_NOT_FOUND");
@@ -105,6 +107,7 @@ export const linkCctvObservation = createServerFn({ method: "POST" })
   .validator(observationInput)
   .middleware([tenantMiddleware])
   .handler(async ({ data, context }) => {
+    if (!["admin", "investigator"].includes(context.role)) throw new Error("Investigator access required");
     const { db } = await service();
     await assertCase(db, context.tenantId, data.caseId);
     const { data: observation, error } = await db.from("cctv_observations").select("*").eq("id", data.observationId).eq("tenant_id", context.tenantId).maybeSingle();
@@ -147,6 +150,7 @@ export const reviewCctvObservation = createServerFn({ method: "POST" })
   .validator(observationInput.extend({ decision: z.enum(["CONFIRMED", "UNCERTAIN", "REJECTED"]), note: z.string().max(2000).optional() }))
   .middleware([tenantMiddleware])
   .handler(async ({ data, context }) => {
+    if (!["admin", "investigator"].includes(context.role)) throw new Error("Investigator access required");
     const { db } = await service();
     await assertCase(db, context.tenantId, data.caseId);
     const { data: observation, error } = await db.from("cctv_observations").select("*").eq("id", data.observationId).eq("tenant_id", context.tenantId).eq("case_id", data.caseId).maybeSingle();

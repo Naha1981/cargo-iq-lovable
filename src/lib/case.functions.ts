@@ -124,6 +124,8 @@ export const registerDocument = createServerFn({ method: "POST" })
   .middleware([tenantMiddleware])
   .handler(async ({ data, context }) => {
     if (!["admin", "investigator"].includes(context.role)) throw new Error("Investigator access required");
+    const { data: ownedCase } = await context.supabase.from("cases").select("id").eq("id", data.caseId).eq("tenant_id", context.tenantId).maybeSingle();
+    if (!ownedCase) throw new Error("CASE_NOT_FOUND");
     const expectedPrefix = context.tenantId + "/" + data.caseId + "/";
     if (!data.filePath.startsWith(expectedPrefix)) throw new Error("INVALID_STORAGE_PATH");
 
@@ -204,6 +206,12 @@ export const corroborateCase = createServerFn({ method: "POST" })
   .middleware([tenantMiddleware])
   .handler(async ({ data, context }) => {
     if (!["admin", "investigator"].includes(context.role)) throw new Error("Investigator access required");
+    // Throttle: each run fans out to paid/external AIS, satellite and weather APIs.
+    const throttleSince = new Date(Date.now() - 60_000).toISOString();
+    const { count: recentRuns } = await context.supabase
+      .from("audit_log").select("id", { head: true, count: "exact" })
+      .eq("tenant_id", context.tenantId).eq("action", "CASE_CORROBORATED").gte("created_at", throttleSince);
+    if ((recentRuns ?? 0) >= 5) throw new Error("CORROBORATE_RATE_LIMITED");
     const { data: row, error } = await context.supabase.from("cases").select("vessel_name,port_code").eq("id", data.caseId).single();
     if (error || !row) throw error ?? new Error("CASE_NOT_FOUND");
 
@@ -221,6 +229,11 @@ export const corroborateCase = createServerFn({ method: "POST" })
       ...weather.slice(0, 48).map((x: any) => ({ source: x.source, observation_type: "MARINE_WEATHER", observed_at: x.time, latitude: center[0], longitude: center[1], payload: x, confidence: 0.6, limitation: "Weather is contextual evidence and does not establish delay responsibility by itself." })),
     ];
 
+    await context.supabase.from("audit_log").insert({
+      tenant_id: context.tenantId, case_id: data.caseId, actor_user_id: context.user.id,
+      action: "CASE_CORROBORATED", entity_type: "case", entity_id: data.caseId,
+      payload: { observations: observations.length },
+    });
     if (observations.length) {
       const { error: insertError } = await context.supabase.from("external_observations").insert(observations.map((x) => ({ tenant_id: context.tenantId, case_id: data.caseId, ...x })));
       if (insertError) throw insertError;

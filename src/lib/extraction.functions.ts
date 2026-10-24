@@ -17,10 +17,11 @@ type ClaimDraft = {
   event_reference?: string;
 };
 
-function inferClass(name: string) {
-  const n = name.toLowerCase();
-  if (n.includes("contract") || n.includes("agreement")) return "CONTRACTUAL";
-  if (n.includes("terminal") || n.includes("port")) return "OFFICIAL_PUBLIC";
+// Match whole filename tokens, not substrings: "report.pdf" must not match "port".
+export function inferClass(name: string) {
+  const tokens = name.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+  if (tokens.includes("contract") || tokens.includes("agreement")) return "CONTRACTUAL";
+  if (tokens.includes("terminal") || tokens.includes("port")) return "OFFICIAL_PUBLIC";
   return "CUSTOMER_PRIMARY";
 }
 

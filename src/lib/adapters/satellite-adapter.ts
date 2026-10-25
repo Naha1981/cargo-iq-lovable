@@ -20,6 +20,7 @@ export async function querySentinelScenes(options: {
   const [west, south, east, north] = options.bbox;
   const response = await fetch(STAC, {
     method: "POST",
+    signal: AbortSignal.timeout(15000),
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       collections: ["sentinel-1-grd", "sentinel-2-l2a"],

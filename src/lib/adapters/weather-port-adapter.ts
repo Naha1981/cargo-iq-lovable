@@ -25,7 +25,7 @@ export async function fetchPortConditions(options: {
     "&longitude=" +
     longitude +
     "&hourly=wave_height,wave_direction,wave_period,ocean_current_velocity,ocean_current_direction&timezone=UTC";
-  const response = await fetch(marineUrl, { cache: "no-store" });
+  const response = await fetch(marineUrl, { cache: "no-store", signal: AbortSignal.timeout(10000) });
   if (!response.ok) throw new Error("OPEN_METEO_MARINE_" + response.status);
   type MarineResponse = {
     hourly?: {
@@ -44,7 +44,7 @@ export async function fetchPortConditions(options: {
     "&longitude=" +
     longitude +
     "&hourly=wind_speed_10m,wind_direction_10m,rain&timezone=UTC";
-  const weatherResponse = await fetch(weatherUrl, { cache: "no-store" });
+  const weatherResponse = await fetch(weatherUrl, { cache: "no-store", signal: AbortSignal.timeout(10000) });
   type ForecastResponse = {
     hourly?: {
       wind_speed_10m?: (number | null)[];

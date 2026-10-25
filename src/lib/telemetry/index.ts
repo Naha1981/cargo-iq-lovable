@@ -108,6 +108,7 @@ export function captureTelemetry<E extends TelemetryEventName>(
     },
     body,
     keepalive: true,
+    signal: AbortSignal.timeout(5000),
   }).catch(() => {
     // Telemetry is best-effort. Product and operational workflows never depend on it.
   });

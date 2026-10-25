@@ -1,5 +1,13 @@
 import { z } from "zod";
-import { reconciledClockGroup } from "./operational-clocks";
+import { reconciledClockGroup, type ClockDecision, type ClockRecord } from "./operational-clocks";
+
+export interface KpiDefinitionLike {
+  physical_reference: string;
+  start_kind: string;
+  end_kind: string;
+  acceptance: string;
+  benchmark_hours: number | null;
+}
 export const kpiInput = z
   .object({
     caseId: z.string().uuid(),
@@ -20,7 +28,11 @@ export const kpiInput = z
     message: "Start and end must identify different event types",
     path: ["endKind"],
   });
-export function evaluateKpi(definition: any, clocks: any[], decisions: any[] = []) {
+export function evaluateKpi(
+  definition: KpiDefinitionLike,
+  clocks: ClockRecord[],
+  decisions: ClockDecision[] = [],
+) {
   const times = (kind: string) =>
     reconciledClockGroup(
       clocks.filter(

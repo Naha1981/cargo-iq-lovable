@@ -6,6 +6,12 @@ import {
   listClockReconciliations,
 } from "@/lib/operational-clocks.functions";
 import { clockKinds } from "@/lib/operational-clocks";
+import type { Database } from "@/integrations/supabase/types";
+
+type DocRow = Database["public"]["Tables"]["documents"]["Row"];
+type KpiRow = Database["public"]["Tables"]["kpi_definitions"]["Row"];
+type ClockRow = Database["public"]["Tables"]["operational_clocks"]["Row"];
+type DecisionRow = Database["public"]["Tables"]["clock_reconciliations"]["Row"];
 const blank = {
   party: "",
   name: "",
@@ -20,10 +26,16 @@ const blank = {
   benchmarkBasis: "",
   supersedesId: null as string | null,
 };
-export function KpiDefinitionRegister({ caseId, documents }: { caseId: string; documents: any[] }) {
-  const [decisions, setDecisions] = useState<any[]>([]);
-  const [rows, setRows] = useState<any[]>([]),
-    [clocks, setClocks] = useState<any[]>([]),
+export function KpiDefinitionRegister({
+  caseId,
+  documents,
+}: {
+  caseId: string;
+  documents: DocRow[];
+}) {
+  const [decisions, setDecisions] = useState<DecisionRow[]>([]);
+  const [rows, setRows] = useState<KpiRow[]>([]),
+    [clocks, setClocks] = useState<ClockRow[]>([]),
     [f, setF] = useState(blank),
     [err, setErr] = useState(""),
     [busy, setBusy] = useState(false),
@@ -70,7 +82,7 @@ export function KpiDefinitionRegister({ caseId, documents }: { caseId: string; d
       setBusy(false);
     }
   }
-  function revise(r: any) {
+  function revise(r: KpiRow) {
     setF({
       party: r.party,
       name: r.name,
@@ -86,14 +98,15 @@ export function KpiDefinitionRegister({ caseId, documents }: { caseId: string; d
       supersedesId: r.id,
     });
   }
-  const latest = new Map<string, any>();
+  const latest = new Map<string, KpiRow>();
   for (const r of rows) {
     const k = JSON.stringify([
       r.party.toLowerCase().trim(),
       r.name.toLowerCase().trim(),
       r.physical_reference,
     ]);
-    if (!latest.has(k) || latest.get(k).version < r.version) latest.set(k, r);
+    const cur = latest.get(k);
+    if (!cur || cur.version < r.version) latest.set(k, r);
   }
   const shown = history ? rows : [...latest.values()],
     cl = "mt-1 w-full rounded border bg-background p-2 text-sm";

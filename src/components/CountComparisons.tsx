@@ -11,6 +11,27 @@ import {
   type CountRecord,
   type CountRule,
 } from "@/lib/count-ledger";
+import type { Database } from "@/integrations/supabase/types";
+
+type DocRow = Database["public"]["Tables"]["documents"]["Row"];
+type CountCtx = Awaited<ReturnType<typeof listCountComparisons>>;
+
+type FormState = {
+  caseId: string;
+  name: string;
+  metric: string;
+  outputUnit: string;
+  ruleIds: string[];
+  physicalReferences: string[];
+  kpiDefinitionId: string | null;
+  acceptance: string;
+  rationale: string;
+  sourceDocumentId: string;
+  sourceReference: string;
+  supersedesId: string | null;
+};
+
+type TextKey = { [K in keyof FormState]: FormState[K] extends string ? K : never }[keyof FormState];
 const cl = "mt-1 w-full min-w-0 rounded border bg-background p-2 text-sm";
 export function CountComparisons({
   caseId,
@@ -19,17 +40,17 @@ export function CountComparisons({
   rules,
 }: {
   caseId: string;
-  documents: any[];
+  documents: DocRow[];
   records: CountRecord[];
   rules: CountRule[];
 }) {
-  const blank = {
+  const blank: FormState = {
     caseId,
     name: "",
     metric: "HATCH_COVER",
     outputUnit: "",
-    ruleIds: [] as string[],
-    physicalReferences: [] as string[],
+    ruleIds: [],
+    physicalReferences: [],
     kpiDefinitionId: null,
     acceptance: "UNRESOLVED",
     rationale: "",
@@ -37,14 +58,14 @@ export function CountComparisons({
     sourceReference: "",
     supersedesId: null,
   };
-  const [form, setForm] = useState<any>(blank),
+  const [form, setForm] = useState<FormState>(blank),
     [scope, setScope] = useState(""),
-    [ctx, setCtx] = useState<{
-      comparisons: CountComparison[];
-      kpis: any[];
-      clocks: any[];
-      decisions: any[];
-    }>({ comparisons: [], kpis: [], clocks: [], decisions: [] }),
+    [ctx, setCtx] = useState<CountCtx>({
+      comparisons: [],
+      kpis: [],
+      clocks: [],
+      decisions: [],
+    }),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
   const load = useCallback(async () => {
@@ -79,7 +100,7 @@ export function CountComparisons({
       setBusy(false);
     }
   }
-  function field(key: string, label: string) {
+  function field(key: TextKey, label: string) {
     return (
       <label className="min-w-0 text-sm" key={key}>
         {label}

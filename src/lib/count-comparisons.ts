@@ -7,8 +7,10 @@ import {
   type CountRecord,
   type CountRule,
 } from "./count-ledger";
-import { evaluateKpi } from "./kpi-definitions";
-import { reconciledClockGroup } from "./operational-clocks";
+import { evaluateKpi, type KpiDefinitionLike } from "./kpi-definitions";
+import { reconciledClockGroup, type ClockDecision, type ClockRecord } from "./operational-clocks";
+
+type KpiRowLike = KpiDefinitionLike & { id: string; supersedes_id?: string | null };
 export const countComparisonInput = z
   .object({
     caseId: z.string().uuid(),
@@ -37,9 +39,9 @@ export function evaluateCountComparison(
   def: CountComparison,
   records: CountRecord[],
   allRules: CountRule[],
-  kpis: any[] = [],
-  clocks: any[] = [],
-  decisions: any[] = [],
+  kpis: KpiRowLike[] = [],
+  clocks: ClockRecord[] = [],
+  decisions: ClockDecision[] = [],
 ) {
   const rules = allRules.filter((r) => def.ruleIds.includes(r.id)),
     currentIds = new Set(latestCountVersions(allRules).map((r) => r.id));

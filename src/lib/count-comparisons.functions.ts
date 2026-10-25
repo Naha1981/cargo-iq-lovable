@@ -7,27 +7,35 @@ export const listCountComparisons = createServerFn({ method: "GET" })
   .validator(z.object({ caseId: z.string().uuid() }))
   .middleware([tenantMiddleware])
   .handler(async ({ data, context: c }) => {
-    const names = [
-      "count_comparison_definitions",
-      "kpi_definitions",
-      "operational_clocks",
-      "clock_reconciliations",
-    ] as const;
-    const res = await Promise.all(
-      names.map((n) =>
-        c.supabase
-          .from(n)
-          .select("*")
-          .eq("case_id", data.caseId)
-          .order("created_at", { ascending: true }),
-      ),
-    );
-    for (const r of res) if (r.error) throw r.error;
+    const byCreated = { ascending: true } as const;
+    const [comparisons, kpis, clocks, decisions] = await Promise.all([
+      c.supabase
+        .from("count_comparison_definitions")
+        .select("*")
+        .eq("case_id", data.caseId)
+        .order("created_at", byCreated),
+      c.supabase
+        .from("kpi_definitions")
+        .select("*")
+        .eq("case_id", data.caseId)
+        .order("created_at", byCreated),
+      c.supabase
+        .from("operational_clocks")
+        .select("*")
+        .eq("case_id", data.caseId)
+        .order("created_at", byCreated),
+      c.supabase
+        .from("clock_reconciliations")
+        .select("*")
+        .eq("case_id", data.caseId)
+        .order("created_at", byCreated),
+    ]);
+    for (const r of [comparisons, kpis, clocks, decisions]) if (r.error) throw r.error;
     return {
-      comparisons: (res[0].data ?? []).map(comparisonFromDb),
-      kpis: res[1].data ?? [],
-      clocks: res[2].data ?? [],
-      decisions: res[3].data ?? [],
+      comparisons: (comparisons.data ?? []).map(comparisonFromDb),
+      kpis: kpis.data ?? [],
+      clocks: clocks.data ?? [],
+      decisions: decisions.data ?? [],
     };
   });
 export const appendCountComparison = createServerFn({ method: "POST" })

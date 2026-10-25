@@ -7,6 +7,12 @@ import {
   appendMatchIdentityReview,
 } from "@/lib/cross-party-matches.functions";
 import { classifyMatchedClaims, matchInput, exactEventCandidates } from "@/lib/cross-party-matches";
+import type { Database } from "@/integrations/supabase/types";
+
+type DocRow = Database["public"]["Tables"]["documents"]["Row"];
+type ClaimRow = Database["public"]["Tables"]["extracted_claims"]["Row"];
+type MatchRow = Database["public"]["Tables"]["cross_party_matches"]["Row"];
+type ReviewRow = Database["public"]["Tables"]["cross_party_match_reviews"]["Row"];
 export function CrossPartyEventMatches({
   caseId,
   documents,
@@ -14,12 +20,12 @@ export function CrossPartyEventMatches({
   onChanged,
 }: {
   caseId: string;
-  documents: any[];
-  claims: any[];
+  documents: DocRow[];
+  claims: ClaimRow[];
   onChanged?: () => Promise<unknown>;
 }) {
   const router = useRouter();
-  const [reviews, setReviews] = useState<any[]>([]),
+  const [reviews, setReviews] = useState<ReviewRow[]>([]),
     [reviewMatch, setReviewMatch] = useState(""),
     [reviewStatus, setReviewStatus] = useState<"IDENTITY_RETRACTED" | "IDENTITY_REAFFIRMED">(
       "IDENTITY_RETRACTED",
@@ -27,7 +33,7 @@ export function CrossPartyEventMatches({
     [reviewDoc, setReviewDoc] = useState(""),
     [reviewRef, setReviewRef] = useState(""),
     [reviewNote, setReviewNote] = useState("");
-  const [rows, setRows] = useState<any[]>([]),
+  const [rows, setRows] = useState<MatchRow[]>([]),
     [a, setA] = useState(""),
     [b, setB] = useState(""),
     [ref, setRef] = useState(""),
@@ -60,7 +66,7 @@ export function CrossPartyEventMatches({
           [r.claim_a_id, r.claim_b_id].includes(c.a) && [r.claim_a_id, r.claim_b_id].includes(c.b),
       ),
   );
-  const doc = (id: string) => documents.find((d) => d.id === id),
+  const doc = (id: string | null | undefined) => documents.find((d) => d.id === id),
     ca = claims.find((c) => c.id === a),
     cb = claims.find((c) => c.id === b),
     sameParty =
@@ -96,7 +102,7 @@ export function CrossPartyEventMatches({
       setBusy(false);
     }
   }
-  function source(c: any) {
+  function source(c: ClaimRow) {
     return (
       <div className="rounded border p-4">
         <p className="text-xs text-muted-foreground">

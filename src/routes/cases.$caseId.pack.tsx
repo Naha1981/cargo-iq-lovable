@@ -15,6 +15,22 @@ export const Route = createFileRoute("/cases/$caseId/pack")({
   component: PackPage,
 });
 
+// Robust blob download: the anchor must be in the document (Firefox ignores
+// programmatic clicks on detached anchors) and the object URL must outlive the
+// download start (revoking synchronously after click() races and cancels the
+// download in Firefox). Revoke on a delay instead.
+export function downloadBlob(blob: Blob, filename: string, revokeDelayMs = 1000): void {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), revokeDelayMs);
+}
+
+
 function PackPage() {
   const { caseId } = Route.useParams();
   const data = CaseRoute.useLoaderData();
@@ -76,12 +92,7 @@ function PackPage() {
         const blob = new Blob([JSON.stringify(full.pack_payload, null, 2)], {
           type: "application/json",
         });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = caseId + "-evidence-pack-v" + pack.version + ".json";
-        a.click();
-        URL.revokeObjectURL(url);
+        downloadBlob(blob, caseId + "-evidence-pack-v" + pack.version + ".json");
       },
       "Could not load pack payload.",
     );
@@ -94,12 +105,7 @@ function PackPage() {
         try {
           const bytes = buildEvidencePackPdf(full);
           const blob = new Blob([bytes as unknown as BlobPart], { type: "application/pdf" });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = caseId + "-evidence-pack-v" + pack.version + ".pdf";
-          a.click();
-          URL.revokeObjectURL(url);
+          downloadBlob(blob, caseId + "-evidence-pack-v" + pack.version + ".pdf");
         } catch (err) {
           setMessage(
             err instanceof Error
@@ -129,12 +135,7 @@ function PackPage() {
           "\n\n" +
           timeline;
         const blob = new Blob([summary], { type: "text/plain;charset=utf-8" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = caseId + "-investigation-summary-v" + pack.version + ".txt";
-        a.click();
-        URL.revokeObjectURL(url);
+        downloadBlob(blob, caseId + "-investigation-summary-v" + pack.version + ".txt");
       },
       "Could not load pack payload.",
     );

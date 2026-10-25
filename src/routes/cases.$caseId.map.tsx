@@ -29,6 +29,25 @@ import {
   type ViewBox,
 } from "@/lib/harbour-map";
 import { DURBAN_COASTLINE } from "@/lib/durban-coastline";
+import { type Nature } from "@/lib/case-data";
+import type { Database } from "@/integrations/supabase/types";
+
+type TimelineEventRow = Database["public"]["Tables"]["timeline_events"]["Row"];
+type ObservationRow = Database["public"]["Tables"]["external_observations"]["Row"];
+
+// Shape of the JSON payload the adapters store on observations; only the
+// fields this page reads. Payload is Json-typed in the schema, so narrow once.
+type ObservationPayload = {
+  id?: string;
+  relativeOrbit?: number | string;
+  cloudPercent?: number;
+  waveHeight?: number;
+};
+
+function payloadOf(o: ObservationRow): ObservationPayload {
+  const p = o.payload;
+  return p !== null && typeof p === "object" && !Array.isArray(p) ? (p as ObservationPayload) : {};
+}
 
 export const Route = createFileRoute("/cases/$caseId/map")({
   head: () => ({ meta: [{ title: "Harbour Evidence Map | CargoIQ" }] }),
@@ -43,7 +62,7 @@ export const Route = createFileRoute("/cases/$caseId/map")({
  * documents route; anything else is shown as plain text, and a missing source is
  * said plainly. Never renders source text as a link itself - it is not a verified URL.
  */
-function eventSourceNode(caseId: string, e: any) {
+function eventSourceNode(caseId: string, e: TimelineEventRow) {
   if (!e.source) return "No linked source record";
   const src = String(e.source);
   if (e.provenance_id && src.startsWith("CCTV /")) {
@@ -82,17 +101,15 @@ export function MapPage() {
   const data = CaseRoute.useLoaderData();
   const router = useRouter();
 
-  const isSample = data.documents.some((document: any) => document.file_path?.startsWith("demo/"));
+  const isSample = data.documents.some((document) => document.file_path?.startsWith("demo/"));
   const track = aisTrack(data.observations);
-  const scenes = data.observations.filter((x: any) =>
-    String(x.observation_type).includes("SENTINEL"),
-  );
-  const marine = data.observations.filter((x: any) => x.observation_type === "MARINE_WEATHER");
+  const scenes = data.observations.filter((x) => String(x.observation_type).includes("SENTINEL"));
+  const marine = data.observations.filter((x) => x.observation_type === "MARINE_WEATHER");
 
   const times = [
     ...track.map((x) => Date.parse(x.at)),
-    ...scenes.map((x: any) => Date.parse(String(x.observed_at))),
-    ...data.timeline.map((x: any) => Date.parse(x.timestamp)),
+    ...scenes.map((x) => Date.parse(String(x.observed_at))),
+    ...data.timeline.map((x) => Date.parse(x.timestamp)),
   ].filter(Number.isFinite);
 
   const hasTemporalEvidence = times.length > 0;
@@ -121,8 +138,8 @@ export function MapPage() {
     | { kind: "vessel" }
     | { kind: "position"; p: TrackPoint }
     | { kind: "terminal"; name: string; covers: string }
-    | { kind: "sar" | "optical"; scene: any }
-    | { kind: "weather"; w: any };
+    | { kind: "sar" | "optical"; scene: ObservationRow }
+    | { kind: "weather"; w: ObservationRow };
   const [preview, setPreview] = useState<Preview | null>(null);
   const [pinned, setPinned] = useState(false);
   const showPreview = (next: Preview) => {
@@ -259,9 +276,9 @@ export function MapPage() {
   }
 
   const nearby = data.timeline
-    .filter((e: any) => Math.abs(Date.parse(e.timestamp) - time) <= 24 * 3600000)
+    .filter((e) => Math.abs(Date.parse(e.timestamp) - time) <= 24 * 3600000)
     .slice(0, 10);
-  const flagged = data.contradictions.filter((x: any) => x.status === "FLAGGED").slice(0, 6);
+  const flagged = data.contradictions.filter((x) => x.status === "FLAGGED").slice(0, 6);
   const disputed = disputedClaimIds(data.contradictions);
   const dWindow = disputedWindow(data.claims, disputed);
   const inDisputedWindow = !!dWindow && time >= dWindow.start - 1 && time <= dWindow.end + 1;
@@ -286,7 +303,7 @@ export function MapPage() {
   function guideDispute() {
     if (dWindow) setTime(dWindow.start);
     const flaggedScene = scenes.find(
-      (sc: any) =>
+      (sc) =>
         dWindow && Math.abs(Date.parse(String(sc.observed_at)) - dWindow.start) <= 48 * 3600000,
     );
     if (flaggedScene)
@@ -460,11 +477,11 @@ export function MapPage() {
             ? "Radar image of the boxed harbour area — sees through cloud"
             : "Photo of the boxed harbour area",
         ],
-        ["Orbit", String(sc.payload?.relativeOrbit ?? "Not recorded")],
+        ["Orbit", String(payloadOf(sc).relativeOrbit ?? "Not recorded")],
       ];
       if (preview.kind === "optical")
-        rows.push(["Cloud cover", Math.round(Number(sc.payload?.cloudPercent ?? 0)) + "%"]);
-      rows.push(["Scene ID", String(sc.payload?.id ?? sc.id)]);
+        rows.push(["Cloud cover", Math.round(Number(payloadOf(sc).cloudPercent ?? 0)) + "%"]);
+      rows.push(["Scene ID", String(payloadOf(sc).id ?? sc.id)]);
       if (Number.isFinite(t))
         dispute = {
           on: inWindowAt(t),
@@ -476,7 +493,7 @@ export function MapPage() {
       const t = Date.parse(String(preview.w.observed_at));
       title = "Sea state";
       rows = [
-        ["Wave height", Number(preview.w.payload?.waveHeight ?? 0).toFixed(1) + " m"],
+        ["Wave height", Number(payloadOf(preview.w).waveHeight ?? 0).toFixed(1) + " m"],
         ["Time", Number.isFinite(t) ? fmt(t) : "Not recorded"],
         ["Source", "Marine weather reading"],
       ];
@@ -1149,7 +1166,7 @@ export function MapPage() {
             </div>
             {eventsOpen && (
               <ul className="mt-2 max-h-44 space-y-2 overflow-y-auto pr-1 md:max-h-[clamp(64px,calc(100vh-640px),34vh)]">
-                {nearby.map((e: any) => (
+                {nearby.map((e) => (
                   <li
                     key={e.id}
                     className="border-t border-white/10 pt-1.5 first:border-t-0 first:pt-0"
@@ -1177,7 +1194,7 @@ export function MapPage() {
                         {isDisputeEvent(e, disputed) && <DisputeBadge />}
                         {(String(e.nature).toLowerCase() !== "disputed" ||
                           !isDisputeEvent(e, disputed)) && (
-                          <NatureBadge n={String(e.nature).toLowerCase() as any} />
+                          <NatureBadge n={String(e.nature).toLowerCase() as Nature} />
                         )}
                       </span>
                     </div>
@@ -1292,15 +1309,15 @@ export function MapPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         <Panel title="Satellite coverage">
           <ul className="space-y-3">
-            {scenes.slice(0, 8).map((s: any) => (
+            {scenes.slice(0, 8).map((s) => (
               <li key={s.id} className="rounded border p-3">
                 <div className="flex justify-between font-mono text-[10px] text-observed">
                   <span>{s.observation_type}</span>
                   <span>{s.observed_at ? new Date(s.observed_at).toISOString() : "—"}</span>
                 </div>
                 <div className="mt-1 text-xs text-muted-foreground">
-                  {s.payload?.id ?? s.id} · orbit {s.payload?.relativeOrbit ?? "—"} · cloud{" "}
-                  {s.payload?.cloudPercent ?? "n/a"}
+                  {payloadOf(s).id ?? s.id} · orbit {payloadOf(s).relativeOrbit ?? "—"} · cloud{" "}
+                  {payloadOf(s).cloudPercent ?? "n/a"}
                 </div>
               </li>
             ))}
@@ -1313,7 +1330,7 @@ export function MapPage() {
         </Panel>
 
         <Panel title="Discrepancy callouts">
-          {flagged.map((c: any) => (
+          {flagged.map((c) => (
             <div
               key={c.id}
               className="mb-3 rounded border border-disputed/40 bg-disputed/5 p-3 text-sm"

@@ -402,6 +402,30 @@ export function enabledFreeFallbacks(freeDataClass?: string) {
   return providers;
 }
 
+// Per-workspace daily cap on FREE provider ATTEMPTS (migration 20261024221000). Bounds actual
+// outbound requests, not documents and not successful extractions; a slot is never refunded on
+// failure. Default 10 attempts/day/workspace; set-but-invalid config fails closed (0 = off).
+export function freeWorkspaceDailyAttemptCap(): number {
+  const raw = process.env.CLAIM_FREE_WORKSPACE_DAILY_ATTEMPTS;
+  if (raw === undefined || raw.trim() === "") return 10;
+  const n = Number.parseInt(raw, 10);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+// Fail CLOSED on any enforcement gap: if the cap RPC is missing (migration not applied) or the
+// check errors, no outbound free request is made. Free AI is simply OFF until enforcement is
+// verifiably active - the cap is never represented as active when it is not.
+type FreeSlot = "reserved" | "over_cap" | "no_cap_configured" | "rpc_missing" | "check_failed";
+async function reserveFreeAttempt(supabase: any, tenantId: string): Promise<FreeSlot> {
+  try {
+    const { data, error } = await supabase.rpc("reserve_free_extraction_attempt", { p_tenant_id: tenantId, p_daily_cap: freeWorkspaceDailyAttemptCap() });
+    if (error) return (error.code === "PGRST202" || error.code === "42883") ? "rpc_missing" : "check_failed";
+    return (data as FreeSlot) ?? "check_failed";
+  } catch { return "check_failed"; }
+}
+// Gate invoked immediately before EVERY actual outbound free-provider request. Throws when no
+// request may be made (cap exhausted, cap unconfigured, or enforcement unavailable).
+export type FreeAttemptGate = () => Promise<void>;
+
 // Free Gemini test path. Model is configurable and defaults to Google's own "latest" alias for the
 // flash-lite tier, so a retired dated model name cannot silently break extraction.
 export const GEMINI_TEST_MODEL_DEFAULT = "gemini-flash-lite-latest";
@@ -428,11 +452,12 @@ const GEMINI_RESPONSE_SCHEMA = { type: "OBJECT", required: ["claims"], propertie
     evidence_class: { type: "STRING", enum: ["CUSTOMER_PRIMARY", "CONTRACTUAL", "OFFICIAL_PUBLIC"] },
     nature: { type: "STRING", enum: ["OBSERVED", "REPORTED", "DERIVED", "INFERRED"] },
     confidence: { type: "NUMBER" }, timestamp_claimed: { type: "STRING" }, event_reference: { type: "STRING" } } } } } };
-async function geminiCall(parts: any[], attempt = 0): Promise<ClaimDraft[]> {
-  try { return await geminiCallOnce(parts); }
-  catch (e) { if (attempt < 1 && e instanceof SyntaxError) return geminiCall(parts, attempt + 1); throw e; }
+async function geminiCall(parts: any[], attempt = 0, onAttempt?: FreeAttemptGate): Promise<ClaimDraft[]> {
+  try { return await geminiCallOnce(parts, onAttempt); }
+  catch (e) { if (attempt < 1 && e instanceof SyntaxError) return geminiCall(parts, attempt + 1, onAttempt); throw e; }
 }
-async function geminiCallOnce(parts: any[]) {
+async function geminiCallOnce(parts: any[], onAttempt?: FreeAttemptGate) {
+  await onAttempt?.();
   const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + geminiTestModel() + ":generateContent", {
     method: "POST", signal: AbortSignal.timeout(60000), headers: { "Content-Type": "application/json", "x-goog-api-key": process.env.GEMINI_API_KEY! },
     body: JSON.stringify({ contents: [{ role: "user", parts }], generationConfig: { temperature: 0, maxOutputTokens: 8192, responseMimeType: "application/json", responseSchema: GEMINI_RESPONSE_SCHEMA } }),
@@ -460,19 +485,19 @@ export function missingContainerIds(pages: string[], claims: { claim_text: strin
   }));
   return [...found].filter(([id]) => !haystack.includes(id)).map(([id, v]) => ({ id, ...v }));
 }
-async function extractViaGeminiTest(bytes: ArrayBuffer, mimeType: string, filename: string, plain: boolean, warnings: string[] = []): Promise<ClaimDraft[]> {
+async function extractViaGeminiTest(bytes: ArrayBuffer, mimeType: string, filename: string, plain: boolean, warnings: string[] = [], onAttempt?: FreeAttemptGate): Promise<ClaimDraft[]> {
   const head = claimPrompt(filename) + "\n" + GEMINI_KEYS;
-  if (plain) return geminiCall([{ text: head }, { text: "DOCUMENT (page 1):\n" + new TextDecoder().decode(bytes) }]);
+  if (plain) return geminiCall([{ text: head }, { text: "DOCUMENT (page 1):\n" + new TextDecoder().decode(bytes) }], 0, onAttempt);
   const pages = mimeType === "application/pdf" || /\.pdf$/i.test(filename) || !mimeType ? await readPdfPages(bytes).catch(() => [] as string[]) : [];
-  if (!pages.length) return geminiCall([{ text: head }, { inline_data: { mime_type: mimeType || "application/pdf", data: bytesToBase64(new Uint8Array(bytes)) } }]);
+  if (!pages.length) return geminiCall([{ text: head }, { inline_data: { mime_type: mimeType || "application/pdf", data: bytesToBase64(new Uint8Array(bytes)) } }], 0, onAttempt);
   const chunks = chunkPages(pages);
   if (chunks.length > GEMINI_MAX_CHUNKS) throw new Error("FREE_GEMINI_DOCUMENT_TOO_LONG_" + chunks.length);
   const all: ClaimDraft[] = [];
-  for (const chunk of chunks) all.push(...await geminiCall([{ text: head + "\nThis is one section of a longer document. Page numbers are given in [page N] tags." }, { text: "DOCUMENT SECTION:\n" + chunk }]));
+  for (const chunk of chunks) all.push(...await geminiCall([{ text: head + "\nThis is one section of a longer document. Page numbers are given in [page N] tags." }, { text: "DOCUMENT SECTION:\n" + chunk }], 0, onAttempt));
   const gaps = missingContainerIds(pages, all);
   if (gaps.length) {
     const lines = gaps.map((g) => "[page " + g.page + "]\n" + g.lines.join("\n")).join("\n");
-    all.push(...await geminiCall([{ text: head + "\nThese lines were skipped in a first pass. Extract every fact in them, one claim per row or statement." }, { text: "DOCUMENT LINES:\n" + lines }]));
+    all.push(...await geminiCall([{ text: head + "\nThese lines were skipped in a first pass. Extract every fact in them, one claim per row or statement." }, { text: "DOCUMENT LINES:\n" + lines }], 0, onAttempt));
     const still = missingContainerIds(pages, all);
     if (still.length) warnings.push("Container IDs in the source but not in any claim: " + still.map((g) => g.id + " (p" + g.page + ")").join(", "));
   }
@@ -497,7 +522,7 @@ export function parseDiscrepancies(text: string, claimCount: number): Discrepanc
   }
   return out;
 }
-async function findGeminiDiscrepancies(claims: ClaimDraft[]): Promise<DiscrepancyFlag[]> {
+async function findGeminiDiscrepancies(claims: ClaimDraft[], onAttempt?: FreeAttemptGate): Promise<DiscrepancyFlag[]> {
   const list = claims.map((c, i) => (i + 1) + ". [p" + (c.page_number ?? "?") + "] " + c.claim_text).join("\n").slice(0, 60000);
   const prompt = [
     "You review extracted claims from a freight or shipping dispute file.",
@@ -509,6 +534,7 @@ async function findGeminiDiscrepancies(claims: ClaimDraft[]): Promise<Discrepanc
   ].join("\n");
   // Comparing many claims needs a stronger reasoning tier than extraction. Model is configurable; the default is Google's own alias.
   const model = (process.env.CLAIM_GEMINI_TEST_REVIEW_MODEL || "gemini-flash-latest").replace(/^models\//, "");
+  await onAttempt?.();
   const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent", {
     method: "POST", signal: AbortSignal.timeout(110000), headers: { "Content-Type": "application/json", "x-goog-api-key": process.env.GEMINI_API_KEY! },
     body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { temperature: 0, maxOutputTokens: 16000, responseMimeType: "application/json" } }),
@@ -518,12 +544,13 @@ async function findGeminiDiscrepancies(claims: ClaimDraft[]): Promise<Discrepanc
   if (json.candidates?.[0]?.finishReason && json.candidates[0].finishReason !== "STOP") throw new Error("FREE_GEMINI_FINISH_" + json.candidates[0].finishReason);
   return parseDiscrepancies((json.candidates?.[0]?.content?.parts ?? []).map((p: any) => p.text ?? "").join(""), claims.length);
 }
-async function extractFreeFallback(provider: "openrouter" | "groq" | "gemini-test", bytes: ArrayBuffer, mimeType: string, filename: string, warnings: string[] = []) {
+async function extractFreeFallback(provider: "openrouter" | "groq" | "gemini-test", bytes: ArrayBuffer, mimeType: string, filename: string, warnings: string[] = [], onAttempt?: FreeAttemptGate) {
   const plain = isPlainDocument(mimeType, filename);
-  if (provider === "gemini-test") return extractViaGeminiTest(bytes, mimeType, filename, plain, warnings);
+  if (provider === "gemini-test") return extractViaGeminiTest(bytes, mimeType, filename, plain, warnings, onAttempt);
   const text = plain ? new TextDecoder().decode(bytes) : (await readPdfLines(bytes)).map(line => `[page ${line.page_number}] ${line.text}`).join("\n");
   plainTextClaims(text);
   const isRouter = provider === "openrouter";
+  await onAttempt?.();
   const res = await fetch(isRouter ? "https://openrouter.ai/api/v1/chat/completions" : "https://api.groq.com/openai/v1/chat/completions", {
     method: "POST", signal: AbortSignal.timeout(30000),
     headers: { "Content-Type": "application/json", Authorization: "Bearer " + (isRouter ? process.env.OPENROUTER_API_KEY : process.env.GROQ_API_KEY) },
@@ -674,6 +701,7 @@ export async function extractDocumentClaimsForPath(input: {
       evidence_class: inferClass(doc.name), nature: "REPORTED", confidence: 0.55 }));
   };
   let claims: ClaimDraft[] = [];
+  let freeGate: FreeAttemptGate | undefined;
   const fallbackErrors: string[] = [];
   const coverageWarnings: string[] = [];
   let reservationId: string | null = null;
@@ -718,9 +746,24 @@ export async function extractDocumentClaimsForPath(input: {
         reservationId = null;
       }
       let recovered = false;
+      // One gate per extraction run: every actual outbound free-provider request (per provider,
+      // per chunk, per retry, per review pass) consumes one daily slot BEFORE it is sent.
+      freeGate = async () => {
+        const slot = await reserveFreeAttempt(input.supabase, input.tenantId);
+        if (slot !== "reserved") throw new Error("FREE_ATTEMPT_" + slot.toUpperCase());
+      };
       for (const provider of enabledFreeFallbacks(input.freeDataClass)) {
-        try { claims = await extractFreeFallback(provider, bytes, doc.file_type, doc.name, coverageWarnings); if (claims.length) { providerUsed = provider; recovered = true; break; } }
-        catch (e) { fallbackErrors.push(provider + ": " + (e instanceof Error ? e.message : "failed").slice(0, 120)); /* bounded one attempt per enabled free provider, never paid retry */ }
+        try { claims = await extractFreeFallback(provider, bytes, doc.file_type, doc.name, coverageWarnings, freeGate); if (claims.length) { providerUsed = provider; recovered = true; break; } }
+        catch (e) {
+          const m = (e instanceof Error ? e.message : "failed");
+          // Cap/enforcement states stop ALL free providers (no more outbound attempts) with a
+          // plain reason each; local text-import recovery below is untouched.
+          if (m === "FREE_ATTEMPT_OVER_CAP") { fallbackErrors.push("free AI attempts for today are used up for this workspace - text import still works"); break; }
+          if (m === "FREE_ATTEMPT_NO_CAP_CONFIGURED") { fallbackErrors.push("free AI daily-attempt cap is not configured - free AI is off until it is"); break; }
+          if (m === "FREE_ATTEMPT_RPC_MISSING") { fallbackErrors.push("free AI is off on this environment until the daily-attempt cap update is applied - text import still works"); break; }
+          if (m === "FREE_ATTEMPT_CHECK_FAILED") { fallbackErrors.push("could not verify the free daily attempt limit - free AI skipped for this document; try again or use text import"); break; }
+          fallbackErrors.push(provider + ": " + m.slice(0, 120)); /* bounded one attempt per enabled free provider, never paid retry */
+        }
       }
       if (!recovered) {
         if (plain || pdf) {
@@ -819,7 +862,7 @@ export async function extractDocumentClaimsForPath(input: {
   }
   if (providerUsed === "gemini-test" && claims.length > 1) {
     try {
-      for (const f of await findGeminiDiscrepancies(claims)) {
+      for (const f of await findGeminiDiscrepancies(claims, freeGate)) {
         const a = claims[f.a - 1]!, b = claims[f.b - 1]!;
         await input.supabase.from("contradictions").insert({
           tenant_id: input.tenantId, case_id: input.caseId,

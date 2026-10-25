@@ -12,7 +12,8 @@ function db(blob: Blob, name: string, type: string) {
   const supabase = {
     storage: { from: () => ({ download: async () => ({ data: blob, error: null }) }) },
     rpc: async (fn: string, args: any) => {
-      // Emulates migration 20261024217000 applied: insert claims, return their ids.
+      // Emulates migrations 20261024217000 + 20261024221000 applied.
+      if (fn === "reserve_free_extraction_attempt") return { data: "reserved", error: null };
       if (fn !== "replace_pending_claims") return { data: null, error: { code: "PGRST202", message: "missing" } };
       const rows = (args._claims as any[]).map((c, i) => ({ id: "claim-" + (inserted.length + i + 1), status: "PENDING", ...c }));
       inserted.push(...rows);

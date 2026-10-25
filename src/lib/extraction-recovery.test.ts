@@ -11,7 +11,8 @@ function db(blob: Blob, name: string, type: string) {
   const supabase = {
     storage: { from: () => ({ download: async () => ({ data: blob, error: null }) }) },
     rpc: async (fn: string, args: any) => {
-      // Emulates migration 20261024217000 applied: insert claims, return their ids.
+      // Emulates migrations 20261024217000 + 20261024221000 applied.
+      if (fn === "reserve_free_extraction_attempt") return { data: "reserved", error: null };
       if (fn !== "replace_pending_claims") return { data: null, error: { code: "PGRST202", message: "missing" } };
       const rows = (args._claims as any[]).map((c, i) => ({ id: "claim-" + (inserted.length + i + 1), status: "PENDING", ...c }));
       inserted.push(...rows);
@@ -151,6 +152,39 @@ describe("bounded extraction recovery", () => {
     const result = await extractDocumentClaimsForPath({ ...base, supabase: mock.supabase });
     expect(fetch).not.toHaveBeenCalled(); // zero provider calls: no gateway, no own-key, no free AI
     expect(result.providerUsed).toBe("none"); expect(result.count).toBe(2); expect(result.mode).toBe("text-fallback");
+  });
+  it("cap RPC missing (migration not applied): free AI is OFF, never fetched, text import still works", async () => {
+    clear(); process.env.LOVABLE_API_KEY = "synthetic-primary"; process.env.OPENROUTER_API_KEY = "synthetic-router"; process.env.CLAIM_OPENROUTER_FREE_FALLBACK_ENABLED = "true";
+    const fetch = vi.fn().mockResolvedValueOnce(new Response("quota", { status: 402 }));
+    vi.stubGlobal("fetch", fetch); const mock = db(new Blob(["Synthetic line"]), "test.txt", "text/plain");
+    // Default mock returns PGRST202 for reserve_free_extraction_attempt when unstubbed below.
+    mock.supabase.rpc = async (fn: string) => fn === "reserve_free_extraction_attempt" ? { data: null, error: { code: "PGRST202", message: "missing" } } : { data: [], error: null };
+    const result = await extractDocumentClaimsForPath({ ...base, supabase: mock.supabase, freeDataClass: "public_synthetic" });
+    expect(fetch).toHaveBeenCalledTimes(1); // the failed paid call only; no free request went out
+    expect(result.providerUsed).toBe("none"); expect(result.mode).toBe("text-fallback");
+    expect((result as any).fallbackErrors?.some((e: string) => e.includes("daily-attempt cap update is applied"))).toBe(true);
+  });
+  it("over-cap: no free request goes out, message says attempts used up and text import works", async () => {
+    clear(); process.env.LOVABLE_API_KEY = "synthetic-primary"; process.env.OPENROUTER_API_KEY = "synthetic-router"; process.env.CLAIM_OPENROUTER_FREE_FALLBACK_ENABLED = "true";
+    const fetch = vi.fn().mockResolvedValueOnce(new Response("quota", { status: 402 }));
+    vi.stubGlobal("fetch", fetch); const mock = db(new Blob(["Synthetic line"]), "test.txt", "text/plain");
+    const realRpc = mock.supabase.rpc;
+    mock.supabase.rpc = async (fn: string, args: any) => fn === "reserve_free_extraction_attempt" ? { data: "over_cap", error: null } : realRpc(fn, args);
+    const result = await extractDocumentClaimsForPath({ ...base, supabase: mock.supabase, freeDataClass: "public_synthetic" });
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(result.providerUsed).toBe("none"); expect(result.mode).toBe("text-fallback");
+    expect((result as any).fallbackErrors?.some((e: string) => e.includes("attempts for today are used up") && e.includes("text import still works"))).toBe(true);
+  });
+  it("transient cap-check failure: free AI skipped with a try-again message, no outbound free request", async () => {
+    clear(); process.env.LOVABLE_API_KEY = "synthetic-primary"; process.env.OPENROUTER_API_KEY = "synthetic-router"; process.env.CLAIM_OPENROUTER_FREE_FALLBACK_ENABLED = "true";
+    const fetch = vi.fn().mockResolvedValueOnce(new Response("quota", { status: 402 }));
+    vi.stubGlobal("fetch", fetch); const mock = db(new Blob(["Synthetic line"]), "test.txt", "text/plain");
+    const realRpc = mock.supabase.rpc;
+    mock.supabase.rpc = async (fn: string, args: any) => { if (fn === "reserve_free_extraction_attempt") throw new Error("connection reset"); return realRpc(fn, args); };
+    const result = await extractDocumentClaimsForPath({ ...base, supabase: mock.supabase, freeDataClass: "public_synthetic" });
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(result.providerUsed).toBe("none"); expect(result.mode).toBe("text-fallback");
+    expect((result as any).fallbackErrors?.some((e: string) => e.includes("could not verify the free daily attempt limit"))).toBe(true);
   });
   it("free providers are disabled by default and require the explicit public/synthetic classification", () => {
     clear(); process.env.GEMINI_API_KEY = "synthetic-key";

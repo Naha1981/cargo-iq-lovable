@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button, Panel } from "@/components/ui-kit";
 import {
   createInvitation,
+  INVITES_NOT_INSTALLED,
   listInvitations,
   revokeInvitation,
   type Invitation,
@@ -13,20 +14,27 @@ export function TeamPanel() {
   const [role, setRole] = useState<"investigator" | "viewer" | "admin">("investigator");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [setupPending, setSetupPending] = useState(false);
   const [newLink, setNewLink] = useState("");
   const [copied, setCopied] = useState(false);
 
-  async function refresh() {
+  const refresh = useCallback(async () => {
     try {
       setInvitations(await listInvitations());
       setError("");
+      setSetupPending(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load invitations.");
+      if (err instanceof Error && err.message === INVITES_NOT_INSTALLED) {
+        setSetupPending(true);
+        setError("");
+      } else {
+        setError(err instanceof Error ? err.message : "Could not load invitations.");
+      }
     }
-  }
+  }, []);
   useEffect(() => {
     void refresh();
-  }, []);
+  }, [refresh]);
 
   async function invite(event: React.FormEvent) {
     event.preventDefault();
@@ -39,7 +47,8 @@ export function TeamPanel() {
       setEmail("");
       await refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not create the invitation.");
+      if (err instanceof Error && err.message === INVITES_NOT_INSTALLED) setSetupPending(true);
+      else setError(err instanceof Error ? err.message : "Could not create the invitation.");
     } finally {
       setBusy(false);
     }
@@ -82,6 +91,7 @@ export function TeamPanel() {
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            disabled={setupPending}
             className="mt-1 w-full rounded-md border bg-background px-3 py-2"
             placeholder="colleague@company.co.za"
           />
@@ -91,6 +101,7 @@ export function TeamPanel() {
           <select
             value={role}
             onChange={(e) => setRole(e.target.value as typeof role)}
+            disabled={setupPending}
             className="mt-1 w-full rounded-md border bg-background px-3 py-2"
           >
             <option value="investigator">Investigator</option>
@@ -98,7 +109,7 @@ export function TeamPanel() {
             <option value="admin">Admin</option>
           </select>
         </label>
-        <Button type="submit" disabled={busy}>
+        <Button type="submit" disabled={busy || setupPending}>
           {busy ? "Working…" : "Create invite link"}
         </Button>
       </form>
@@ -111,6 +122,12 @@ export function TeamPanel() {
               {copied ? "Copied" : "Copy"}
             </Button>
           </div>
+        </div>
+      )}
+      {setupPending && (
+        <div className="mt-3 rounded border border-primary/40 bg-primary/10 p-3 text-sm">
+          Team invites are being set up for this workspace. Inviting switches on automatically when
+          setup is complete.
         </div>
       )}
       {error && (

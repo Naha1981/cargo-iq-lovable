@@ -1,5 +1,7 @@
 import { createMiddleware, createServerFn } from "@tanstack/react-start";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
+import type { Database } from "@/integrations/supabase/types";
 import { getAuthed } from "@/lib/supabase/server";
 import { freeWorkspaceDailyAttemptCap } from "@/lib/extraction.functions";
 
@@ -8,7 +10,7 @@ import { freeWorkspaceDailyAttemptCap } from "@/lib/extraction.functions";
 const authedOnly = createMiddleware({ type: "function" }).server(async ({ next }) => {
   const { supabase, user } = await getAuthed();
   if (!user) throw new Error("Not found.");
-  return next({ context: { supabase: supabase as any, user } });
+  return next({ context: { supabase: supabase as SupabaseClient<Database>, user } });
 });
 
 // Owner-only platform administration (request 25 Oct: "super admin panel for me alone").
@@ -73,10 +75,12 @@ const PAGE = 100;
 export const getPlatformAdminOverview = createServerFn({ method: "GET" })
   .validator(z.object({}).strict())
   .middleware([authedOnly])
-  .handler(async ({ context }: any) => {
+  .handler(async ({ context }) => {
     const supabase = context?.supabase;
     if (!supabase) throw opaque();
-    const call = async (fn: string) => {
+    const call = async (
+      fn: "admin_list_tenants" | "admin_list_users" | "admin_list_cases" | "admin_list_disputes",
+    ) => {
       const { data, error } = await supabase.rpc(fn, { p_limit: PAGE });
       if (error) throw opaque();
       return data;
@@ -103,10 +107,16 @@ export const getPlatformAdminMore = createServerFn({ method: "GET" })
       .strict(),
   )
   .middleware([authedOnly])
-  .handler(async ({ context, data }: any) => {
+  .handler(async ({ context, data }) => {
     const supabase = context?.supabase;
     if (!supabase) throw opaque();
-    const { data: page, error } = await supabase.rpc("admin_list_" + data.section, {
+    const fns = {
+      tenants: "admin_list_tenants",
+      users: "admin_list_users",
+      cases: "admin_list_cases",
+      disputes: "admin_list_disputes",
+    } as const;
+    const { data: page, error } = await supabase.rpc(fns[data.section], {
       p_limit: PAGE,
       p_cursor: data.cursor,
     });
@@ -117,7 +127,7 @@ export const getPlatformAdminMore = createServerFn({ method: "GET" })
 export const getPlatformAdminDispute = createServerFn({ method: "GET" })
   .validator(z.object({ id: z.string().uuid() }).strict())
   .middleware([authedOnly])
-  .handler(async ({ context, data }: any) => {
+  .handler(async ({ context, data }) => {
     const supabase = context?.supabase;
     if (!supabase) throw opaque();
     const { data: row, error } = await supabase.rpc("admin_get_dispute", { p_id: data.id });
@@ -142,7 +152,7 @@ export type AdminTenantCaps = { rows: AdminTenantCap[]; total: number; default_c
 export const getPlatformAdminTenantCaps = createServerFn({ method: "GET" })
   .validator(z.object({}).strict())
   .middleware([authedOnly])
-  .handler(async ({ context }: any) => {
+  .handler(async ({ context }) => {
     const supabase = context?.supabase;
     if (!supabase) throw opaque();
     const { data, error } = await supabase.rpc("admin_list_tenant_free_caps");
@@ -163,7 +173,7 @@ export const setPlatformAdminTenantCap = createServerFn({ method: "POST" })
       .strict(),
   )
   .middleware([authedOnly])
-  .handler(async ({ context, data }: any) => {
+  .handler(async ({ context, data }) => {
     const supabase = context?.supabase;
     if (!supabase) throw opaque();
     const { error } = await supabase.rpc("admin_set_tenant_free_cap", {

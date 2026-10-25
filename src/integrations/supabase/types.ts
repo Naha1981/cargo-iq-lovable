@@ -1862,6 +1862,38 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      admin_get_dispute: {
+        Args: { p_id: string };
+        Returns: Json;
+      };
+      admin_list_cases: {
+        Args: { p_limit?: number; p_cursor?: string };
+        Returns: Json;
+      };
+      admin_list_disputes: {
+        Args: { p_limit?: number; p_cursor?: string };
+        Returns: Json;
+      };
+      admin_list_tenant_free_caps: {
+        Args: Record<string, never>;
+        Returns: Json;
+      };
+      admin_list_tenants: {
+        Args: { p_limit?: number; p_cursor?: string };
+        Returns: Json;
+      };
+      admin_list_users: {
+        Args: { p_limit?: number; p_cursor?: string };
+        Returns: Json;
+      };
+      admin_set_tenant_free_cap: {
+        Args: { p_tenant_id: string; p_daily_attempts: number | null };
+        Returns: Json;
+      };
+      reserve_free_extraction_attempt: {
+        Args: { p_tenant_id: string; p_daily_cap: number };
+        Returns: string;
+      };
       cases_with_unresolved_operational_clocks: {
         Args: { _case_ids: string[] };
         Returns: string[];

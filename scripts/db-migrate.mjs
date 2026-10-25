@@ -55,7 +55,13 @@ psql(["-c", "select 1"]); // fail fast on bad connection
 psql(["-c", "set client_min_messages=warning"]);
 psql([
   "-c",
-  "create table if not exists public.schema_migrations(filename text primary key, sha256 text not null, applied_at timestamptz not null default now())",
+  "create table if not exists public.schema_migrations(filename text primary key, sha256 text not null, applied_at timestamptz not null default now()); " +
+    // Internal runner ledger: never API-visible. Platform default privileges would
+    // otherwise grant full read/write to anon/authenticated via PostgREST (verified
+    // live on staging: anonymous API read + write surface). Owner is not subject to
+    // RLS without FORCE, so the runner keeps working.
+    "revoke all on table public.schema_migrations from anon, authenticated, service_role; " +
+    "alter table public.schema_migrations enable row level security",
 ]);
 
 const rows = psql([

@@ -702,8 +702,10 @@ export async function extractDocumentClaimsForPath(input: {
   let providerUsed = input.noAi ? "none" : resolveClaimAiProvider().kind as string;
   const importLines = async (): Promise<ClaimDraft[]> => {
     const rows = pdf ? await readPdfLines(bytes) : plainTextClaims(await blob.text()).map(text => ({ page_number: 1, text }));
+    // Raw imported lines carry NO assessed confidence: a fixed number would be invented
+    // precision. The pack lists them separately as source material, never as claims.
     return rows.map(line => ({ page_number: line.page_number, claim_text: line.text, claim_type: "TEXT_RECORD", normalized_value: line.text,
-      evidence_class: inferClass(doc.name), nature: "REPORTED", confidence: 0.55 }));
+      evidence_class: inferClass(doc.name), nature: "REPORTED" as const }));
   };
   let claims: ClaimDraft[] = [];
   let freeGate: FreeAttemptGate | undefined;

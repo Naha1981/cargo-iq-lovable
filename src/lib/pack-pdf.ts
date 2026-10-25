@@ -122,7 +122,8 @@ export function buildEvidencePackPdf(pack: any): Uint8Array {
   const d = new Doc();
 
   d.text("CargoIQ", { size: 10, bold: true, gray: 0.4 });
-  d.text("Evidence Pack - Dispute Submission", { size: 20, bold: true });
+  // The title must never present an unapproved pack as a submission document.
+  d.text(pack.status === "APPROVED" ? "Evidence Pack - Dispute Submission" : "Evidence Pack - DRAFT - not approved for submission", { size: 20, bold: true });
   d.text("Case " + (c.reference_no ?? "n/a") + "  |  Pack v" + pack.version + "  |  Status: " + pack.status, { size: 10, gray: 0.3 });
   d.gap(6);
 
@@ -156,10 +157,16 @@ export function buildEvidencePackPdf(pack: any): Uint8Array {
     d.text(evBody, { indent: 14 });
   }
 
-  const verified = claims.filter((x) => x.status === "VERIFIED");
-  d.heading("4. Claims with sources (" + verified.length + " verified of " + claims.length + ")");
-  if (!claims.length) d.text("No claims recorded.", { indent: 4 });
-  shown.forEach((x, i) => {
+  // Raw imported lines (text/PDF import, claim_type TEXT_RECORD) are preserved as source
+  // material but are NOT claims: they are listed in their own section so a document header
+  // is never presented as a substantive claim, and no confidence is shown for them.
+  const isRawImport = (x: any) => x.claim_type === "TEXT_RECORD";
+  const substantive = shown.filter((x) => !isRawImport(x));
+  const rawLines = shown.filter(isRawImport);
+  const verified = substantive.filter((x) => x.status === "VERIFIED");
+  d.heading("4. Claims with sources (" + verified.length + " verified of " + substantive.length + ")");
+  if (!substantive.length) d.text("No claims recorded.", { indent: 4 });
+  substantive.forEach((x, i) => {
     const claimLine = (i + 1) + ". [" + String(x.status ?? "").toUpperCase() + " / " + String(x.nature ?? "").toUpperCase() + "] " + x.claim_text;
     const src = (docName.get(x.document_id) ?? "unknown document") + (x.page_number ? ", page " + x.page_number : "");
     const srcLine = "Source: " + src + (x.timestamp_claimed ? "  |  Claimed time: " + stamp(x.timestamp_claimed) : "") +
@@ -169,6 +176,18 @@ export function buildEvidencePackPdf(pack: any): Uint8Array {
     d.text(claimLine, { indent: 4 });
     d.text(srcLine, { indent: 14, size: 8, gray: 0.35 });
   });
+
+  if (rawLines.length) {
+    d.heading("4a. Imported text lines (" + rawLines.length + ") - raw source material, not claims");
+    d.text("These lines were imported verbatim from the named documents. They are preserved so nothing in the source is dropped, but they are not claims: no confidence is assessed for them and they are not counted above.", { indent: 4, size: 8.5, gray: 0.2 });
+    rawLines.forEach((x, i) => {
+      const line = (i + 1) + ". [" + String(x.status ?? "").toUpperCase() + "] " + x.claim_text;
+      const src = "Source: " + (docName.get(x.document_id) ?? "unknown document") + (x.page_number ? ", page " + x.page_number : "");
+      d.reserve(d.height(line, { indent: 4 }) + d.height(src, { indent: 14, size: 8 }));
+      d.text(line, { indent: 4 });
+      d.text(src, { indent: 14, size: 8, gray: 0.35 });
+    });
+  }
 
   const contr: any[] = p.contradictions ?? [];
   d.heading("5. Contradictions and resolutions (" + contr.length + ")");

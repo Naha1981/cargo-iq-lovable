@@ -31,6 +31,39 @@ describe("evidence pack pdf", () => {
   });
 });
 
+describe("status-aware title and raw imported lines", () => {
+  it("titles a DRAFT pack as not approved for submission, never as a dispute submission", () => {
+    const out = Buffer.from(buildEvidencePackPdf(pack)).toString("latin1");
+    expect(out).toContain("Evidence Pack - DRAFT - not approved for");
+    expect(out).not.toContain("Evidence Pack - Dispute Submission");
+  });
+  it("titles only an APPROVED pack as a dispute submission", () => {
+    const out = Buffer.from(buildEvidencePackPdf({ ...pack, status: "APPROVED", approved_by: "user-123" })).toString("latin1");
+    expect(out).toContain("Evidence Pack - Dispute Submission");
+    expect(out).not.toContain("not approved for submission");
+  });
+  it("preserves raw imported lines outside the claims count and without confidence", () => {
+    const withRaw = {
+      ...pack,
+      pack_payload: {
+        ...pack.pack_payload,
+        claims: [
+          ...pack.pack_payload.claims,
+          { id: "r1", document_id: "d1", page_number: 1, claim_text: "INVOICE HEADER FURNITURE LINE", status: "PENDING", nature: "REPORTED", claim_type: "TEXT_RECORD" },
+        ],
+      },
+    };
+    const out = Buffer.from(buildEvidencePackPdf(withRaw)).toString("latin1");
+    // substantive count unaffected by the raw line (1 verified of 1, not of 2)
+    expect(out).toContain("1 VERIFIED OF 1");
+    // raw line preserved in its own section, not dropped
+    expect(out).toContain("IMPORTED TEXT LINES");
+    expect(out).toContain("INVOICE HEADER FURNITURE LINE");
+    // no confidence rendered for the raw line (only the substantive claim's 90% appears)
+    expect(out).not.toContain("Confidence: 55%");
+  });
+});
+
 describe("map snapshots in the pack pdf", () => {
   it("lists sealed snapshots with source, dispute status and limits", () => {
     const withSnap = {

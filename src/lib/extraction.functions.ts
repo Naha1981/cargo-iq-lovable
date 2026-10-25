@@ -402,9 +402,12 @@ export function enabledFreeFallbacks(freeDataClass?: string) {
   return providers;
 }
 
-// Per-workspace daily cap on FREE provider ATTEMPTS (migration 20261024221000). Bounds actual
-// outbound requests, not documents and not successful extractions; a slot is never refunded on
-// failure. Default 10 attempts/day/workspace; set-but-invalid config fails closed (0 = off).
+// Per-workspace daily cap on FREE provider ATTEMPTS (migrations 20261024221000 and
+// 20261025200000). Bounds actual outbound requests, not documents and not successful
+// extractions; a slot is never refunded on failure. This env value is the DEFAULT
+// (10 attempts/day/workspace); set-but-invalid config fails closed (0 = off). A
+// per-workspace owner override, set from the owner panel without a deploy, wins over
+// this default when one exists (resolution happens inside the reserve RPC).
 export function freeWorkspaceDailyAttemptCap(): number {
   const raw = process.env.CLAIM_FREE_WORKSPACE_DAILY_ATTEMPTS;
   if (raw === undefined || raw.trim() === "") return 10;

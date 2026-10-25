@@ -1,8 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { getPlatformAdminMore, getPlatformAdminOverview } from "@/lib/admin.functions";
-import type { AdminOverview, AdminPage } from "@/lib/admin.functions";
+import { getPlatformAdminMore, getPlatformAdminOverview, getPlatformAdminTenantCaps, setPlatformAdminTenantCap } from "@/lib/admin.functions";
+import type { AdminOverview, AdminPage, AdminTenantCaps } from "@/lib/admin.functions";
 
 // Owner-only platform overview. Authorization is enforced in the database functions;
 // any failure renders the same plain not-found state as a missing route. Lists are
@@ -21,6 +21,12 @@ function AdminPage() {
   });
   const [extra, setExtra] = useState<Partial<Record<Section, AdminPage<any>[]>>>({});
   const [loadingMore, setLoadingMore] = useState<Section | null>(null);
+  const caps = useQuery({
+    queryKey: ["platform-admin-tenant-caps"],
+    queryFn: () => getPlatformAdminTenantCaps({ data: {} }),
+    retry: false,
+    staleTime: 30_000,
+  });
 
   if (isLoading) return <main className="mx-auto max-w-3xl px-6 py-16 text-muted-foreground">Loading…</main>;
   if (isError || !data) return <main className="mx-auto max-w-3xl px-6 py-16"><h1 className="text-xl font-semibold">Page not found</h1><p className="mt-2 text-sm text-muted-foreground">The page you're looking for doesn't exist or has been moved.</p></main>;
@@ -32,14 +38,19 @@ function AdminPage() {
       setExtra((e) => ({ ...e, [section]: [...(e[section] ?? []), page] }));
     } finally { setLoadingMore(null); }
   };
-  return <AdminOverviewView data={data} extra={extra} loadingMore={loadingMore} onLoadMore={loadMore} />;
+  return (
+    <>
+      <AdminOverviewView data={data} extra={extra} loadingMore={loadingMore} onLoadMore={loadMore} caps={caps.data ?? null} />
+    </>
+  );
 }
 
-export function AdminOverviewView({ data, extra = {}, loadingMore = null, onLoadMore }: {
+export function AdminOverviewView({ data, extra = {}, loadingMore = null, onLoadMore, caps = null }: {
   data: AdminOverview;
   extra?: Partial<Record<Section, AdminPage<any>[]>>;
   loadingMore?: Section | null;
   onLoadMore?: (section: Section, cursor: string) => void;
+  caps?: AdminTenantCaps | null;
 }) {
   const pages = <T,>(section: Section, first: AdminPage<T>) => [first, ...((extra[section] ?? []) as AdminPage<T>[])];
   const rows = <T,>(section: Section, first: AdminPage<T>): T[] => pages(section, first).flatMap((p) => p.rows);
@@ -129,6 +140,74 @@ export function AdminOverviewView({ data, extra = {}, loadingMore = null, onLoad
         </ul>
         {moreButton("disputes", data.disputes)}
       </section>
+
+      {caps && (
+        <section className="mt-8">
+          <h2 className="text-base font-medium">Free AI extraction - daily attempt limits ({caps.rows.length} of {caps.total})</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Bounds how many free-provider extraction attempts each business can make per day (provider day, Pacific midnight).
+            A business without its own limit uses the default of {caps.default_cap > 0 ? caps.default_cap : "off (no default configured)"}. Changes apply immediately; no deploy needed.
+          </p>
+          <ul className="mt-3 divide-y divide-border rounded-xl border border-border">
+            {caps.rows.map((t) => <TenantCapRow key={t.tenant_id} row={t} defaultCap={caps.default_cap} />)}
+          </ul>
+        </section>
+      )}
     </main>
+  );
+}
+
+function TenantCapRow({ row, defaultCap }: { row: AdminTenantCaps["rows"][number]; defaultCap: number }) {
+  const queryClient = useQueryClient();
+  const [value, setValue] = useState(row.override === null ? "" : String(row.override));
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const effective = row.override ?? defaultCap;
+
+  const save = async (dailyAttempts: number | null) => {
+    setSaving(true);
+    setError(null);
+    try {
+      await setPlatformAdminTenantCap({ data: { tenantId: row.tenant_id, dailyAttempts } });
+      await queryClient.invalidateQueries({ queryKey: ["platform-admin-tenant-caps"] });
+    } catch {
+      setError("Could not save. Try again.");
+    } finally { setSaving(false); }
+  };
+
+  return (
+    <li className="px-4 py-3 min-h-11">
+      <div className="flex items-center justify-between gap-4">
+        <span className="text-sm font-medium">{row.name}</span>
+        <span className="shrink-0 text-xs text-muted-foreground">
+          {row.attempts_today} used today · limit {effective > 0 ? effective : "off"}{row.override === null ? " (default)" : ""}
+        </span>
+      </div>
+      <div className="mt-2 flex items-center gap-2">
+        <input
+          type="number" min={1} max={10000} value={value} placeholder={String(defaultCap)}
+          onChange={(e) => setValue(e.target.value)}
+          className="h-9 w-24 rounded-lg border border-border bg-background px-2 text-sm"
+          aria-label={"Daily attempt limit for " + row.name}
+        />
+        <button
+          onClick={() => { const n = Number.parseInt(value, 10); if (Number.isFinite(n) && n >= 1 && n <= 10000) save(n); else setError("Enter a whole number from 1 to 10000."); }}
+          disabled={saving}
+          className="min-h-9 rounded-lg bg-primary px-3 text-sm text-primary-foreground disabled:opacity-50"
+        >
+          {saving ? "Saving…" : "Save"}
+        </button>
+        {row.override !== null && (
+          <button
+            onClick={() => { setValue(""); save(null); }}
+            disabled={saving}
+            className="min-h-9 rounded-lg border border-border px-3 text-sm text-muted-foreground disabled:opacity-50"
+          >
+            Reset to default
+          </button>
+        )}
+        {error && <span className="text-xs text-destructive">{error}</span>}
+      </div>
+    </li>
   );
 }

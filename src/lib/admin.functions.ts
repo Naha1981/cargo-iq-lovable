@@ -1,6 +1,7 @@
 import { createMiddleware, createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { getAuthed } from "@/lib/supabase/server";
+import { freeWorkspaceDailyAttemptCap } from "@/lib/extraction.functions";
 
 // Deliberately NOT tenantMiddleware: the owner panel is cross-tenant and must never
 // auto-provision an organization for a caller.
@@ -70,4 +71,34 @@ export const getPlatformAdminDispute = createServerFn({ method: "GET" })
     const { data: row, error } = await supabase.rpc("admin_get_dispute", { p_id: data.id });
     if (error || !row) throw opaque();
     return row as AdminDisputeDetail;
+  });
+
+// Owner-settable per-workspace free-extraction daily caps (migration 20261025200000).
+// The override lives in the database so the owner changes it from this panel, without a
+// developer or a deploy. Effective cap = owner override when set, else the env default
+// (CLAIM_FREE_WORKSPACE_DAILY_ATTEMPTS, default 10); fail-closed semantics are unchanged
+// and live in reserve_free_extraction_attempt.
+export type AdminTenantCap = { tenant_id: string; name: string; override: number | null; attempts_today: number };
+export type AdminTenantCaps = { rows: AdminTenantCap[]; total: number; default_cap: number };
+
+export const getPlatformAdminTenantCaps = createServerFn({ method: "GET" })
+  .validator(z.object({}).strict())
+  .middleware([authedOnly])
+  .handler(async ({ context }: any) => {
+    const supabase = context?.supabase;
+    if (!supabase) throw opaque();
+    const { data, error } = await supabase.rpc("admin_list_tenant_free_caps");
+    if (error || !data) throw opaque();
+    return { ...(data as { rows: AdminTenantCap[]; total: number }), default_cap: freeWorkspaceDailyAttemptCap() } as AdminTenantCaps;
+  });
+
+export const setPlatformAdminTenantCap = createServerFn({ method: "POST" })
+  .validator(z.object({ tenantId: z.string().uuid(), dailyAttempts: z.number().int().min(1).max(10000).nullable() }).strict())
+  .middleware([authedOnly])
+  .handler(async ({ context, data }: any) => {
+    const supabase = context?.supabase;
+    if (!supabase) throw opaque();
+    const { error } = await supabase.rpc("admin_set_tenant_free_cap", { p_tenant_id: data.tenantId, p_daily_attempts: data.dailyAttempts });
+    if (error) throw opaque();
+    return { tenant_id: data.tenantId, daily_attempts: data.dailyAttempts };
   });

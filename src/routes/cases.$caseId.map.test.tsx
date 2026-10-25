@@ -46,7 +46,7 @@ function renderMap(data: any) {
 
 // Whole-component dump: fixed overlays and controls are HTML, not SVG, so the
 // shell must carry the full markup plus the real built stylesheet.
-const APP_CSS = "file:///tmp/cq-mapfix/.output/public/assets/styles-CABeGiMA.css";
+const APP_CSS = "file:///tmp/cq-mapfix/.output/public/assets/styles-yhuU95zJ.css";
 function dumpPage(container: HTMLElement, name: string) {
   const html = "<!doctype html><html><head><meta charset=\"utf-8\">"
     + "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"

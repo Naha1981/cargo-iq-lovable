@@ -324,7 +324,7 @@ export function MapPage() {
     <div className="space-y-3">
       <div className="rounded border bg-card px-3 py-2">
         <p className="text-sm">{track.length
-          ? "Recorded vessel positions for this case plotted in place and time, so the disputed period can be checked against physical evidence. Only recorded data appears: positions derived between fixes are labelled as derived, stale positions are labelled with their last recorded time, and recording gaps stay visible as gaps."
+          ? "Vessel position recordings for this case plotted in place and time, so the disputed period can be checked against physical evidence. Estimates derived between recordings are explicitly labelled as derived, stale positions carry their last recorded time, and recording gaps stay visible as gaps."
           : "No vessel positions are recorded for this case yet. Playback still moves through the case events and satellite passes in time, and the vessel marker appears once AIS positions are stored - nothing on this map shows an invented location."}</p>
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">What to look at:</span>
@@ -491,7 +491,8 @@ export function MapPage() {
             {basisLine && <div>{basisLine}</div>}
           </div>
           <div className="pointer-events-none absolute right-3 top-2 font-mono text-[10px] text-[#d2ff6b]" style={{ textShadow: "0 1px 3px #000" }}>N ↑</div>
-          <div className="pointer-events-none absolute bottom-2 right-3 font-mono text-[9px] text-[#d2ff6b]/80" style={{ textShadow: "0 1px 3px #000" }}>{attributionLine}</div>
+          <div className="pointer-events-none absolute bottom-2 right-3 hidden md:block font-mono text-[9px] text-[#d2ff6b]/80" style={{ textShadow: "0 1px 3px #000" }}>{attributionLine}</div>
+          <div className="mx-3 mb-3 mt-1 md:hidden font-mono text-[9px] leading-relaxed text-[#d2ff6b]/80">{attributionLine}</div>
           {zoom > 1 && <div className="pointer-events-none absolute bottom-2 left-3 font-mono text-[9px] text-[#d2ff6b]/80" style={{ textShadow: "0 1px 3px #000" }}>DRAG TO PAN</div>}
 
           {renderPreview()}
@@ -534,7 +535,7 @@ export function MapPage() {
             <div className="flex justify-between font-mono text-[9px] text-white/50"><span>{new Date(initialTime).toISOString().slice(0, 16)}Z</span><span>{new Date(maxTime).toISOString().slice(0, 16)}Z</span></div>
           </div>
 
-          <div className="relative mx-3 mb-3 flex flex-wrap gap-1 md:absolute md:mx-0 md:mb-0 md:right-4 md:top-8 md:max-w-[60%] md:justify-end">
+          <div className="relative mx-3 mb-3 mt-1 flex flex-wrap gap-2 pr-1 md:absolute md:mx-0 md:mb-0 md:mt-0 md:right-4 md:top-8 md:max-w-[60%] md:justify-end md:gap-1 md:pr-0">
             <button aria-label="Zoom in" onClick={() => setZoom((z) => clampZoom(z * 1.5))} className="rounded border border-[#d2ff6b]/35 bg-black/65 px-2 py-1 font-mono text-[10px] uppercase text-[#d2ff6b]">+ Zoom in</button>
             <button aria-label="Zoom out" onClick={() => setZoom((z) => clampZoom(z / 1.5))} className="rounded border border-[#d2ff6b]/35 bg-black/65 px-2 py-1 font-mono text-[10px] uppercase text-[#d2ff6b]">- Zoom out</button>
             {zoom !== 1 && <button aria-label="Reset zoom" onClick={resetView} className="rounded border border-[#d2ff6b]/35 bg-black/65 px-2 py-1 font-mono text-[10px] uppercase text-[#d2ff6b]">Reset view</button>}

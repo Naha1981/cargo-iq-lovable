@@ -46,7 +46,7 @@ function renderMap(data: any) {
 
 // Whole-component dump: fixed overlays and controls are HTML, not SVG, so the
 // shell must carry the full markup plus the real built stylesheet.
-const APP_CSS = "file:///tmp/cq-mapfix/.output/public/assets/styles-yhuU95zJ.css";
+const APP_CSS = "file:///tmp/cq-mapfix/.output/public/assets/styles-BpaHtrmx.css";
 function dumpPage(container: HTMLElement, name: string) {
   const html = "<!doctype html><html><head><meta charset=\"utf-8\">"
     + "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
@@ -94,6 +94,8 @@ describe("Harbour map rendering - evidence truth", () => {
     expect(container.textContent).toContain("LAST RECORDED SPEED 8.0 kn · 10:00Z - NO NEWER POSITIONS"); // stale speed labelled, not implied live
     expect(container.textContent).toContain("VESSEL COURSE · LAST RECORDED 10:00Z"); // stale course carries its last-recorded time
     expect(container.textContent).toContain("VESSEL POSITION · LAST RECORDED 10:00Z"); // stale coords carry their last-recorded time
+    expect(container.textContent).toContain("Upcoming"); // 14:20 event is after 12:00 playback - not yet evidence
+    expect(container.textContent).toContain("No linked source record"); // fixture event has no source - said plainly, not fabricated
     dumpPage(container, "map-page-tracked.html");
   });
 

@@ -513,8 +513,11 @@ export function MapPage() {
             <ul className="mt-2 max-h-44 space-y-2 overflow-y-auto pr-1 md:max-h-[clamp(64px,calc(100vh-640px),34vh)]">
               {nearby.map((e: any) => (
                 <li key={e.id} className="border-t border-white/10 pt-1.5 first:border-t-0 first:pt-0">
-                  <div className="flex items-center justify-between gap-2"><span className="text-white/60">{String(e.timestamp).slice(5, 16).replace("T", " ")}Z</span><span className="flex items-center gap-1.5">{isDisputeEvent(e, disputed) && <DisputeBadge />}{(String(e.nature).toLowerCase() !== "disputed" || !isDisputeEvent(e, disputed)) && <NatureBadge n={String(e.nature).toLowerCase() as any} />}</span></div>
+                  <div className="flex items-center justify-between gap-2"><span className="text-white/60">{String(e.timestamp).slice(5, 16).replace("T", " ")}Z</span><span className="flex items-center gap-1.5">{Date.parse(String(e.timestamp)) > time
+                      ? <span className="rounded border border-amber-300/60 px-1 py-px text-[8px] uppercase tracking-wider text-amber-300" title="After the selected playback time - not yet evidence at that moment">Upcoming</span>
+                      : <span className="rounded border border-white/20 px-1 py-px text-[8px] uppercase tracking-wider text-white/50" title="At or before the selected playback time">Occurred</span>}{isDisputeEvent(e, disputed) && <DisputeBadge />}{(String(e.nature).toLowerCase() !== "disputed" || !isDisputeEvent(e, disputed)) && <NatureBadge n={String(e.nature).toLowerCase() as any} />}</span></div>
                   <div className="mt-0.5 font-sans text-[11px] leading-snug text-white/90">{e.title}</div>
+                  <div className="mt-0.5 font-sans text-[10px] text-white/50">{e.source ? "Source: " + String(e.source) : "No linked source record"}</div>
                 </li>
               ))}
               {!nearby.length && <li className="font-sans text-[11px] text-white/60">No events near the selected time.</li>}

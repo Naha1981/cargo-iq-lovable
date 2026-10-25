@@ -2,15 +2,67 @@ import { describe, expect, it } from "vitest";
 import { buildEvidencePackPdf } from "@/lib/pack-pdf";
 
 const pack = {
-  version: 2, status: "DRAFT", sha256_hash: "a".repeat(64), generated_at: "2026-10-12T10:00:00Z", approved_by: null,
+  version: 2,
+  status: "DRAFT",
+  sha256_hash: "a".repeat(64),
+  generated_at: "2026-10-12T10:00:00Z",
+  approved_by: null,
   pack_payload: {
     generatedAt: "2026-10-12T10:00:00Z",
-    case: { reference_no: "CIQ-001", vessel_name: "MSC Test", container_no: "MSKU1234567", port_code: "ZADUR", counterparty: "Carrier (Pty) Ltd" },
-    documents: [{ id: "d1", name: "Invoice.pdf", source_party: "Carrier", uploaded_at: "2026-10-01T08:00:00Z", sha256_hash: "b".repeat(64) }],
-    timeline: [{ timestamp: "2026-10-02T08:00:00Z", title: "Container released", nature: "OBSERVED", source: "Invoice.pdf" }],
-    claims: [{ id: "c1", document_id: "d1", page_number: 2, claim_text: "Released 2 Oct – “gate-out” (café)", status: "VERIFIED", nature: "REPORTED", confidence: 0.9 }],
-    contradictions: [{ title: "Gate time differs", description: "Two sources", status: "RESOLVED", resolution_note: "Terminal log wins" }],
-    financialCalculations: [{ calculation_type: "DEMURRAGE", currency: "ZAR", calculated_amount_minor: 1234500, charged_amount_minor: 1500000, variance_minor: 265500, rule_version: "v1", input_payload: { freeDays: 3, units: 2 } }],
+    case: {
+      reference_no: "CIQ-001",
+      vessel_name: "MSC Test",
+      container_no: "MSKU1234567",
+      port_code: "ZADUR",
+      counterparty: "Carrier (Pty) Ltd",
+    },
+    documents: [
+      {
+        id: "d1",
+        name: "Invoice.pdf",
+        source_party: "Carrier",
+        uploaded_at: "2026-10-01T08:00:00Z",
+        sha256_hash: "b".repeat(64),
+      },
+    ],
+    timeline: [
+      {
+        timestamp: "2026-10-02T08:00:00Z",
+        title: "Container released",
+        nature: "OBSERVED",
+        source: "Invoice.pdf",
+      },
+    ],
+    claims: [
+      {
+        id: "c1",
+        document_id: "d1",
+        page_number: 2,
+        claim_text: "Released 2 Oct – “gate-out” (café)",
+        status: "VERIFIED",
+        nature: "REPORTED",
+        confidence: 0.9,
+      },
+    ],
+    contradictions: [
+      {
+        title: "Gate time differs",
+        description: "Two sources",
+        status: "RESOLVED",
+        resolution_note: "Terminal log wins",
+      },
+    ],
+    financialCalculations: [
+      {
+        calculation_type: "DEMURRAGE",
+        currency: "ZAR",
+        calculated_amount_minor: 1234500,
+        charged_amount_minor: 1500000,
+        variance_minor: 265500,
+        rule_version: "v1",
+        input_payload: { freeDays: 3, units: 2 },
+      },
+    ],
     externalObservations: [],
   },
 };
@@ -25,7 +77,17 @@ describe("evidence pack pdf", () => {
     expect(Buffer.from(a).toString("latin1")).toContain("%%EOF");
   });
   it("handles many claims across pages", () => {
-    const many = { ...pack, pack_payload: { ...pack.pack_payload, claims: Array.from({ length: 120 }, (_, i) => ({ ...pack.pack_payload.claims[0], id: "c" + i, claim_text: "Claim " + i + " " + "word ".repeat(40) })) } };
+    const many = {
+      ...pack,
+      pack_payload: {
+        ...pack.pack_payload,
+        claims: Array.from({ length: 120 }, (_, i) => ({
+          ...pack.pack_payload.claims[0],
+          id: "c" + i,
+          claim_text: "Claim " + i + " " + "word ".repeat(40),
+        })),
+      },
+    };
     const out = Buffer.from(buildEvidencePackPdf(many)).toString("latin1");
     expect((out.match(/\/Type \/Page /g) ?? []).length).toBeGreaterThan(2);
   });
@@ -38,7 +100,9 @@ describe("status-aware title and raw imported lines", () => {
     expect(out).not.toContain("Evidence Pack - Dispute Submission");
   });
   it("titles only an APPROVED pack as a dispute submission", () => {
-    const out = Buffer.from(buildEvidencePackPdf({ ...pack, status: "APPROVED", approved_by: "user-123" })).toString("latin1");
+    const out = Buffer.from(
+      buildEvidencePackPdf({ ...pack, status: "APPROVED", approved_by: "user-123" }),
+    ).toString("latin1");
     expect(out).toContain("Evidence Pack - Dispute Submission");
     expect(out).not.toContain("not approved for submission");
   });
@@ -49,7 +113,15 @@ describe("status-aware title and raw imported lines", () => {
         ...pack.pack_payload,
         claims: [
           ...pack.pack_payload.claims,
-          { id: "r1", document_id: "d1", page_number: 1, claim_text: "INVOICE HEADER FURNITURE LINE", status: "PENDING", nature: "REPORTED", claim_type: "TEXT_RECORD" },
+          {
+            id: "r1",
+            document_id: "d1",
+            page_number: 1,
+            claim_text: "INVOICE HEADER FURNITURE LINE",
+            status: "PENDING",
+            nature: "REPORTED",
+            claim_type: "TEXT_RECORD",
+          },
         ],
       },
     };
@@ -71,9 +143,30 @@ describe("map snapshots in the pack pdf", () => {
       pack_payload: {
         ...pack.pack_payload,
         externalObservations: [
-          { observation_type: "AIS_POSITION", observed_at: "2026-10-02T06:00:00Z", source: "AISStream", payload: {} },
-          { observation_type: "MAP_SNAPSHOT", observed_at: "2026-10-02T08:00:00Z", source: "CargoIQ harbour map snapshot", latitude: -29.88, longitude: 31.04,
-            payload: { vesselName: "MSC Test", mmsi: "123456789", sog: 0.2, cog: 90, inDisputedWindow: true, windowStart: "2026-10-02T00:00:00Z", windowEnd: "2026-10-06T14:20:00Z", document_id: "d1", sha256: "c".repeat(64) } },
+          {
+            observation_type: "AIS_POSITION",
+            observed_at: "2026-10-02T06:00:00Z",
+            source: "AISStream",
+            payload: {},
+          },
+          {
+            observation_type: "MAP_SNAPSHOT",
+            observed_at: "2026-10-02T08:00:00Z",
+            source: "CargoIQ harbour map snapshot",
+            latitude: -29.88,
+            longitude: 31.04,
+            payload: {
+              vesselName: "MSC Test",
+              mmsi: "123456789",
+              sog: 0.2,
+              cog: 90,
+              inDisputedWindow: true,
+              windowStart: "2026-10-02T00:00:00Z",
+              windowEnd: "2026-10-06T14:20:00Z",
+              document_id: "d1",
+              sha256: "c".repeat(64),
+            },
+          },
         ],
       },
     };
@@ -88,5 +181,8 @@ describe("map snapshots in the pack pdf", () => {
 
 import { writeFileSync } from "node:fs";
 it.skipIf(!process.env.PDF_OUT)("writes a sample", () => {
-  writeFileSync(process.env.PDF_OUT!, buildEvidencePackPdf({ ...pack, status: "APPROVED", approved_by: "user-123" }));
+  writeFileSync(
+    process.env.PDF_OUT!,
+    buildEvidencePackPdf({ ...pack, status: "APPROVED", approved_by: "user-123" }),
+  );
 });

@@ -31,12 +31,20 @@ function LiveHarbourPage() {
     <div className="space-y-3">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <div className="font-mono text-[10px] tracking-[0.2em] text-primary">LIVE HARBOUR VIEW</div>
+          <div className="font-mono text-[10px] tracking-[0.2em] text-primary">
+            LIVE HARBOUR VIEW
+          </div>
           <p className="mt-1 max-w-xl text-xs text-muted-foreground">
-            Real-time vessels off the South African coast. Case evidence stays on the Harbour Map; this is the live outside picture.
+            Real-time vessels off the South African coast. Case evidence stays on the Harbour Map;
+            this is the live outside picture.
           </p>
         </div>
-        <a href={src} target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground hover:text-foreground">
+        <a
+          href={src}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-xs text-muted-foreground hover:text-foreground"
+        >
           Open full page ↗
         </a>
       </div>

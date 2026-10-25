@@ -31,8 +31,14 @@ function ResetPasswordPage() {
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setError("");
-    if (password.length < 8) { setError("Password must be at least 8 characters."); return; }
-    if (password !== confirm) { setError("Passwords do not match."); return; }
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters.");
+      return;
+    }
+    if (password !== confirm) {
+      setError("Passwords do not match.");
+      return;
+    }
     setBusy(true);
     try {
       const { error: updateError } = await supabase.auth.updateUser({ password });
@@ -56,20 +62,42 @@ function ResetPasswordPage() {
           {!ready ? (
             <div className="text-sm text-muted-foreground">
               <p>This reset link is invalid or has expired.</p>
-              <Link to="/auth" className="mt-3 inline-block text-primary hover:underline">Back to sign in</Link>
+              <Link to="/auth" className="mt-3 inline-block text-primary hover:underline">
+                Back to sign in
+              </Link>
             </div>
           ) : (
             <form className="space-y-4" onSubmit={submit}>
               <label className="block text-sm">
                 New password
-                <input required minLength={8} type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="mt-1 w-full rounded-md border bg-background px-3 py-2" />
+                <input
+                  required
+                  minLength={8}
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="mt-1 w-full rounded-md border bg-background px-3 py-2"
+                />
               </label>
               <label className="block text-sm">
                 Repeat new password
-                <input required minLength={8} type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} className="mt-1 w-full rounded-md border bg-background px-3 py-2" />
+                <input
+                  required
+                  minLength={8}
+                  type="password"
+                  value={confirm}
+                  onChange={(e) => setConfirm(e.target.value)}
+                  className="mt-1 w-full rounded-md border bg-background px-3 py-2"
+                />
               </label>
-              {error && <div className="rounded border border-disputed/40 bg-disputed/10 p-3 text-sm text-disputed">{error}</div>}
-              <Button disabled={busy} className="w-full justify-center">{busy ? "Working…" : "Save new password"}</Button>
+              {error && (
+                <div className="rounded border border-disputed/40 bg-disputed/10 p-3 text-sm text-disputed">
+                  {error}
+                </div>
+              )}
+              <Button disabled={busy} className="w-full justify-center">
+                {busy ? "Working…" : "Save new password"}
+              </Button>
             </form>
           )}
         </Panel>

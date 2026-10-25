@@ -12,18 +12,27 @@ async function sha256Bytes(input: string | ArrayBuffer): Promise<Uint8Array> {
 
 export async function sha256Hex(input: string | ArrayBuffer): Promise<string> {
   const bytes = await sha256Bytes(input);
-  return Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
+  return Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
 }
 
 async function deriveAesKey(masterSecret: string) {
   const raw = await sha256Bytes(masterSecret);
-  return crypto.subtle.importKey("raw", raw as BufferSource, "AES-GCM", false, ["encrypt", "decrypt"]);
+  return crypto.subtle.importKey("raw", raw as BufferSource, "AES-GCM", false, [
+    "encrypt",
+    "decrypt",
+  ]);
 }
 
 export async function encryptSecret(secret: string, masterSecret: string): Promise<string> {
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const key = await deriveAesKey(masterSecret);
-  const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, new TextEncoder().encode(secret));
+  const ciphertext = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv },
+    key,
+    new TextEncoder().encode(secret),
+  );
   const combined = new Uint8Array(12 + ciphertext.byteLength);
   combined.set(iv, 0);
   combined.set(new Uint8Array(ciphertext), 12);

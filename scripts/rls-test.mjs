@@ -3,9 +3,16 @@ import { PGlite } from "@electric-sql/pglite";
 import { readFileSync } from "node:fs";
 
 const db = new PGlite();
-let pass = 0, fail = 0;
-const ok = (n) => { pass++; console.log("PASS", n); };
-const bad = (n, e) => { fail++; console.log("FAIL", n, "-", e); };
+let pass = 0,
+  fail = 0;
+const ok = (n) => {
+  pass++;
+  console.log("PASS", n);
+};
+const bad = (n, e) => {
+  fail++;
+  console.log("FAIL", n, "-", e);
+};
 
 await db.exec(`
 create role authenticated nologin;
@@ -73,16 +80,29 @@ alter table public.cctv_observations force row level security;
 alter table public.cctv_evidence_artifacts force row level security;
 `);
 
-const T='11111111-1111-1111-1111-111111111111', CA='c1111111-1111-1111-1111-111111111111', CB='c2222222-2222-2222-2222-222222222222';
-const INV='a0000000-0000-0000-0000-0000000000a2', VIEW='a0000000-0000-0000-0000-0000000000a3', INVB='b0000000-0000-0000-0000-0000000000b2';
+const T = "11111111-1111-1111-1111-111111111111",
+  CA = "c1111111-1111-1111-1111-111111111111",
+  CB = "c2222222-2222-2222-2222-222222222222";
+const INV = "a0000000-0000-0000-0000-0000000000a2",
+  VIEW = "a0000000-0000-0000-0000-0000000000a3",
+  INVB = "b0000000-0000-0000-0000-0000000000b2";
 const asUser = async (uid, sql) => {
   await db.query("BEGIN");
   await db.query("SET LOCAL ROLE app_user");
   await db.query(`SET LOCAL app.test_uid='${uid}'`);
-  try { const r = await db.query(sql); await db.query("ROLLBACK"); return { ok: true, r }; }
-  catch (e) { await db.query("ROLLBACK"); return { ok: false, e }; }
+  try {
+    const r = await db.query(sql);
+    await db.query("ROLLBACK");
+    return { ok: true, r };
+  } catch (e) {
+    await db.query("ROLLBACK");
+    return { ok: false, e };
+  }
 };
-const expectOk = async (n, uid, sql) => { const r = await asUser(uid, sql); r.ok ? ok(n) : bad(n, r.e.message); };
+const expectOk = async (n, uid, sql) => {
+  const r = await asUser(uid, sql);
+  r.ok ? ok(n) : bad(n, r.e.message);
+};
 const expectDenied = async (n, uid, sql) => {
   const r = await asUser(uid, sql);
   if (!r.ok) return ok(n);
@@ -91,10 +111,26 @@ const expectDenied = async (n, uid, sql) => {
 };
 
 // PRE-GUARD: prove the viewer bypass existed (documents/cctv modify allowed for any member)
-await expectOk("PRE-GUARD viewer can insert+delete cctv source (vuln repro: insert)", VIEW, `insert into public.cctv_sources(tenant_id,name) values ('${T}','tmp')`);
-await expectOk("PRE-GUARD viewer can insert+delete cctv source (vuln repro: delete)", VIEW, `delete from public.cctv_sources where tenant_id='${T}' and name='tmp'`);
-await expectOk("PRE-GUARD viewer can insert document (vuln repro)", VIEW, `insert into public.documents(tenant_id,case_id,name) values ('${T}','${CA}','tmp')`);
-await expectOk("PRE-GUARD viewer can delete document (vuln repro)", VIEW, `delete from public.documents where tenant_id='${T}' and name='tmp'`);
+await expectOk(
+  "PRE-GUARD viewer can insert+delete cctv source (vuln repro: insert)",
+  VIEW,
+  `insert into public.cctv_sources(tenant_id,name) values ('${T}','tmp')`,
+);
+await expectOk(
+  "PRE-GUARD viewer can insert+delete cctv source (vuln repro: delete)",
+  VIEW,
+  `delete from public.cctv_sources where tenant_id='${T}' and name='tmp'`,
+);
+await expectOk(
+  "PRE-GUARD viewer can insert document (vuln repro)",
+  VIEW,
+  `insert into public.documents(tenant_id,case_id,name) values ('${T}','${CA}','tmp')`,
+);
+await expectOk(
+  "PRE-GUARD viewer can delete document (vuln repro)",
+  VIEW,
+  `delete from public.documents where tenant_id='${T}' and name='tmp'`,
+);
 
 // storage.objects mock so the existing 16 Oct core guard can apply verbatim
 await db.exec(`
@@ -104,27 +140,79 @@ grant select,insert,update,delete on storage.objects to authenticated;
 `);
 
 // Apply guards verbatim: existing 16 Oct core guard first, then the two new ones
-for (const f of ["supabase/migrations/20261016063000_core_viewer_readonly_guard.sql","supabase/migrations/20261024210000_evidence_immutability_guards.sql","supabase/migrations/20261024211000_cctv_role_guard.sql"]) {
-  try { await db.exec(readFileSync(new URL("../"+f, import.meta.url), "utf8")); ok("apply "+f.split("/").pop()); }
-  catch (e) { bad("apply "+f.split("/").pop(), e.message); }
+for (const f of [
+  "supabase/migrations/20261016063000_core_viewer_readonly_guard.sql",
+  "supabase/migrations/20261024210000_evidence_immutability_guards.sql",
+  "supabase/migrations/20261024211000_cctv_role_guard.sql",
+]) {
+  try {
+    await db.exec(readFileSync(new URL("../" + f, import.meta.url), "utf8"));
+    ok("apply " + f.split("/").pop());
+  } catch (e) {
+    bad("apply " + f.split("/").pop(), e.message);
+  }
 }
 
 // POST-GUARD: viewer writes denied on every guarded surface
-await expectDenied("viewer insert cctv source denied", VIEW, `insert into public.cctv_sources(tenant_id,name) values ('${T}','x')`);
-await expectDenied("viewer update cctv source denied", VIEW, `update public.cctv_sources set name='y' where tenant_id='${T}'`);
-await expectDenied("viewer delete cctv source denied", VIEW, `delete from public.cctv_sources where tenant_id='${T}'`);
-await expectDenied("viewer insert document denied (core guard)", VIEW, `insert into public.documents(tenant_id,case_id,name) values ('${T}','${CA}','x')`);
+await expectDenied(
+  "viewer insert cctv source denied",
+  VIEW,
+  `insert into public.cctv_sources(tenant_id,name) values ('${T}','x')`,
+);
+await expectDenied(
+  "viewer update cctv source denied",
+  VIEW,
+  `update public.cctv_sources set name='y' where tenant_id='${T}'`,
+);
+await expectDenied(
+  "viewer delete cctv source denied",
+  VIEW,
+  `delete from public.cctv_sources where tenant_id='${T}'`,
+);
+await expectDenied(
+  "viewer insert document denied (core guard)",
+  VIEW,
+  `insert into public.documents(tenant_id,case_id,name) values ('${T}','${CA}','x')`,
+);
 // investigator still works
-await expectOk("investigator insert cctv source", INV, `insert into public.cctv_sources(tenant_id,name) values ('${T}','inv-src')`);
-await expectOk("investigator insert document", INV, `insert into public.documents(tenant_id,case_id,name,file_path,sha256_hash) values ('${T}','${CA}','ok.pdf','${T}/${CA}/ok.pdf','h')`);
+await expectOk(
+  "investigator insert cctv source",
+  INV,
+  `insert into public.cctv_sources(tenant_id,name) values ('${T}','inv-src')`,
+);
+await expectOk(
+  "investigator insert document",
+  INV,
+  `insert into public.documents(tenant_id,case_id,name,file_path,sha256_hash) values ('${T}','${CA}','ok.pdf','${T}/${CA}/ok.pdf','h')`,
+);
 // tenant isolation: B investigator cannot see or touch A rows
-await expectDenied("tenantB select A cases returns nothing", INVB, `select * from public.cases where tenant_id='${T}'`);
-await expectDenied("tenantB insert into A documents", INVB, `insert into public.documents(tenant_id,case_id,name) values ('${T}','${CA}','x')`);
-await expectDenied("tenantB modify A cctv", INVB, `insert into public.cctv_sources(tenant_id,name) values ('${T}','x')`);
+await expectDenied(
+  "tenantB select A cases returns nothing",
+  INVB,
+  `select * from public.cases where tenant_id='${T}'`,
+);
+await expectDenied(
+  "tenantB insert into A documents",
+  INVB,
+  `insert into public.documents(tenant_id,case_id,name) values ('${T}','${CA}','x')`,
+);
+await expectDenied(
+  "tenantB modify A cctv",
+  INVB,
+  `insert into public.cctv_sources(tenant_id,name) values ('${T}','x')`,
+);
 // direct REST hostile: investigator A inserting doc pointing at B's case -> trigger blocks (RLS would pass tenant check)
-await expectDenied("investigator A doc->case B blocked by trigger", INV, `insert into public.documents(tenant_id,case_id,name,file_path,sha256_hash) values ('${T}','${CB}','evil.pdf','${T}/${CB}/evil.pdf','h')`);
+await expectDenied(
+  "investigator A doc->case B blocked by trigger",
+  INV,
+  `insert into public.documents(tenant_id,case_id,name,file_path,sha256_hash) values ('${T}','${CB}','evil.pdf','${T}/${CB}/evil.pdf','h')`,
+);
 // viewer reads still fine
-await expectOk("viewer can still select cases", VIEW, `select * from public.cases where tenant_id='${T}'`);
+await expectOk(
+  "viewer can still select cases",
+  VIEW,
+  `select * from public.cases where tenant_id='${T}'`,
+);
 
 console.log(`\nRLS: ${pass} pass, ${fail} fail`);
 process.exit(fail ? 1 : 0);

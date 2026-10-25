@@ -1,21 +1,63 @@
 import { describe, expect, it } from "vitest";
 import {
-  aisTrack, basisDescription, basisLabel, clampZoom, interpolateTrack, mapCoverageLine, panBy, positionGap, project,
-  scaleBarPx, splitTrackSegments, vesselIdentityLine, viewBoxString, zoomViewBox, fitViewBox, GEO_WINDOW, MAP_CANVAS, ZOOM_MAX, ZOOM_MIN,
+  aisTrack,
+  basisDescription,
+  basisLabel,
+  clampZoom,
+  interpolateTrack,
+  mapCoverageLine,
+  panBy,
+  positionGap,
+  project,
+  scaleBarPx,
+  splitTrackSegments,
+  vesselIdentityLine,
+  viewBoxString,
+  zoomViewBox,
+  fitViewBox,
+  GEO_WINDOW,
+  MAP_CANVAS,
+  ZOOM_MAX,
+  ZOOM_MIN,
 } from "./harbour-map";
 
 const t0 = "2026-09-02T08:00:00.000Z";
 const t1 = "2026-09-02T10:00:00.000Z";
-const pt = (at: string, lat: number, lon: number, sog = 5) => ({ at, lat, lon, sog, cog: 90, mmsi: "111", vesselName: "MV TEST" });
+const pt = (at: string, lat: number, lon: number, sog = 5) => ({
+  at,
+  lat,
+  lon,
+  sog,
+  cog: 90,
+  mmsi: "111",
+  vesselName: "MV TEST",
+});
 
 describe("aisTrack", () => {
   it("keeps only AIS_POSITION rows with coordinates, sorted by time", () => {
     const track = aisTrack([
-      { observation_type: "AIS_POSITION", observed_at: t1, latitude: -29.9, longitude: 31.1, payload: { sog: 3 } },
+      {
+        observation_type: "AIS_POSITION",
+        observed_at: t1,
+        latitude: -29.9,
+        longitude: 31.1,
+        payload: { sog: 3 },
+      },
       { observation_type: "SENTINEL_1_SCENE", observed_at: t0, latitude: -29.8, longitude: 31.0 },
-      { observation_type: "AIS_POSITION", observed_at: t0, latitude: -29.8, longitude: 31.0, payload: { sog: 7, cog: 45 } },
+      {
+        observation_type: "AIS_POSITION",
+        observed_at: t0,
+        latitude: -29.8,
+        longitude: 31.0,
+        payload: { sog: 7, cog: 45 },
+      },
       { observation_type: "AIS_POSITION", observed_at: t0, latitude: null, longitude: 31.0 },
-      { observation_type: "AIS_POSITION", observed_at: "not-a-date", latitude: -29.7, longitude: 31.2 },
+      {
+        observation_type: "AIS_POSITION",
+        observed_at: "not-a-date",
+        latitude: -29.7,
+        longitude: 31.2,
+      },
     ]);
     expect(track.map((p) => p.at)).toEqual([t0, t1]);
     expect(track[0]).toMatchObject({ sog: 7, cog: 45 });
@@ -39,7 +81,10 @@ describe("interpolateTrack", () => {
     expect(pos!.sog).toBe(5);
   });
   it("interpolates halfway between two points", () => {
-    const pos = interpolateTrack([pt(t0, -29.8, 31.0, 4), pt(t1, -29.9, 31.1, 8)], Date.parse(t0) + 3600e3);
+    const pos = interpolateTrack(
+      [pt(t0, -29.8, 31.0, 4), pt(t1, -29.9, 31.1, 8)],
+      Date.parse(t0) + 3600e3,
+    );
     expect(pos!.lat).toBeCloseTo(-29.85);
     expect(pos!.lon).toBeCloseTo(31.05);
     expect(pos!.sog).toBeCloseTo(6);
@@ -63,7 +108,11 @@ describe("interpolateTrack", () => {
   });
 
   it("splitTrackSegments breaks the track at unsupported gaps", () => {
-    const segs = splitTrackSegments([pt(t0, -29.8, 31.0), pt(t1, -29.9, 31.1), pt("2026-09-02T16:00:00.000Z", -30.0, 31.2)]);
+    const segs = splitTrackSegments([
+      pt(t0, -29.8, 31.0),
+      pt(t1, -29.9, 31.1),
+      pt("2026-09-02T16:00:00.000Z", -30.0, 31.2),
+    ]);
     expect(segs.length).toBe(2);
     expect(segs[0]!.length).toBe(2);
     expect(segs[1]!.length).toBe(1);
@@ -91,7 +140,10 @@ describe("interpolateTrack provenance", () => {
   it("refuses to derive across a long gap and reports the gap instead", () => {
     const far = pt("2026-09-02T16:00:00.000Z", -30.0, 31.2);
     expect(interpolateTrack([a, far], Date.parse(t0) + 4 * 3600e3)).toBeNull(); // no implied route
-    expect(positionGap([a, far], Date.parse(t0) + 4 * 3600e3)).toEqual({ from: t0, to: "2026-09-02T16:00:00.000Z" });
+    expect(positionGap([a, far], Date.parse(t0) + 4 * 3600e3)).toEqual({
+      from: t0,
+      to: "2026-09-02T16:00:00.000Z",
+    });
     expect(positionGap([a, b], Date.parse(t0) + 30 * 60e3)).toBeNull(); // inside the supported 2h segment
     expect(positionGap([a, b], Date.parse(t1))).toBeNull(); // exactly on a fix, not between
   });
@@ -105,18 +157,29 @@ describe("interpolateTrack provenance", () => {
   });
   it("labels each basis honestly", () => {
     expect(basisLabel({ kind: "fix", at: t0 })).toContain("RECORDED AIS FIX");
-    expect(basisLabel({ kind: "interpolated", from: t0, to: t1, gapHours: 2, longGap: false })).toContain("DERIVED BETWEEN FIXES");
-    expect(basisLabel({ kind: "interpolated", from: t0, to: t1, gapHours: 8, longGap: true })).toContain("LONG GAP");
+    expect(
+      basisLabel({ kind: "interpolated", from: t0, to: t1, gapHours: 2, longGap: false }),
+    ).toContain("DERIVED BETWEEN FIXES");
+    expect(
+      basisLabel({ kind: "interpolated", from: t0, to: t1, gapHours: 8, longGap: true }),
+    ).toContain("LONG GAP");
     expect(basisLabel({ kind: "stale", at: t1 })).toContain("NO NEWER POSITIONS");
     expect(basisLabel({ kind: "before-first", at: t0 })).toContain("NO EARLIER POSITIONS");
-    expect(basisDescription({ kind: "interpolated", from: t0, to: t1, gapHours: 8, longGap: true })).toContain("not a direct recording");
+    expect(
+      basisDescription({ kind: "interpolated", from: t0, to: t1, gapHours: 8, longGap: true }),
+    ).toContain("not a direct recording");
     expect(basisDescription({ kind: "stale", at: t1 })).toContain("Last recorded position");
   });
 });
 
 describe("zoomViewBox", () => {
   it("zoom 1 shows the whole canvas", () => {
-    expect(zoomViewBox(1)).toEqual({ x: 0, y: 0, width: MAP_CANVAS.width, height: MAP_CANVAS.height });
+    expect(zoomViewBox(1)).toEqual({
+      x: 0,
+      y: 0,
+      width: MAP_CANVAS.width,
+      height: MAP_CANVAS.height,
+    });
   });
   it("zoom 2 centres a quarter-area crop on the focus point", () => {
     const vb = zoomViewBox(2, { x: 500, y: 320 });
@@ -140,20 +203,40 @@ describe("zoomViewBox", () => {
   });
   it("serialises to an svg viewBox string", () => {
     expect(viewBoxString({ x: 0, y: 0, width: 1000, height: 640 })).toBe("0 0 1000 640");
-    expect(viewBoxString(zoomViewBox(3, { x: 500, y: 320 }))).toMatch(/^\d+(\.\d+)? \d+(\.\d+)? \d+(\.\d+)? \d+(\.\d+)?$/);
+    expect(viewBoxString(zoomViewBox(3, { x: 500, y: 320 }))).toMatch(
+      /^\d+(\.\d+)? \d+(\.\d+)? \d+(\.\d+)? \d+(\.\d+)?$/,
+    );
   });
 });
 
 describe("vesselIdentityLine", () => {
   it("combines reference, vessel, voyage and container", () => {
-    expect(vesselIdentityLine({ reference_no: "DUR-2026-0412", vessel_name: "MV Umhlanga Trader", voyage_no: "214S", container_no: "MSKU7748213" }))
-      .toBe("DUR-2026-0412 · MV Umhlanga Trader · voyage 214S · Container MSKU7748213");
+    expect(
+      vesselIdentityLine({
+        reference_no: "DUR-2026-0412",
+        vessel_name: "MV Umhlanga Trader",
+        voyage_no: "214S",
+        container_no: "MSKU7748213",
+      }),
+    ).toBe("DUR-2026-0412 · MV Umhlanga Trader · voyage 214S · Container MSKU7748213");
   });
   it("falls back honestly when fields are missing", () => {
-    expect(vesselIdentityLine({ reference_no: null, vessel_name: null, voyage_no: null, container_no: null }))
-      .toBe("CASE · Unnamed vessel");
-    expect(vesselIdentityLine({ reference_no: "X-1", vessel_name: "MV A", voyage_no: null, container_no: null }))
-      .toBe("X-1 · MV A");
+    expect(
+      vesselIdentityLine({
+        reference_no: null,
+        vessel_name: null,
+        voyage_no: null,
+        container_no: null,
+      }),
+    ).toBe("CASE · Unnamed vessel");
+    expect(
+      vesselIdentityLine({
+        reference_no: "X-1",
+        vessel_name: "MV A",
+        voyage_no: null,
+        container_no: null,
+      }),
+    ).toBe("X-1 · MV A");
   });
 });
 

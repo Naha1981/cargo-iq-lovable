@@ -16,11 +16,7 @@ const PROHIBITED_VALUE_PATTERNS = [
 type Primitive = string | number | boolean;
 
 function isPrimitive(value: unknown): value is Primitive {
-  return (
-    typeof value === "string" ||
-    typeof value === "number" ||
-    typeof value === "boolean"
-  );
+  return typeof value === "string" || typeof value === "number" || typeof value === "boolean";
 }
 
 function isDev(): boolean {
@@ -37,7 +33,10 @@ function valueMatchesProhibitedPattern(value: string): boolean {
   return PROHIBITED_VALUE_PATTERNS.some((pattern) => pattern.test(value));
 }
 
-function valueMatchesExpectedType(value: Primitive, rule: "string" | "number" | "boolean"): boolean {
+function valueMatchesExpectedType(
+  value: Primitive,
+  rule: "string" | "number" | "boolean",
+): boolean {
   if (rule === "string") return typeof value === "string";
   if (rule === "number") return typeof value === "number" && Number.isFinite(value);
   return typeof value === "boolean";
@@ -84,7 +83,11 @@ export function sanitizeTelemetry(
 
     if (typeof value === "string") {
       const trimmed = value.trim();
-      if (!trimmed || trimmed.length > MAX_STRING_LENGTH || valueMatchesProhibitedPattern(trimmed)) {
+      if (
+        !trimmed ||
+        trimmed.length > MAX_STRING_LENGTH ||
+        valueMatchesProhibitedPattern(trimmed)
+      ) {
         warn(`unsafe string value: ${key}`);
         continue;
       }

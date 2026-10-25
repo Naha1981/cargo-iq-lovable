@@ -1,6 +1,46 @@
-import {createServerFn} from "@tanstack/react-start";
-import {z} from "zod";
-import {tenantMiddleware} from "@/lib/auth-middleware";
-import {kpiInput} from "@/lib/kpi-definitions";
-export const listKpiDefinitions=createServerFn({method:"GET"}).validator(z.object({caseId:z.string().uuid()})).middleware([tenantMiddleware]).handler(async({data,context})=>{const {data:rows,error}=await context.supabase.from("kpi_definitions").select("*").eq("case_id",data.caseId).eq("tenant_id",context.tenantId).order("created_at",{ascending:false});if(error)throw error;return rows??[]});
-export const addKpiDefinition=createServerFn({method:"POST"}).validator(kpiInput).middleware([tenantMiddleware]).handler(async({data,context})=>{if(!["admin","investigator"].includes(context.role))throw new Error("Investigator access required");const {data:row,error}=await context.supabase.from("kpi_definitions").insert({tenant_id:context.tenantId,case_id:data.caseId,party:data.party,name:data.name,physical_reference:data.physicalReference,start_kind:data.startKind,end_kind:data.endKind,definition:data.definition,source_document_id:data.sourceDocumentId,source_reference:data.sourceReference,acceptance:data.acceptance,benchmark_hours:data.benchmarkHours,benchmark_basis:data.benchmarkBasis,supersedes_id:data.supersedesId}).select("*").single();if(error)throw error;return row});
+import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
+import { tenantMiddleware } from "@/lib/auth-middleware";
+import { kpiInput } from "@/lib/kpi-definitions";
+export const listKpiDefinitions = createServerFn({ method: "GET" })
+  .validator(z.object({ caseId: z.string().uuid() }))
+  .middleware([tenantMiddleware])
+  .handler(async ({ data, context }) => {
+    const { data: rows, error } = await context.supabase
+      .from("kpi_definitions")
+      .select("*")
+      .eq("case_id", data.caseId)
+      .eq("tenant_id", context.tenantId)
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    return rows ?? [];
+  });
+export const addKpiDefinition = createServerFn({ method: "POST" })
+  .validator(kpiInput)
+  .middleware([tenantMiddleware])
+  .handler(async ({ data, context }) => {
+    if (!["admin", "investigator"].includes(context.role))
+      throw new Error("Investigator access required");
+    const { data: row, error } = await context.supabase
+      .from("kpi_definitions")
+      .insert({
+        tenant_id: context.tenantId,
+        case_id: data.caseId,
+        party: data.party,
+        name: data.name,
+        physical_reference: data.physicalReference,
+        start_kind: data.startKind,
+        end_kind: data.endKind,
+        definition: data.definition,
+        source_document_id: data.sourceDocumentId,
+        source_reference: data.sourceReference,
+        acceptance: data.acceptance,
+        benchmark_hours: data.benchmarkHours,
+        benchmark_basis: data.benchmarkBasis,
+        supersedes_id: data.supersedesId,
+      })
+      .select("*")
+      .single();
+    if (error) throw error;
+    return row;
+  });

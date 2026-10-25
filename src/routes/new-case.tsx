@@ -60,7 +60,11 @@ function NewCasePage() {
             </label>
           ))}
 
-          {error && <div className="md:col-span-2 rounded border border-disputed/40 bg-disputed/10 p-3 text-sm text-disputed">{error}</div>}
+          {error && (
+            <div className="md:col-span-2 rounded border border-disputed/40 bg-disputed/10 p-3 text-sm text-disputed">
+              {error}
+            </div>
+          )}
 
           <div className="md:col-span-2 flex justify-end">
             <Button disabled={busy}>{busy ? "Creating…" : "Create investigation"}</Button>

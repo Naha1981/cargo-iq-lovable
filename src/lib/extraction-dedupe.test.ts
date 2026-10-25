@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { csvHeaderLine, filterNewClaims, isSemanticDuplicate, normalizeClaimKey } from "./extraction.functions";
+import {
+  csvHeaderLine,
+  filterNewClaims,
+  isSemanticDuplicate,
+  normalizeClaimKey,
+} from "./extraction.functions";
 
 const csvBytes = (text: string) => new TextEncoder().encode(text).buffer as ArrayBuffer;
 
@@ -9,11 +14,12 @@ describe("extraction dedupe", () => {
   });
 
   it("drops the CSV header line from claims", () => {
-    const header = csvHeaderLine(csvBytes("record_id,event,time\nSYN-1,gate_in,18:00\n"), "text/csv", "gate.csv");
-    const claims = [
-      { claim_text: "record_id,event,time" },
-      { claim_text: "SYN-1,gate_in,18:00" },
-    ];
+    const header = csvHeaderLine(
+      csvBytes("record_id,event,time\nSYN-1,gate_in,18:00\n"),
+      "text/csv",
+      "gate.csv",
+    );
+    const claims = [{ claim_text: "record_id,event,time" }, { claim_text: "SYN-1,gate_in,18:00" }];
     const kept = filterNewClaims(claims, [], header);
     expect(kept.map((c) => c.claim_text)).toEqual(["SYN-1,gate_in,18:00"]);
   });
@@ -34,7 +40,6 @@ describe("extraction dedupe", () => {
     const kept = filterNewClaims(claims, [], null);
     expect(kept.map((c) => c.claim_text)).toEqual(["Same", "Other"]);
   });
-
 
   it("drops AI re-reads that rephrase a stored verified fact", () => {
     const stored = [
@@ -80,7 +85,6 @@ describe("extraction dedupe", () => {
     const kept = filterNewClaims(claims, [], null);
     expect(kept).toHaveLength(1);
   });
-
 
   it("drops short AI re-reads that restate a stored fact word for word", () => {
     const stored = [

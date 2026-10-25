@@ -7,7 +7,9 @@ describe("case navigation cache safety", () => {
     expect(parent).toContain("staleTime: 30_000");
     expect(parent).toContain("getCaseWorkspace({ data: { caseId: params.caseId } })");
     expect(parent).not.toContain("beforeLoad:");
-    expect(source("src/lib/case.functions.ts")).toContain('export const getCaseWorkspace = createServerFn({ method: "GET" }).validator(idInput).middleware([tenantMiddleware])');
+    expect(source("src/lib/case.functions.ts").replace(/\s+/g, "")).toContain(
+      'export const getCaseWorkspace = createServerFn({ method: "GET" }).validator(idInput).middleware([tenantMiddleware])'.replace(/\s+/g, ""),
+    );
     expect(source("src/lib/auth-middleware.ts")).toContain("await getAuthed()");
   });
   it("shares the parent snapshot across tabs instead of repeating workspace calls", () => {
@@ -24,22 +26,44 @@ describe("case navigation cache safety", () => {
   });
 });
 
-import { createRootRoute, createRoute, createRouter, createMemoryHistory } from "@tanstack/react-router";
+import {
+  createRootRoute,
+  createRoute,
+  createRouter,
+  createMemoryHistory,
+} from "@tanstack/react-router";
 it("reuses parent data across cached tab navigation and refetches on invalidation", async () => {
   let reads = 0;
   const root = createRootRoute();
-  const parent = createRoute({ getParentRoute: () => root, path: "/case/$id", staleTime: 30_000, loader: async () => ({ reads: ++reads }) });
+  const parent = createRoute({
+    getParentRoute: () => root,
+    path: "/case/$id",
+    staleTime: 30_000,
+    loader: async () => ({ reads: ++reads }),
+  });
   const a = createRoute({ getParentRoute: () => parent, path: "map" });
   const b = createRoute({ getParentRoute: () => parent, path: "financials" });
-  const router = createRouter({ routeTree: root.addChildren([parent.addChildren([a, b])]), history: createMemoryHistory({ initialEntries: ["/case/demo/map"] }) });
+  const router = createRouter({
+    routeTree: root.addChildren([parent.addChildren([a, b])]),
+    history: createMemoryHistory({ initialEntries: ["/case/demo/map"] }),
+  });
   await router.load();
   expect(reads).toBe(1);
-  await (router.navigate as (options: any) => Promise<void>)({ to: "/case/$id/financials", params: { id: "demo" } });
+  await (router.navigate as (options: any) => Promise<void>)({
+    to: "/case/$id/financials",
+    params: { id: "demo" },
+  });
   expect(reads).toBe(1);
   await router.invalidate();
   expect(reads).toBe(2);
-  await (router.navigate as (options: any) => Promise<void>)({ to: "/case/$id/map", params: { id: "demo" } });
+  await (router.navigate as (options: any) => Promise<void>)({
+    to: "/case/$id/map",
+    params: { id: "demo" },
+  });
   expect(reads).toBe(2);
-  await (router.navigate as (options: any) => Promise<void>)({ to: "/case/$id/map", params: { id: "other" } });
+  await (router.navigate as (options: any) => Promise<void>)({
+    to: "/case/$id/map",
+    params: { id: "other" },
+  });
   expect(reads).toBe(3);
 });

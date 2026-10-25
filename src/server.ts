@@ -44,7 +44,6 @@ function isH3SwallowedErrorBody(body: string): boolean {
   }
 }
 
-
 // Security headers delivered by the worker itself (audit item 7). public/_headers is kept
 // for any host route that honors it, but the current host does not - so every response the
 // worker hands out (SSR pages, server functions, redirects, and our own error pages) gets
@@ -73,7 +72,10 @@ export function withSecurityHeaders(request: Request, response: Response): Respo
   for (const [name, value] of Object.entries(BASELINE_HEADERS)) {
     if (!out.headers.has(name)) out.headers.set(name, value);
   }
-  if (new URL(request.url).pathname.startsWith("/harbour-view/") && !out.headers.has("content-security-policy")) {
+  if (
+    new URL(request.url).pathname.startsWith("/harbour-view/") &&
+    !out.headers.has("content-security-policy")
+  ) {
     out.headers.set("content-security-policy", HARBOUR_VIEW_CSP);
   }
   return out;
@@ -87,10 +89,13 @@ export default {
       return withSecurityHeaders(request, await normalizeCatastrophicSsrResponse(response));
     } catch (error) {
       console.error(error);
-      return withSecurityHeaders(request, new Response(renderErrorPage(), {
-        status: 500,
-        headers: { "content-type": "text/html; charset=utf-8" },
-      }));
+      return withSecurityHeaders(
+        request,
+        new Response(renderErrorPage(), {
+          status: 500,
+          headers: { "content-type": "text/html; charset=utf-8" },
+        }),
+      );
     }
   },
 };

@@ -8,7 +8,7 @@ describe("case port query centers", () => {
     expect(resolvePortCenter("ZARCB")).not.toEqual(resolvePortCenter("ZADUR"));
   });
   it("never silently sends unsupported/missing ports to Durban", () => {
-    expect(()=>resolvePortCenter(null)).toThrow("Unsupported or missing");
-    expect(()=>resolvePortCenter("ZZXXX")).toThrow("Unsupported or missing");
+    expect(() => resolvePortCenter(null)).toThrow("Unsupported or missing");
+    expect(() => resolvePortCenter("ZZXXX")).toThrow("Unsupported or missing");
   });
 });

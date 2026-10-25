@@ -1,8 +1,111 @@
-import {describe,it,expect} from "vitest";import {frozenOperationalResults} from "./count-pack";import {buildEvidencePackPdf} from "./pack-pdf";
-const r={id:"r",version:1,case_id:"c",name:"Synthetic source rule",metric:"HATCH_COVER",input_basis:"INDIVIDUAL_LIFT",output_unit:"operation",calculation:"EXPLICIT_FACTOR",numerator:1,denominator:4,gate_kinds:[],acceptance:"AGREED",effective_from:"2026-10-01T00:00:00Z",effective_to:null,source_document_id:"d",source_reference:"p.1",rationale:"SYNTHETIC agreed four lifts to one operation",supersedes_id:null};const record={id:"s",version:1,case_id:"c",physical_reference:"SYNTHETIC-HATCH",party:"Synthetic terminal",metric:"HATCH_COVER",basis:"INDIVIDUAL_LIFT",quantity:4,occurred_at:"2026-10-16T10:00:00Z",containers20:null,containers40:null,gate_kind:"NOT_APPLICABLE",source_document_id:"d",source_reference:"row1",limitations:"SYNTHETIC only",supersedes_id:null};const def={id:"comp",version:1,case_id:"c",name:"Synthetic frozen comparison",metric:"HATCH_COVER",output_unit:"operation",rule_ids:["r"],physical_references:["SYNTHETIC-HATCH"],kpi_definition_id:null,acceptance:"AGREED",rationale:"SYNTHETIC same event scope and rule",source_document_id:"d",source_reference:"p.1",supersedes_id:null};
-const p={countEngineVersion:"1",countRuleVersions:[r],countSourceRecords:[record,{...record,id:"s2",party:"Synthetic carrier"}],countComparisons:[def],appointmentLifecycle:[],authorisedImports:[{id:"i",source_document_id:"d",dataset:"COUNTS",row_count:2,source_party:"Synthetic terminal",exported_at:"2026-10-16T10:00:00Z",created_at:"2026-10-16T11:00:00Z",created_by:"u",raw_sha256:"a".repeat(64),authorization_basis:"SYNTHETIC permission for testing only"}],documents:[{id:"d",name:"SYNTHETIC export.csv"}]};
-describe("frozen count and lifecycle outputs",()=>{
- it("reproduces common-unit calculation from frozen raw source only",()=>{const copy=structuredClone(p);expect(frozenOperationalResults(copy).counts[0].result.results.map(r=>r.total)).toEqual([1,1]);copy.countSourceRecords[0].quantity=8;expect(frozenOperationalResults(copy).counts[0].result.results.map(r=>r.total)).toEqual([2,1]);expect(frozenOperationalResults(p).counts[0].result.results[0].total).toBe(1);});
- it("does not silently apply v1 calculations to an unknown engine version",()=>{expect(frozenOperationalResults({...p,countEngineVersion:"2"}).counts).toEqual([]);});
- it("PDF includes source registers, permission provenance and derived result",()=>{const pack={version:1,status:"DRAFT",sha256_hash:"b".repeat(64),pack_payload:p};const bytes=buildEvidencePackPdf(pack),text=Buffer.from(bytes).toString("latin1").replace(/\\/g,"");for(const value of ["RAW COUNT SOURCE LEDGER","EXECUTABLE LOCAL COUNT RULES","EXPLICIT COMMON-UNIT SCOPES","AUTHORISED EXPORT PROVENANCE","FROZEN OPERATIONAL CALCULATIONS","Synthetic terminal: 1 operation","Source: SYNTHETIC export.csv"])expect(text).toContain(value);expect(bytes).toEqual(buildEvidencePackPdf(pack));});
+import { describe, it, expect } from "vitest";
+import { frozenOperationalResults } from "./count-pack";
+import { buildEvidencePackPdf } from "./pack-pdf";
+const r = {
+  id: "r",
+  version: 1,
+  case_id: "c",
+  name: "Synthetic source rule",
+  metric: "HATCH_COVER",
+  input_basis: "INDIVIDUAL_LIFT",
+  output_unit: "operation",
+  calculation: "EXPLICIT_FACTOR",
+  numerator: 1,
+  denominator: 4,
+  gate_kinds: [],
+  acceptance: "AGREED",
+  effective_from: "2026-10-01T00:00:00Z",
+  effective_to: null,
+  source_document_id: "d",
+  source_reference: "p.1",
+  rationale: "SYNTHETIC agreed four lifts to one operation",
+  supersedes_id: null,
+};
+const record = {
+  id: "s",
+  version: 1,
+  case_id: "c",
+  physical_reference: "SYNTHETIC-HATCH",
+  party: "Synthetic terminal",
+  metric: "HATCH_COVER",
+  basis: "INDIVIDUAL_LIFT",
+  quantity: 4,
+  occurred_at: "2026-10-16T10:00:00Z",
+  containers20: null,
+  containers40: null,
+  gate_kind: "NOT_APPLICABLE",
+  source_document_id: "d",
+  source_reference: "row1",
+  limitations: "SYNTHETIC only",
+  supersedes_id: null,
+};
+const def = {
+  id: "comp",
+  version: 1,
+  case_id: "c",
+  name: "Synthetic frozen comparison",
+  metric: "HATCH_COVER",
+  output_unit: "operation",
+  rule_ids: ["r"],
+  physical_references: ["SYNTHETIC-HATCH"],
+  kpi_definition_id: null,
+  acceptance: "AGREED",
+  rationale: "SYNTHETIC same event scope and rule",
+  source_document_id: "d",
+  source_reference: "p.1",
+  supersedes_id: null,
+};
+const p = {
+  countEngineVersion: "1",
+  countRuleVersions: [r],
+  countSourceRecords: [record, { ...record, id: "s2", party: "Synthetic carrier" }],
+  countComparisons: [def],
+  appointmentLifecycle: [],
+  authorisedImports: [
+    {
+      id: "i",
+      source_document_id: "d",
+      dataset: "COUNTS",
+      row_count: 2,
+      source_party: "Synthetic terminal",
+      exported_at: "2026-10-16T10:00:00Z",
+      created_at: "2026-10-16T11:00:00Z",
+      created_by: "u",
+      raw_sha256: "a".repeat(64),
+      authorization_basis: "SYNTHETIC permission for testing only",
+    },
+  ],
+  documents: [{ id: "d", name: "SYNTHETIC export.csv" }],
+};
+describe("frozen count and lifecycle outputs", () => {
+  it("reproduces common-unit calculation from frozen raw source only", () => {
+    const copy = structuredClone(p);
+    expect(frozenOperationalResults(copy).counts[0].result.results.map((r) => r.total)).toEqual([
+      1, 1,
+    ]);
+    copy.countSourceRecords[0].quantity = 8;
+    expect(frozenOperationalResults(copy).counts[0].result.results.map((r) => r.total)).toEqual([
+      2, 1,
+    ]);
+    expect(frozenOperationalResults(p).counts[0].result.results[0].total).toBe(1);
+  });
+  it("does not silently apply v1 calculations to an unknown engine version", () => {
+    expect(frozenOperationalResults({ ...p, countEngineVersion: "2" }).counts).toEqual([]);
+  });
+  it("PDF includes source registers, permission provenance and derived result", () => {
+    const pack = { version: 1, status: "DRAFT", sha256_hash: "b".repeat(64), pack_payload: p };
+    const bytes = buildEvidencePackPdf(pack),
+      text = Buffer.from(bytes).toString("latin1").replace(/\\/g, "");
+    for (const value of [
+      "RAW COUNT SOURCE LEDGER",
+      "EXECUTABLE LOCAL COUNT RULES",
+      "EXPLICIT COMMON-UNIT SCOPES",
+      "AUTHORISED EXPORT PROVENANCE",
+      "FROZEN OPERATIONAL CALCULATIONS",
+      "Synthetic terminal: 1 operation",
+      "Source: SYNTHETIC export.csv",
+    ])
+      expect(text).toContain(value);
+    expect(bytes).toEqual(buildEvidencePackPdf(pack));
+  });
 });

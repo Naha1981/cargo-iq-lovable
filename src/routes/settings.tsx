@@ -62,9 +62,18 @@ function SettingsPage() {
               placeholder="DELETE"
             />
           </label>
-          {error && <div className="mt-3 rounded border border-disputed/40 bg-disputed/10 p-3 text-sm text-disputed">{error}</div>}
+          {error && (
+            <div className="mt-3 rounded border border-disputed/40 bg-disputed/10 p-3 text-sm text-disputed">
+              {error}
+            </div>
+          )}
           <div className="mt-4">
-            <Button disabled={busy || confirmText !== "DELETE"} variant="ghost" className="border border-disputed/50 text-disputed" onClick={deleteAccount}>
+            <Button
+              disabled={busy || confirmText !== "DELETE"}
+              variant="ghost"
+              className="border border-disputed/50 text-disputed"
+              onClick={deleteAccount}
+            >
               {busy ? "Deleting…" : "Delete account and workspace"}
             </Button>
           </div>

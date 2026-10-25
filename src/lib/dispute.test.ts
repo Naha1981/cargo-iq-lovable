@@ -29,11 +29,16 @@ describe("dispute marking", () => {
       { id: "z", status: "VERIFIED", timestamp_claimed: "2026-10-01T00:00:00Z" },
       { id: "e", status: "VERIFIED", timestamp_claimed: null },
     ];
-    expect(disputedWindow(claims, ids)).toEqual({ start: Date.parse("2026-10-10T08:00:00Z"), end: Date.parse("2026-10-17T09:30:00Z") });
+    expect(disputedWindow(claims, ids)).toEqual({
+      start: Date.parse("2026-10-10T08:00:00Z"),
+      end: Date.parse("2026-10-17T09:30:00Z"),
+    });
   });
 
   it("returns no window when no disputed claim carries a timestamp", () => {
-    expect(disputedWindow([{ id: "e", status: "VERIFIED" }], disputedClaimIds(contradictions))).toBeNull();
+    expect(
+      disputedWindow([{ id: "e", status: "VERIFIED" }], disputedClaimIds(contradictions)),
+    ).toBeNull();
     expect(disputedWindow([], new Set())).toBeNull();
   });
 

@@ -7,8 +7,14 @@ export const MAP_CANVAS = { width: 1000, height: 640 } as const;
  * Sized so one canvas unit is square on the ground (equirectangular at ~29.86S),
  * which keeps the scale bar honest.
  */
-export const GEO_WINDOW = { lonMin: 30.82, lonMax: 31.306, latMin: -29.99, latMax: -29.72 } as const;
-const WINDOW_WIDTH_KM = (GEO_WINDOW.lonMax - GEO_WINDOW.lonMin) * 111.32 * Math.cos(-29.855 * Math.PI / 180);
+export const GEO_WINDOW = {
+  lonMin: 30.82,
+  lonMax: 31.306,
+  latMin: -29.99,
+  latMax: -29.72,
+} as const;
+const WINDOW_WIDTH_KM =
+  (GEO_WINDOW.lonMax - GEO_WINDOW.lonMin) * 111.32 * Math.cos((-29.855 * Math.PI) / 180);
 export const ZOOM_MIN = 1;
 export const ZOOM_MAX = 8;
 
@@ -27,8 +33,10 @@ export type CanvasPoint = { x: number; y: number };
 /** Real geographic projection (equirectangular) over GEO_WINDOW. No clamping:
  *  the svg viewBox crops naturally, and positions must never snap to fake points. */
 export function project(lat: number, lon: number): CanvasPoint {
-  const x = ((lon - GEO_WINDOW.lonMin) / (GEO_WINDOW.lonMax - GEO_WINDOW.lonMin)) * MAP_CANVAS.width;
-  const y = ((GEO_WINDOW.latMax - lat) / (GEO_WINDOW.latMax - GEO_WINDOW.latMin)) * MAP_CANVAS.height;
+  const x =
+    ((lon - GEO_WINDOW.lonMin) / (GEO_WINDOW.lonMax - GEO_WINDOW.lonMin)) * MAP_CANVAS.width;
+  const y =
+    ((GEO_WINDOW.latMax - lat) / (GEO_WINDOW.latMax - GEO_WINDOW.latMin)) * MAP_CANVAS.height;
   return { x, y };
 }
 
@@ -40,7 +48,9 @@ export function scaleBarPx(meters: number): number {
 /** Parse AIS_POSITION observations into an ordered vessel track. */
 export function aisTrack(observations: any[]): TrackPoint[] {
   return (observations ?? [])
-    .filter((x) => x.observation_type === "AIS_POSITION" && x.latitude != null && x.longitude != null)
+    .filter(
+      (x) => x.observation_type === "AIS_POSITION" && x.latitude != null && x.longitude != null,
+    )
     .map((x) => ({
       at: String(x.observed_at),
       lat: Number(x.latitude),
@@ -106,16 +116,28 @@ export function interpolateTrack(track: TrackPoint[], time: number): SourcedPosi
   let cog: number | null;
   if (Math.abs(time - ta) <= FIX_TOLERANCE_MS || ta === tb) {
     basis = { kind: "fix", at: at(a) };
-    lat = a.lat; lon = a.lon; sog = a.sog; cog = a.cog;
+    lat = a.lat;
+    lon = a.lon;
+    sog = a.sog;
+    cog = a.cog;
   } else if (Math.abs(time - tb) <= FIX_TOLERANCE_MS) {
     basis = { kind: "fix", at: at(b) };
-    lat = b.lat; lon = b.lon; sog = b.sog; cog = b.cog;
+    lat = b.lat;
+    lon = b.lon;
+    sog = b.sog;
+    cog = b.cog;
   } else if (time < ta) {
     basis = { kind: "before-first", at: at(a) };
-    lat = a.lat; lon = a.lon; sog = a.sog; cog = a.cog;
+    lat = a.lat;
+    lon = a.lon;
+    sog = a.sog;
+    cog = a.cog;
   } else if (time > tb) {
     basis = { kind: "stale", at: at(b) };
-    lat = b.lat; lon = b.lon; sog = b.sog; cog = b.cog;
+    lat = b.lat;
+    lon = b.lon;
+    sog = b.sog;
+    cog = b.cog;
   } else {
     const gapHours = (tb - ta) / 3600000;
     if (gapHours > LONG_GAP_HOURS) return null; // unsupported window: no marker, no derived position
@@ -131,7 +153,10 @@ export function interpolateTrack(track: TrackPoint[], time: number): SourcedPosi
 }
 
 /** The unsupported window containing time, when fixes are too far apart to derive across. */
-export function positionGap(track: TrackPoint[], time: number): { from: string; to: string } | null {
+export function positionGap(
+  track: TrackPoint[],
+  time: number,
+): { from: string; to: string } | null {
   for (let i = 1; i < track.length; i++) {
     const ta = Date.parse(track[i - 1]!.at);
     const tb = Date.parse(track[i]!.at);
@@ -171,10 +196,20 @@ export function panBy(vb: ViewBox, dx: number, dy: number): ViewBox {
 export function basisLabel(basis: PositionBasis): string {
   const hm = (iso: string) => iso.slice(11, 16) + "Z";
   switch (basis.kind) {
-    case "fix": return "RECORDED AIS FIX " + hm(basis.at);
-    case "interpolated": return "DERIVED BETWEEN FIXES " + hm(basis.from) + "-" + hm(basis.to) + (basis.longGap ? " · LONG GAP - APPROXIMATE" : "");
-    case "stale": return "LAST RECORDED " + hm(basis.at) + " - NO NEWER POSITIONS";
-    case "before-first": return "FIRST RECORDED " + hm(basis.at) + " - NO EARLIER POSITIONS";
+    case "fix":
+      return "RECORDED AIS FIX " + hm(basis.at);
+    case "interpolated":
+      return (
+        "DERIVED BETWEEN FIXES " +
+        hm(basis.from) +
+        "-" +
+        hm(basis.to) +
+        (basis.longGap ? " · LONG GAP - APPROXIMATE" : "")
+      );
+    case "stale":
+      return "LAST RECORDED " + hm(basis.at) + " - NO NEWER POSITIONS";
+    case "before-first":
+      return "FIRST RECORDED " + hm(basis.at) + " - NO EARLIER POSITIONS";
   }
 }
 
@@ -182,12 +217,23 @@ export function basisLabel(basis: PositionBasis): string {
 export function basisDescription(basis: PositionBasis): string {
   const full = (iso: string) => iso.replace("T", " ").slice(0, 16) + "Z";
   switch (basis.kind) {
-    case "fix": return "Recorded by AIS at " + full(basis.at);
+    case "fix":
+      return "Recorded by AIS at " + full(basis.at);
     case "interpolated":
-      return "Derived between recorded fixes " + full(basis.from) + " and " + full(basis.to) + " - not a direct recording"
-        + (basis.longGap ? "; spans a " + Math.round(basis.gapHours) + "-hour gap, treat as approximate" : "");
-    case "stale": return "Last recorded position (" + full(basis.at) + ") - no newer positions";
-    case "before-first": return "First recorded position (" + full(basis.at) + ") - no earlier positions";
+      return (
+        "Derived between recorded fixes " +
+        full(basis.from) +
+        " and " +
+        full(basis.to) +
+        " - not a direct recording" +
+        (basis.longGap
+          ? "; spans a " + Math.round(basis.gapHours) + "-hour gap, treat as approximate"
+          : "")
+      );
+    case "stale":
+      return "Last recorded position (" + full(basis.at) + ") - no newer positions";
+    case "before-first":
+      return "First recorded position (" + full(basis.at) + ") - no earlier positions";
   }
 }
 
@@ -220,19 +266,27 @@ export function zoomViewBox(zoom: number, focus?: CanvasPoint | null): ViewBox {
  * canvas. Zoom shrinks the window preserving the viewport aspect. Geographic
  * scale stays uniform because the window aspect equals the element aspect.
  */
-export function fitViewBox(zoom: number, focus: CanvasPoint | null | undefined, aspect: number): ViewBox {
+export function fitViewBox(
+  zoom: number,
+  focus: CanvasPoint | null | undefined,
+  aspect: number,
+): ViewBox {
   const z = clampZoom(zoom);
   const canvasAspect = MAP_CANVAS.width / MAP_CANVAS.height;
   let width: number;
   let height: number;
   if (!(aspect > 0) || !Number.isFinite(aspect) || Math.abs(aspect - canvasAspect) < 1e-6) {
-    width = MAP_CANVAS.width; height = MAP_CANVAS.height;
+    width = MAP_CANVAS.width;
+    height = MAP_CANVAS.height;
   } else if (aspect > canvasAspect) {
-    width = MAP_CANVAS.width; height = width / aspect;
+    width = MAP_CANVAS.width;
+    height = width / aspect;
   } else {
-    height = MAP_CANVAS.height; width = height * aspect;
+    height = MAP_CANVAS.height;
+    width = height * aspect;
   }
-  width /= z; height /= z;
+  width /= z;
+  height /= z;
   const cx = focus?.x ?? MAP_CANVAS.width / 2;
   const cy = focus?.y ?? MAP_CANVAS.height / 2;
   const x = Math.min(Math.max(cx - width / 2, 0), MAP_CANVAS.width - width);
@@ -258,7 +312,9 @@ export function vesselIdentityLine(c: CaseIdentity): string {
     c.reference_no || "CASE",
     (c.vessel_name || "Unnamed vessel") + (c.voyage_no ? " · voyage " + c.voyage_no : ""),
     c.container_no ? "Container " + c.container_no : null,
-  ].filter(Boolean).join(" · ");
+  ]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 /** Honest data-status line: never claims coverage the case does not have. */

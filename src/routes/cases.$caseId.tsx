@@ -12,7 +12,8 @@ export const Route = createFileRoute("/cases/$caseId")({
     try {
       data = await getCaseWorkspace({ data: { caseId: params.caseId } });
     } catch (error) {
-      if (error instanceof Error && error.message.includes("UNAUTHENTICATED")) throw redirect({ to: "/auth" });
+      if (error instanceof Error && error.message.includes("UNAUTHENTICATED"))
+        throw redirect({ to: "/auth" });
       throw error;
     }
     if (!data.case) throw notFound();
@@ -20,9 +21,24 @@ export const Route = createFileRoute("/cases/$caseId")({
   },
   pendingMs: 150,
   pendingMinMs: 0,
-  pendingComponent: () => <div role="status" className="p-10 text-sm text-muted-foreground">Loading investigation...</div>,
-  head: ({ loaderData }) => ({ meta: loaderData ? [{ title: loaderData.case.reference_no + " | CargoIQ" }] : [{ title: "Case | CargoIQ" }] }),
-  notFoundComponent: () => <div className="p-10 text-center">Case not found. <Link to="/" className="text-primary">Back</Link></div>,
+  pendingComponent: () => (
+    <div role="status" className="p-10 text-sm text-muted-foreground">
+      Loading investigation...
+    </div>
+  ),
+  head: ({ loaderData }) => ({
+    meta: loaderData
+      ? [{ title: loaderData.case.reference_no + " | CargoIQ" }]
+      : [{ title: "Case | CargoIQ" }],
+  }),
+  notFoundComponent: () => (
+    <div className="p-10 text-center">
+      Case not found.{" "}
+      <Link to="/" className="text-primary">
+        Back
+      </Link>
+    </div>
+  ),
   component: CaseLayout,
 });
 
@@ -54,21 +70,42 @@ function CaseLayout() {
       <AppHeader />
       <div className="border-b bg-panel">
         <div className="mx-auto max-w-[1400px] px-6 pt-6">
-          <Link to="/" className="text-xs text-muted-foreground hover:text-foreground">← All cases</Link>
+          <Link to="/" className="text-xs text-muted-foreground hover:text-foreground">
+            ← All cases
+          </Link>
           <div className="mt-2 flex flex-wrap items-end justify-between gap-4">
             <div>
-              <div className="font-mono text-xs text-primary">{c.reference_no} · {c.port_code ?? "—"} · {c.status}</div>
-              <h1 className="mt-1 text-2xl font-semibold tracking-tight">{c.vessel_name || "Unnamed vessel"} {c.voyage_no ? "· " + c.voyage_no : ""}</h1>
-              <p className="text-sm text-muted-foreground">{c.container_no ? "Container " + c.container_no : "Multiple containers"} · Opened {new Date(c.created_at).toLocaleDateString("en-GB")}</p>
+              <div className="font-mono text-xs text-primary">
+                {c.reference_no} · {c.port_code ?? "—"} · {c.status}
+              </div>
+              <h1 className="mt-1 text-2xl font-semibold tracking-tight">
+                {c.vessel_name || "Unnamed vessel"} {c.voyage_no ? "· " + c.voyage_no : ""}
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                {c.container_no ? "Container " + c.container_no : "Multiple containers"} · Opened{" "}
+                {new Date(c.created_at).toLocaleDateString("en-GB")}
+              </p>
               {openDisputes > 0 && (
-                <Link to="/cases/$caseId/documents" params={{ caseId: c.id }} className="mt-2 inline-block" aria-label="Open the disputed items">
-                  <DisputeBadge label={openDisputes + " open dispute" + (openDisputes === 1 ? "" : "s") + " · review"} />
+                <Link
+                  to="/cases/$caseId/documents"
+                  params={{ caseId: c.id }}
+                  className="mt-2 inline-block"
+                  aria-label="Open the disputed items"
+                >
+                  <DisputeBadge
+                    label={
+                      openDisputes + " open dispute" + (openDisputes === 1 ? "" : "s") + " · review"
+                    }
+                  />
                 </Link>
               )}
             </div>
           </div>
 
-          <nav aria-label="Investigation pages" className="mt-5 grid grid-cols-2 gap-1 pb-2 sm:flex sm:flex-wrap sm:pb-0">
+          <nav
+            aria-label="Investigation pages"
+            className="mt-5 grid grid-cols-2 gap-1 pb-2 sm:flex sm:flex-wrap sm:pb-0"
+          >
             {tabs.map((t) => (
               <Link
                 key={t.to}
@@ -94,8 +131,9 @@ function CaseLayout() {
         </div>
       </div>
 
-      <main className="mx-auto max-w-[1400px] px-6 py-8"><Outlet /></main>
+      <main className="mx-auto max-w-[1400px] px-6 py-8">
+        <Outlet />
+      </main>
     </div>
   );
 }
-

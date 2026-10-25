@@ -62,15 +62,26 @@ export function reportLovableError(error: unknown, context: Record<string, unkno
   // or before the table exists.
   try {
     const route = window.location.pathname;
-    import("@/lib/supabase/client").then(({ createClient }) => {
-      try {
-        const client = createClient() as any;
-        client
-          .from("app_errors")
-          .insert({ route, message: String(message).slice(0, 2000), stack: stack ? String(stack).slice(0, 4000) : null, source: (context as Record<string, unknown>).boundary ?? "client" })
-          .then(() => {})
-          .catch(() => {});
-      } catch { /* ignore */ }
-    }).catch(() => {});
-  } catch { /* ignore */ }
+    import("@/lib/supabase/client")
+      .then(({ createClient }) => {
+        try {
+          const client = createClient() as any;
+          client
+            .from("app_errors")
+            .insert({
+              route,
+              message: String(message).slice(0, 2000),
+              stack: stack ? String(stack).slice(0, 4000) : null,
+              source: (context as Record<string, unknown>).boundary ?? "client",
+            })
+            .then(() => {})
+            .catch(() => {});
+        } catch {
+          /* ignore */
+        }
+      })
+      .catch(() => {});
+  } catch {
+    /* ignore */
+  }
 }

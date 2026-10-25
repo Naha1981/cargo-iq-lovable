@@ -9,7 +9,11 @@ export function isMissingSourceSeqColumn(error: any): boolean {
 }
 
 export async function insertClaimRow(supabase: any, base: Record<string, unknown>, seq: number) {
-  const first = await supabase.from("extracted_claims").insert({ ...base, source_seq: seq }).select("*").single();
+  const first = await supabase
+    .from("extracted_claims")
+    .insert({ ...base, source_seq: seq })
+    .select("*")
+    .single();
   if (!isMissingSourceSeqColumn(first.error)) return first;
   return supabase.from("extracted_claims").insert(base).select("*").single();
 }

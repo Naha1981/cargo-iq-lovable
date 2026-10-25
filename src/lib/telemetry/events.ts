@@ -389,13 +389,16 @@ export const telemetryContract = {
 export type TelemetryContract = typeof telemetryContract;
 export type TelemetryEventContract = TelemetryContract[TelemetryEventName];
 
-type RuleToType<T> =
-  T extends "string" ? string :
-  T extends "number" ? number :
-  T extends "boolean" ? boolean :
-  never;
+type RuleToType<T> = T extends "string"
+  ? string
+  : T extends "number"
+    ? number
+    : T extends "boolean"
+      ? boolean
+      : never;
 
 export type TelemetryPayload<E extends TelemetryEventName> = Partial<{
-  [K in keyof TelemetryContract[E]["allowedProperties"]]:
-    RuleToType<TelemetryContract[E]["allowedProperties"][K]>;
+  [K in keyof TelemetryContract[E]["allowedProperties"]]: RuleToType<
+    TelemetryContract[E]["allowedProperties"][K]
+  >;
 }>;

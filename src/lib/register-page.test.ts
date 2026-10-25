@@ -11,22 +11,50 @@ function fakeCases(rows: any[]) {
   const applyOr = (rs: any[], f: string) => {
     if (f.startsWith("reference_no.ilike.")) {
       const term = f.split(".ilike.")[1].split(",")[0].replace(/^%|%$/g, "").toLowerCase();
-      return rs.filter((r) => [r.reference_no, r.vessel_name, r.container_no, r.port_code].some((v) => (v ?? "").toLowerCase().includes(term)));
+      return rs.filter((r) =>
+        [r.reference_no, r.vessel_name, r.container_no, r.port_code].some((v) =>
+          (v ?? "").toLowerCase().includes(term),
+        ),
+      );
     }
     const m = f.match(/^created_at\.lt\.([^,]+),and\(created_at\.eq\.([^,]+),id\.lt\.([^)]+)\)$/);
-    if (m) return rs.filter((r) => r.created_at < m![1] || (r.created_at === m![2] && r.id < m![3]));
+    if (m)
+      return rs.filter((r) => r.created_at < m![1] || (r.created_at === m![2] && r.id < m![3]));
     throw new Error("unexpected or: " + f);
   };
   const builder: any = {
-    or: (f: string) => { ops.ors.push(f); return builder; },
+    or: (f: string) => {
+      ops.ors.push(f);
+      return builder;
+    },
     then: (res: any, rej: any) => {
-      let rs = [...rows].sort((a, b) => (b.created_at !== a.created_at ? b.created_at.localeCompare(a.created_at) : b.id < a.id ? -1 : 1));
+      let rs = [...rows].sort((a, b) =>
+        b.created_at !== a.created_at
+          ? b.created_at.localeCompare(a.created_at)
+          : b.id < a.id
+            ? -1
+            : 1,
+      );
       for (const f of ops.ors) rs = applyOr(rs, f);
-      return Promise.resolve({ data: rs.slice(0, ops.limitN ?? rs.length), error: null }).then(res, rej);
+      return Promise.resolve({ data: rs.slice(0, ops.limitN ?? rs.length), error: null }).then(
+        res,
+        rej,
+      );
     },
   };
   return {
-    from: () => ({ select: () => ({ order: () => ({ order: () => ({ limit: (n: number) => { ops.limitN = n; return builder; } }) }) }) }),
+    from: () => ({
+      select: () => ({
+        order: () => ({
+          order: () => ({
+            limit: (n: number) => {
+              ops.limitN = n;
+              return builder;
+            },
+          }),
+        }),
+      }),
+    }),
   };
 }
 
@@ -36,15 +64,26 @@ function mk(n: number, prefix = "c", overrides: any = {}) {
     created_at: new Date(Date.UTC(2026, 9, 1, 8, 0, 0) - i * 60000).toISOString(),
     reference_no: `DUR-2026-${String(i).padStart(4, "0")}`,
     vessel_name: i % 3 === 0 ? "MV Umhlanga Trader" : `Vessel ${i}`,
-    container_no: `MSKU${i}`, port_code: "DUR", ...overrides,
+    container_no: `MSKU${i}`,
+    port_code: "DUR",
+    ...overrides,
   }));
 }
 
 // Mirror of the fn's page logic over the fake (lookahead + cursor extraction).
 async function pageQuery(db: any, { q, cursor, limit }: any) {
-  let query = db.from("cases").select("*").order().order().limit(limit + 1);
-  if (q?.trim()) query = query.or(`reference_no.ilike.%${q.trim()}%,vessel_name.ilike.%${q.trim()}%`);
-  if (cursor) query = query.or(`created_at.lt.${cursor.created_at},and(created_at.eq.${cursor.created_at},id.lt.${cursor.id})`);
+  let query = db
+    .from("cases")
+    .select("*")
+    .order()
+    .order()
+    .limit(limit + 1);
+  if (q?.trim())
+    query = query.or(`reference_no.ilike.%${q.trim()}%,vessel_name.ilike.%${q.trim()}%`);
+  if (cursor)
+    query = query.or(
+      `created_at.lt.${cursor.created_at},and(created_at.eq.${cursor.created_at},id.lt.${cursor.id})`,
+    );
   const { data } = await query;
   const page = (data ?? []).slice(0, limit);
   const nextCursor = (data ?? []).length > limit && page.length ? page[page.length - 1] : null;

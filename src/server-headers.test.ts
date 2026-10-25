@@ -7,7 +7,11 @@ describe("worker security headers", () => {
   it("adds the baseline set to a normal SSR page response without touching body/status/cookies", async () => {
     const original = new Response("<html>case register</html>", {
       status: 200,
-      headers: { "content-type": "text/html", "set-cookie": "session=abc; HttpOnly", "cache-control": "no-store" },
+      headers: {
+        "content-type": "text/html",
+        "set-cookie": "session=abc; HttpOnly",
+        "cache-control": "no-store",
+      },
     });
     const out = withSecurityHeaders(req("/"), original);
     expect(out.status).toBe(200);
@@ -22,7 +26,10 @@ describe("worker security headers", () => {
   });
 
   it("covers redirects (3xx) and error (500) responses", () => {
-    const redirect = withSecurityHeaders(req("/cases"), new Response(null, { status: 302, headers: { location: "/auth" } }));
+    const redirect = withSecurityHeaders(
+      req("/cases"),
+      new Response(null, { status: 302, headers: { location: "/auth" } }),
+    );
     expect(redirect.status).toBe(302);
     expect(redirect.headers.get("location")).toBe("/auth");
     expect(redirect.headers.get("x-frame-options")).toBe("DENY");
@@ -32,7 +39,9 @@ describe("worker security headers", () => {
   });
 
   it("never overwrites an upstream-set header", () => {
-    const upstream = new Response("ok", { headers: { "x-frame-options": "SAMEORIGIN", "content-security-policy": "default-src 'none'" } });
+    const upstream = new Response("ok", {
+      headers: { "x-frame-options": "SAMEORIGIN", "content-security-policy": "default-src 'none'" },
+    });
     const out = withSecurityHeaders(req("/harbour-view/index.html"), upstream);
     expect(out.headers.get("x-frame-options")).toBe("SAMEORIGIN");
     expect(out.headers.get("content-security-policy")).toBe("default-src 'none'");

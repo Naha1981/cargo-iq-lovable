@@ -83,10 +83,16 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "CargoIQ — Evidence & Dispute Intelligence" },
-      { name: "description", content: "Investigative evidence platform for freight, port and logistics disputes." },
+      {
+        name: "description",
+        content: "Investigative evidence platform for freight, port and logistics disputes.",
+      },
       { name: "author", content: "NahaLabs" },
       { property: "og:title", content: "CargoIQ — Evidence & Dispute Intelligence" },
-      { property: "og:description", content: "Investigative evidence platform for freight, port and logistics disputes." },
+      {
+        property: "og:description",
+        content: "Investigative evidence platform for freight, port and logistics disputes.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "theme-color", content: "#f4f5f7" },
@@ -97,7 +103,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     scripts: [{ children: THEME_INIT }],
     links: [
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
-      { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" },
+      {
+        rel: "stylesheet",
+        href: "https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap",
+      },
       {
         rel: "stylesheet",
         href: appCss,

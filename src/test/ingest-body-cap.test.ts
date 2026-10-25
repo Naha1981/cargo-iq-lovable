@@ -10,7 +10,12 @@ function streamRequest(chunks: string[], contentLength?: number) {
   });
   const headers: Record<string, string> = {};
   if (contentLength !== undefined) headers["content-length"] = String(contentLength);
-  return new Request("https://x.test/api/cctv/ingest", { method: "POST", headers, body: stream, duplex: "half" } as RequestInit);
+  return new Request("https://x.test/api/cctv/ingest", {
+    method: "POST",
+    headers,
+    body: stream,
+    duplex: "half",
+  } as RequestInit);
 }
 
 describe("ingest body cap", () => {

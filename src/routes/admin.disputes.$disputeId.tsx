@@ -14,8 +14,17 @@ function DisputePage() {
     retry: false,
     staleTime: 60_000,
   });
-  if (isLoading) return <main className="mx-auto max-w-3xl px-6 py-16 text-muted-foreground">Loading…</main>;
-  if (isError || !data) return <main className="mx-auto max-w-3xl px-6 py-16"><h1 className="text-xl font-semibold">Page not found</h1><p className="mt-2 text-sm text-muted-foreground">The page you're looking for doesn't exist or has been moved.</p></main>;
+  if (isLoading)
+    return <main className="mx-auto max-w-3xl px-6 py-16 text-muted-foreground">Loading…</main>;
+  if (isError || !data)
+    return (
+      <main className="mx-auto max-w-3xl px-6 py-16">
+        <h1 className="text-xl font-semibold">Page not found</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          The page you're looking for doesn't exist or has been moved.
+        </p>
+      </main>
+    );
   return <AdminDisputeView data={data} />;
 }
 
@@ -23,16 +32,26 @@ import type { AdminDisputeDetail } from "@/lib/admin.functions";
 export function AdminDisputeView({ data }: { data: AdminDisputeDetail }) {
   return (
     <main className="mx-auto max-w-3xl px-6 py-10">
-      <Link to="/admin" className="text-sm text-muted-foreground">← Platform overview</Link>
-      <h1 className="mt-2 text-2xl font-semibold tracking-tight">{data.case_title ?? "Untitled case"}</h1>
-      <p className="mt-1 text-sm text-muted-foreground">Dispute · {data.status.toLowerCase()} since {new Date(data.created_at).toLocaleString()}</p>
+      <Link to="/admin" className="text-sm text-muted-foreground">
+        ← Platform overview
+      </Link>
+      <h1 className="mt-2 text-2xl font-semibold tracking-tight">
+        {data.case_title ?? "Untitled case"}
+      </h1>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Dispute · {data.status.toLowerCase()} since {new Date(data.created_at).toLocaleString()}
+      </p>
       <section className="mt-8 space-y-4">
         <div className="rounded-xl border border-border p-4">
-          <h2 className="text-sm font-medium text-muted-foreground">Record A{data.claim_a_document?.name ? " · " + data.claim_a_document.name : ""}</h2>
+          <h2 className="text-sm font-medium text-muted-foreground">
+            Record A{data.claim_a_document?.name ? " · " + data.claim_a_document.name : ""}
+          </h2>
           <p className="mt-1 text-sm">{data.claim_a ?? "No text recorded."}</p>
         </div>
         <div className="rounded-xl border border-border p-4">
-          <h2 className="text-sm font-medium text-muted-foreground">Record B{data.claim_b_document?.name ? " · " + data.claim_b_document.name : ""}</h2>
+          <h2 className="text-sm font-medium text-muted-foreground">
+            Record B{data.claim_b_document?.name ? " · " + data.claim_b_document.name : ""}
+          </h2>
           <p className="mt-1 text-sm">{data.claim_b ?? "No text recorded."}</p>
         </div>
       </section>

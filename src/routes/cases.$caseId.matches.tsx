@@ -11,5 +11,12 @@ function MatchesPage() {
   const data = CaseRoute.useLoaderData();
   const { caseId } = Route.useParams();
   const router = useRouter();
-  return <CrossPartyEventMatches caseId={caseId} documents={data.documents} claims={data.claims} onChanged={() => router.invalidate()} />;
+  return (
+    <CrossPartyEventMatches
+      caseId={caseId}
+      documents={data.documents}
+      claims={data.claims}
+      onChanged={() => router.invalidate()}
+    />
+  );
 }

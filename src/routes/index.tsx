@@ -24,7 +24,11 @@ export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "CargoIQ — Investigations" },
-      { name: "description", content: "Investigative evidence and dispute intelligence for freight, port and logistics disputes." },
+      {
+        name: "description",
+        content:
+          "Investigative evidence and dispute intelligence for freight, port and logistics disputes.",
+      },
     ],
   }),
   component: Index,
@@ -42,7 +46,9 @@ function Index() {
   const { session, stats, page } = Route.useLoaderData();
   const [q, setQ] = useState("");
   const [rows, setRows] = useState<any[]>(page?.rows ?? []);
-  const [cursor, setCursor] = useState<{ created_at: string; id: string } | null>(page?.nextCursor ?? null);
+  const [cursor, setCursor] = useState<{ created_at: string; id: string } | null>(
+    page?.nextCursor ?? null,
+  );
   const [loading, setLoading] = useState(false);
   const firstLoad = useRef(true);
   // Monotonic request sequence: any response that is not the latest request
@@ -52,7 +58,10 @@ function Index() {
   // Server-side search over the same four fields as the old client filter,
   // debounced; resets paging to the first page of the filtered result.
   useEffect(() => {
-    if (firstLoad.current) { firstLoad.current = false; return; }
+    if (firstLoad.current) {
+      firstLoad.current = false;
+      return;
+    }
     const seq = ++reqSeq.current;
     const t = setTimeout(async () => {
       setLoading(true);
@@ -89,7 +98,9 @@ function Index() {
     return (
       <div className="min-h-screen bg-background">
         <AppHeader public />
-        <main><CargoIqOffer /></main>
+        <main>
+          <CargoIqOffer />
+        </main>
       </div>
     );
   }
@@ -103,24 +114,53 @@ function Index() {
       <main className="mx-auto max-w-[1400px] px-6 py-10">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="font-mono text-xs uppercase tracking-[0.2em] text-primary">Investigations</p>
-            {noCases
-              ? <h2 className="mt-2 max-w-3xl text-3xl font-semibold tracking-tight md:text-4xl">What actually happened — and what can be defensibly proven.</h2>
-              : <h1 className="mt-2 max-w-3xl text-3xl font-semibold tracking-tight md:text-4xl">What actually happened — and what can be defensibly proven.</h1>}
+            <p className="font-mono text-xs uppercase tracking-[0.2em] text-primary">
+              Investigations
+            </p>
+            {noCases ? (
+              <h2 className="mt-2 max-w-3xl text-3xl font-semibold tracking-tight md:text-4xl">
+                What actually happened — and what can be defensibly proven.
+              </h2>
+            ) : (
+              <h1 className="mt-2 max-w-3xl text-3xl font-semibold tracking-tight md:text-4xl">
+                What actually happened — and what can be defensibly proven.
+              </h1>
+            )}
           </div>
-          <Link to="/new-case" className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">+ New investigation</Link>
+          <Link
+            to="/new-case"
+            className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+          >
+            + New investigation
+          </Link>
         </div>
 
-        <a href="/demo/cuf" className="mt-6 inline-flex rounded-md border px-4 py-2 text-sm font-semibold">Explore a worked example</a>
+        <a
+          href="/demo/cuf"
+          className="mt-6 inline-flex rounded-md border px-4 py-2 text-sm font-semibold"
+        >
+          Explore a worked example
+        </a>
         <div className="mt-8 grid grid-cols-2 gap-3 md:grid-cols-4">
           <Stat label="Open cases" value={stats?.openCases ?? 0} />
           <Stat label="Contradictions" value={stats?.contradictions ?? 0} tone="disputed" />
-          <Stat label="Exposure (ZAR)" value={fmtMoney(stats?.exposureZar ?? 0, "ZAR")} className="col-span-2 md:col-span-1" />
-          <Stat label="Recoverable (ZAR)" value={stats?.recoveryBlocked ? "BLOCKED" : fmtMoney(stats?.recoveryZar ?? 0, "ZAR")} tone={stats?.recoveryBlocked ? "disputed" : "observed"} className="col-span-2 md:col-span-1" />
+          <Stat
+            label="Exposure (ZAR)"
+            value={fmtMoney(stats?.exposureZar ?? 0, "ZAR")}
+            className="col-span-2 md:col-span-1"
+          />
+          <Stat
+            label="Recoverable (ZAR)"
+            value={stats?.recoveryBlocked ? "BLOCKED" : fmtMoney(stats?.recoveryZar ?? 0, "ZAR")}
+            tone={stats?.recoveryBlocked ? "disputed" : "observed"}
+            className="col-span-2 md:col-span-1"
+          />
         </div>
 
         <div className="mt-10 flex flex-wrap items-center justify-between gap-4">
-          <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground">Case register</h2>
+          <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+            Case register
+          </h2>
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
@@ -144,22 +184,51 @@ function Index() {
                 <tr key={c.id} className="border-t bg-card transition-colors hover:bg-accent">
                   <td className="px-4 py-3">
                     <Link to="/cases/$caseId" params={{ caseId: c.id }} className="block">
-                      <div className="font-mono text-xs text-muted-foreground">{c.reference_no} · {c.port_code ?? "—"}</div>
-                      <div className="font-medium">{c.vessel_name || "Unnamed vessel"} {c.voyage_no ? "· " + c.voyage_no : ""}</div>
+                      <div className="font-mono text-xs text-muted-foreground">
+                        {c.reference_no} · {c.port_code ?? "—"}
+                      </div>
+                      <div className="font-medium">
+                        {c.vessel_name || "Unnamed vessel"} {c.voyage_no ? "· " + c.voyage_no : ""}
+                      </div>
                     </Link>
                   </td>
-                  <td className="px-4 py-3"><span className={cn("rounded px-2 py-1 text-xs", statusCls[c.status] ?? "bg-secondary")}>{c.status}</span></td>
-                  <td className="px-4 py-3 text-right font-mono">{fmtMoney(c.exposure, c.currency)}</td>
-                  <td className="px-4 py-3 text-right font-mono text-observed">{(c.contradictions > 0 || c.clockConflicts) ? "BLOCKED" : fmtMoney(c.recovery ?? 0, c.currency)}</td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={cn(
+                        "rounded px-2 py-1 text-xs",
+                        statusCls[c.status] ?? "bg-secondary",
+                      )}
+                    >
+                      {c.status}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-right font-mono">
+                    {fmtMoney(c.exposure, c.currency)}
+                  </td>
+                  <td className="px-4 py-3 text-right font-mono text-observed">
+                    {c.contradictions > 0 || c.clockConflicts
+                      ? "BLOCKED"
+                      : fmtMoney(c.recovery ?? 0, c.currency)}
+                  </td>
                 </tr>
               ))}
-              {!rows.length && <tr><td colSpan={4} className="px-4 py-10 text-center text-sm text-muted-foreground">No investigations yet. Create the first case to begin.</td></tr>}
+              {!rows.length && (
+                <tr>
+                  <td colSpan={4} className="px-4 py-10 text-center text-sm text-muted-foreground">
+                    No investigations yet. Create the first case to begin.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
         {cursor && (
           <div className="mt-4 text-center">
-            <button onClick={loadMore} disabled={loading} className="rounded-md border px-4 py-2 text-sm font-semibold disabled:opacity-50">
+            <button
+              onClick={loadMore}
+              disabled={loading}
+              className="rounded-md border px-4 py-2 text-sm font-semibold disabled:opacity-50"
+            >
               {loading ? "Loading…" : "Load more investigations"}
             </button>
           </div>

@@ -17,7 +17,9 @@ function AuthPage() {
   const navigate = useNavigate();
   const { mode: requestedMode } = Route.useSearch();
   // New customers arrive via "Create an account" (?mode=signup); default stays sign-in.
-  const [mode, setMode] = useState<"signin" | "signup" | "reset">(requestedMode === "signup" ? "signup" : "signin");
+  const [mode, setMode] = useState<"signin" | "signup" | "reset">(
+    requestedMode === "signup" ? "signup" : "signin",
+  );
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [organization, setOrganization] = useState("");
@@ -53,7 +55,9 @@ function AuthPage() {
         });
         if (resetError) throw resetError;
         setError("");
-        setNotice("If an account exists for this email, a reset link is on its way. Open it on this device.");
+        setNotice(
+          "If an account exists for this email, a reset link is on its way. Open it on this device.",
+        );
         setMode("signin");
         return;
       } else {
@@ -76,48 +80,102 @@ function AuthPage() {
         <div className="mb-8">
           <div className="font-mono text-xs uppercase tracking-[0.2em] text-primary">CargoIQ</div>
           <h1 className="mt-2 text-3xl font-semibold">Investigative evidence, not guesswork.</h1>
-          <p className="mt-2 text-sm text-muted-foreground">Secure case workspaces for freight, port and dispute investigations.</p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Secure case workspaces for freight, port and dispute investigations.
+          </p>
         </div>
 
-        <Panel title={mode === "signin" ? "Sign in" : mode === "signup" ? "Create workspace" : "Reset password"}>
+        <Panel
+          title={
+            mode === "signin"
+              ? "Sign in"
+              : mode === "signup"
+                ? "Create workspace"
+                : "Reset password"
+          }
+        >
           <form className="space-y-4" onSubmit={submit}>
             {mode === "signup" && (
               <label className="block text-sm">
                 Organization
-                <input value={organization} onChange={(e) => setOrganization(e.target.value)} className="mt-1 w-full rounded-md border bg-background px-3 py-2" placeholder="Acme Logistics" />
+                <input
+                  value={organization}
+                  onChange={(e) => setOrganization(e.target.value)}
+                  className="mt-1 w-full rounded-md border bg-background px-3 py-2"
+                  placeholder="Acme Logistics"
+                />
               </label>
             )}
 
             <label className="block text-sm">
               Email
-              <input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="mt-1 w-full rounded-md border bg-background px-3 py-2" />
+              <input
+                required
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="mt-1 w-full rounded-md border bg-background px-3 py-2"
+              />
             </label>
 
             {mode !== "reset" && (
               <label className="block text-sm">
                 Password
-                <input required minLength={8} type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="mt-1 w-full rounded-md border bg-background px-3 py-2" />
+                <input
+                  required
+                  minLength={8}
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="mt-1 w-full rounded-md border bg-background px-3 py-2"
+                />
               </label>
             )}
 
-            {error && <div className="rounded border border-disputed/40 bg-disputed/10 p-3 text-sm text-disputed">{error}</div>}
-            {notice && <div className="rounded border border-observed/40 bg-observed/10 p-3 text-sm text-observed">{notice}</div>}
-            <Button disabled={busy} className="w-full justify-center">{busy ? "Working…" : mode === "signin" ? "Sign in" : mode === "signup" ? "Create workspace" : "Send reset link"}</Button>
+            {error && (
+              <div className="rounded border border-disputed/40 bg-disputed/10 p-3 text-sm text-disputed">
+                {error}
+              </div>
+            )}
+            {notice && (
+              <div className="rounded border border-observed/40 bg-observed/10 p-3 text-sm text-observed">
+                {notice}
+              </div>
+            )}
+            <Button disabled={busy} className="w-full justify-center">
+              {busy
+                ? "Working…"
+                : mode === "signin"
+                  ? "Sign in"
+                  : mode === "signup"
+                    ? "Create workspace"
+                    : "Send reset link"}
+            </Button>
           </form>
 
           {mode === "signin" && (
             <button
-              onClick={() => { setMode("reset"); setError(""); setNotice(""); }}
+              onClick={() => {
+                setMode("reset");
+                setError("");
+                setNotice("");
+              }}
               className="mt-3 w-full text-center text-xs text-muted-foreground hover:text-foreground"
             >
               Forgot password?
             </button>
           )}
           <button
-            onClick={() => { setMode(mode === "signin" ? "signup" : "signin"); setError(""); setNotice(""); }}
+            onClick={() => {
+              setMode(mode === "signin" ? "signup" : "signin");
+              setError("");
+              setNotice("");
+            }}
             className="mt-4 w-full text-center text-xs text-muted-foreground hover:text-foreground"
           >
-            {mode === "signin" ? "Need a workspace? Create one." : "Already have an account? Sign in."}
+            {mode === "signin"
+              ? "Need a workspace? Create one."
+              : "Already have an account? Sign in."}
           </button>
         </Panel>
       </div>

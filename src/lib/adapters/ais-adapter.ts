@@ -16,7 +16,8 @@ const num = (value: unknown) => {
 export function normalizeAisMessage(payload: any): NormalizedAis | null {
   const metadata = payload?.MetaData ?? payload?.metadata ?? payload;
   const message = payload?.Message ?? payload?.message ?? {};
-  const position = message?.PositionReport ?? message?.positionReport ?? message?.Position ?? metadata;
+  const position =
+    message?.PositionReport ?? message?.positionReport ?? message?.Position ?? metadata;
   const lat = num(position?.Latitude ?? position?.latitude ?? metadata?.Latitude);
   const lon = num(position?.Longitude ?? position?.longitude ?? metadata?.Longitude);
   const mmsi = String(metadata?.MMSI ?? metadata?.mmsi ?? message?.MMSI ?? "").trim();
@@ -28,25 +29,35 @@ export function normalizeAisMessage(payload: any): NormalizedAis | null {
     longitude: lon,
     sog: num(position?.Sog ?? position?.SOG ?? position?.sog),
     cog: num(position?.Cog ?? position?.COG ?? position?.cog),
-    navigationalStatus: position?.NavigationalStatus != null ? String(position.NavigationalStatus) : null,
+    navigationalStatus:
+      position?.NavigationalStatus != null ? String(position.NavigationalStatus) : null,
     observedAt: new Date(payload?.timestamp ?? Date.now()).toISOString(),
     source: "AISStream",
   };
 }
-export function buildAisBoundingBox(center: [number, number], radiusKm = 25): [number, number, number, number] {
+export function buildAisBoundingBox(
+  center: [number, number],
+  radiusKm = 25,
+): [number, number, number, number] {
   const [lat, lon] = center;
   const latDelta = radiusKm / 111;
   const lonDelta = radiusKm / (111 * Math.cos((lat * Math.PI) / 180));
   return [lon - lonDelta, lat - latDelta, lon + lonDelta, lat + latDelta];
 }
-export async function fetchAisSnapshot(options: { vesselName?: string; bbox: [number, number, number, number]; timeoutMs?: number }) {
+export async function fetchAisSnapshot(options: {
+  vesselName?: string;
+  bbox: [number, number, number, number];
+  timeoutMs?: number;
+}) {
   const apiKey = process.env.AISSTREAM_API_KEY;
   const httpEndpoint = process.env.AIS_PUBLIC_HTTP_URL;
   if (httpEndpoint) {
-    const response = await fetch(httpEndpoint, { headers: apiKey ? { Authorization: "Bearer " + apiKey } : {} });
+    const response = await fetch(httpEndpoint, {
+      headers: apiKey ? { Authorization: "Bearer " + apiKey } : {},
+    });
     if (response.ok) {
       const body = await response.json();
-      const rows = Array.isArray(body) ? body : body?.data ?? [];
+      const rows = Array.isArray(body) ? body : (body?.data ?? []);
       return rows.map(normalizeAisMessage).filter(Boolean) as NormalizedAis[];
     }
   }
@@ -62,15 +73,26 @@ export async function fetchAisSnapshot(options: { vesselName?: string; bbox: [nu
       if (done) return;
       done = true;
       clearTimeout(timer);
-      try { socket.close(); } catch {}
+      try {
+        socket.close();
+      } catch {}
       resolve();
     };
     const timer = setTimeout(finish, timeoutMs);
-    socket.addEventListener("open", () => socket.send(JSON.stringify({
-      APIKey: apiKey,
-      BoundingBoxes: [[[south, west], [north, east]]],
-      FilterMessageTypes: ["PositionReport", "ShipStaticData", "StaticDataReport"],
-    })));
+    socket.addEventListener("open", () =>
+      socket.send(
+        JSON.stringify({
+          APIKey: apiKey,
+          BoundingBoxes: [
+            [
+              [south, west],
+              [north, east],
+            ],
+          ],
+          FilterMessageTypes: ["PositionReport", "ShipStaticData", "StaticDataReport"],
+        }),
+      ),
+    );
     socket.addEventListener("message", (event) => {
       const row = normalizeAisMessage(JSON.parse(String(event.data)));
       if (!row) return;

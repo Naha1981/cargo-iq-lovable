@@ -1,10 +1,15 @@
-import { createClient as createSbClient, type SupabaseClient, type User } from "@supabase/supabase-js";
+import {
+  createClient as createSbClient,
+  type SupabaseClient,
+  type User,
+} from "@supabase/supabase-js";
 import { getRequest } from "@tanstack/react-start/server";
 import type { Database } from "@/integrations/supabase/types";
 
 function env() {
   const url = process.env["SUPABASE_URL"] || import.meta.env.VITE_SUPABASE_URL;
-  const key = process.env["SUPABASE_PUBLISHABLE_KEY"] || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  const key =
+    process.env["SUPABASE_PUBLISHABLE_KEY"] || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
   if (!url || !key) throw new Error("Supabase environment variables are not configured.");
   return { url, key };
 }
@@ -25,7 +30,8 @@ export function createClient(token: string | null = bearer()): SupabaseClient<Da
       fetch: (input, init) => {
         const h = new Headers(init?.headers);
         if (token) h.set("Authorization", `Bearer ${token}`);
-        else if (key.startsWith("sb_") && h.get("Authorization") === `Bearer ${key}`) h.delete("Authorization");
+        else if (key.startsWith("sb_") && h.get("Authorization") === `Bearer ${key}`)
+          h.delete("Authorization");
         h.set("apikey", key);
         return fetch(input, { ...init, headers: h });
       },
@@ -33,7 +39,10 @@ export function createClient(token: string | null = bearer()): SupabaseClient<Da
   });
 }
 
-export async function getAuthed(): Promise<{ supabase: SupabaseClient<Database>; user: User | null }> {
+export async function getAuthed(): Promise<{
+  supabase: SupabaseClient<Database>;
+  user: User | null;
+}> {
   const token = bearer();
   const supabase = createClient(token);
   if (!token) return { supabase, user: null };

@@ -22,10 +22,34 @@ function fixture() {
     { id: "c4", status: "APPROVED" }, // no calc row -> currency defaults ZAR, zero amounts
   ];
   const calcs = [
-    { case_id: "c1", calculated_amount_minor: 80000, charged_amount_minor: 100000, currency: "ZAR", created_at: "2026-10-02" },
-    { case_id: "c1", calculated_amount_minor: 1, charged_amount_minor: 1, currency: "ZAR", created_at: "2026-10-01" }, // older, latest wins
-    { case_id: "c2", calculated_amount_minor: 5000, charged_amount_minor: 20000, currency: "USD", created_at: "2026-10-01" },
-    { case_id: "c3", calculated_amount_minor: 50000, charged_amount_minor: 90000, currency: "ZAR", created_at: "2026-10-03" },
+    {
+      case_id: "c1",
+      calculated_amount_minor: 80000,
+      charged_amount_minor: 100000,
+      currency: "ZAR",
+      created_at: "2026-10-02",
+    },
+    {
+      case_id: "c1",
+      calculated_amount_minor: 1,
+      charged_amount_minor: 1,
+      currency: "ZAR",
+      created_at: "2026-10-01",
+    }, // older, latest wins
+    {
+      case_id: "c2",
+      calculated_amount_minor: 5000,
+      charged_amount_minor: 20000,
+      currency: "USD",
+      created_at: "2026-10-01",
+    },
+    {
+      case_id: "c3",
+      calculated_amount_minor: 50000,
+      charged_amount_minor: 90000,
+      currency: "ZAR",
+      created_at: "2026-10-03",
+    },
   ];
   const contradictions = [
     { case_id: "c3", status: "FLAGGED" },
@@ -40,30 +64,55 @@ describe("computeDashboardStats equivalence with previous client derivation", ()
   it("matches exactly on a mixed fixture (multi-currency, blocked, closed, calc-less)", () => {
     const { cases, calcs, contradictions, blocked } = fixture();
     const latest = new Map<string, any>();
-    for (const r of [...calcs].sort((a, b) => b.created_at.localeCompare(a.created_at))) if (!latest.has(r.case_id)) latest.set(r.case_id, r);
+    for (const r of [...calcs].sort((a, b) => b.created_at.localeCompare(a.created_at)))
+      if (!latest.has(r.case_id)) latest.set(r.case_id, r);
     const enriched = cases.map((c) => {
       const calc = latest.get(c.id);
-      const contra = contradictions.filter((x) => x.case_id === c.id && x.status === "FLAGGED").length;
+      const contra = contradictions.filter(
+        (x) => x.case_id === c.id && x.status === "FLAGGED",
+      ).length;
       const clock = blocked.has(c.id);
       const charged = calc?.charged_amount_minor ? calc.charged_amount_minor / 100 : 0;
       const calculated = calc?.calculated_amount_minor ? calc.calculated_amount_minor / 100 : 0;
-      return { ...c, currency: calc?.currency ?? "ZAR", exposure: charged, recovery: caseRecovery(charged, calculated, contra + (clock ? 1 : 0)), contradictions: contra, clockConflicts: clock };
+      return {
+        ...c,
+        currency: calc?.currency ?? "ZAR",
+        exposure: charged,
+        recovery: caseRecovery(charged, calculated, contra + (clock ? 1 : 0)),
+        contradictions: contra,
+        clockConflicts: clock,
+      };
     });
     const oldStats = oldDerivation(enriched);
     const orderedCalcs = [...calcs].sort((a, b) => b.created_at.localeCompare(a.created_at));
     const newStats = computeDashboardStats(cases, orderedCalcs, contradictions, blocked);
-    expect({ openCases: newStats.openCases, contradictions: newStats.contradictions, exposureZar: newStats.exposureZar, recoveryZar: newStats.recoveryZar, recoveryBlocked: newStats.recoveryBlocked }).toEqual(oldStats);
+    expect({
+      openCases: newStats.openCases,
+      contradictions: newStats.contradictions,
+      exposureZar: newStats.exposureZar,
+      recoveryZar: newStats.recoveryZar,
+      recoveryBlocked: newStats.recoveryBlocked,
+    }).toEqual(oldStats);
     expect(newStats.total).toBe(4);
   });
 
   it("handles empty datasets", () => {
-    expect(computeDashboardStats([], [], [], new Set())).toEqual({ total: 0, openCases: 0, contradictions: 0, exposureZar: 0, recoveryZar: 0, recoveryBlocked: false });
+    expect(computeDashboardStats([], [], [], new Set())).toEqual({
+      total: 0,
+      openCases: 0,
+      contradictions: 0,
+      exposureZar: 0,
+      recoveryZar: 0,
+      recoveryBlocked: false,
+    });
   });
 });
 
 describe("caseSearchOrFilter", () => {
   it("builds an ilike or-filter over the same four fields as the old client filter", () => {
-    expect(caseSearchOrFilter("umhlanga")).toBe("reference_no.ilike.%umhlanga%,vessel_name.ilike.%umhlanga%,container_no.ilike.%umhlanga%,port_code.ilike.%umhlanga%");
+    expect(caseSearchOrFilter("umhlanga")).toBe(
+      "reference_no.ilike.%umhlanga%,vessel_name.ilike.%umhlanga%,container_no.ilike.%umhlanga%,port_code.ilike.%umhlanga%",
+    );
   });
   it("strips PostgREST or() syntax characters so input cannot break the filter", () => {
     const f = caseSearchOrFilter("a%,(b).c\\d");

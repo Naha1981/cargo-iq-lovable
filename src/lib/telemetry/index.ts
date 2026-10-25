@@ -1,8 +1,4 @@
-import {
-  TELEMETRY_PRODUCT,
-  type TelemetryEventName,
-  type TelemetryPayload,
-} from "./events";
+import { TELEMETRY_PRODUCT, type TelemetryEventName, type TelemetryPayload } from "./events";
 import { sanitizeTelemetry } from "./sanitizer";
 
 type TelemetryEnvironment = ImportMeta & {
@@ -101,7 +97,7 @@ export function captureTelemetry<E extends TelemetryEventName>(
     distinct_id: getAnonymousSubjectId(),
     properties: {
       ...sanitized.properties,
-      "$process_person_profile": false,
+      $process_person_profile: false,
     },
   });
 

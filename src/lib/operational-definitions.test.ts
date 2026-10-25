@@ -1,8 +1,41 @@
-import { describe,it,expect } from "vitest";
-import { definitionInput,latestDefinitions } from "./operational-definitions";
-const good={caseId:"759843cd-f9e2-441e-adf5-d13148bb46ab",party:"Synthetic terminal",metric:"HATCH_COVER",unit:"individual lifts",rule:"Count each individual lift separately",originalSourceText:"Four individual hatch-cover lifts",sourceDocumentId:"759843cd-f9e2-441e-adf5-d13148bb46ac",sourceReference:"row 1",effectiveFrom:"2026-10-15T00:00:00+02:00",effectiveTo:null,acceptance:"PARTY_REPORTED",acceptanceBasis:"Party supplied counting definition",supersedesId:null};
-describe("operational definition input",()=>{
- it("requires source provenance and explicit acceptance",()=>{expect(definitionInput.safeParse(good).success).toBe(true);expect(definitionInput.safeParse({...good,sourceDocumentId:""}).success).toBe(false);expect(definitionInput.safeParse({...good,acceptanceBasis:""}).success).toBe(false)});
- it("rejects timezone-free instants and reversed intervals",()=>{expect(definitionInput.safeParse({...good,effectiveFrom:"2026-10-15T00:00:00"}).success).toBe(false);expect(definitionInput.safeParse({...good,effectiveTo:"2026-10-14T00:00:00Z"}).success).toBe(false)});
- it("keeps parties separate and selects versions, never converts source units",()=>{const rows=[{party:"Terminal",metric:"HATCH_COVER",version:1,unit:"lift"},{party:"Terminal",metric:"HATCH_COVER",version:2,unit:"individual lift"},{party:"Carrier",metric:"HATCH_COVER",version:1,unit:"operation"}];expect(latestDefinitions(rows).map(r=>r.unit)).toEqual(["individual lift","operation"]);expect(rows).toHaveLength(3)});
+import { describe, it, expect } from "vitest";
+import { definitionInput, latestDefinitions } from "./operational-definitions";
+const good = {
+  caseId: "759843cd-f9e2-441e-adf5-d13148bb46ab",
+  party: "Synthetic terminal",
+  metric: "HATCH_COVER",
+  unit: "individual lifts",
+  rule: "Count each individual lift separately",
+  originalSourceText: "Four individual hatch-cover lifts",
+  sourceDocumentId: "759843cd-f9e2-441e-adf5-d13148bb46ac",
+  sourceReference: "row 1",
+  effectiveFrom: "2026-10-15T00:00:00+02:00",
+  effectiveTo: null,
+  acceptance: "PARTY_REPORTED",
+  acceptanceBasis: "Party supplied counting definition",
+  supersedesId: null,
+};
+describe("operational definition input", () => {
+  it("requires source provenance and explicit acceptance", () => {
+    expect(definitionInput.safeParse(good).success).toBe(true);
+    expect(definitionInput.safeParse({ ...good, sourceDocumentId: "" }).success).toBe(false);
+    expect(definitionInput.safeParse({ ...good, acceptanceBasis: "" }).success).toBe(false);
+  });
+  it("rejects timezone-free instants and reversed intervals", () => {
+    expect(
+      definitionInput.safeParse({ ...good, effectiveFrom: "2026-10-15T00:00:00" }).success,
+    ).toBe(false);
+    expect(
+      definitionInput.safeParse({ ...good, effectiveTo: "2026-10-14T00:00:00Z" }).success,
+    ).toBe(false);
+  });
+  it("keeps parties separate and selects versions, never converts source units", () => {
+    const rows = [
+      { party: "Terminal", metric: "HATCH_COVER", version: 1, unit: "lift" },
+      { party: "Terminal", metric: "HATCH_COVER", version: 2, unit: "individual lift" },
+      { party: "Carrier", metric: "HATCH_COVER", version: 1, unit: "operation" },
+    ];
+    expect(latestDefinitions(rows).map((r) => r.unit)).toEqual(["individual lift", "operation"]);
+    expect(rows).toHaveLength(3);
+  });
 });

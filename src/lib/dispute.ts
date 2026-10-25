@@ -2,7 +2,12 @@
 // tied to FLAGGED contradictions (plus any claim a reviewer marked DISPUTED). Every surface
 // (documents, timeline, harbour map, ships) uses the same marker: the theme's --disputed red,
 // an uppercase DISPUTED badge with a pulsing dot, and a shaded band for the disputed window.
-export type ContradictionLike = { id: string; status: string; claim_a_id?: string | null; claim_b_id?: string | null };
+export type ContradictionLike = {
+  id: string;
+  status: string;
+  claim_a_id?: string | null;
+  claim_b_id?: string | null;
+};
 export type ClaimLike = { id: string; status?: string | null; timestamp_claimed?: string | null };
 
 export const DISPUTE_MARKER = {
@@ -26,7 +31,10 @@ export function isDisputedClaim<T extends ClaimLike>(claim: T, disputed: Set<str
 }
 
 // The disputed window: the earliest-to-latest claimed timestamp among disputed claims.
-export function disputedWindow(claims: ClaimLike[], disputed: Set<string>): { start: number; end: number } | null {
+export function disputedWindow(
+  claims: ClaimLike[],
+  disputed: Set<string>,
+): { start: number; end: number } | null {
   const times = claims
     .filter((c) => isDisputedClaim(c, disputed))
     .map((c) => (c.timestamp_claimed ? Date.parse(c.timestamp_claimed) : NaN))
@@ -35,6 +43,9 @@ export function disputedWindow(claims: ClaimLike[], disputed: Set<string>): { st
   return { start: Math.min(...times), end: Math.max(...times) };
 }
 
-export function isDisputeEvent(event: { provenance_id?: string | null }, disputed: Set<string>): boolean {
+export function isDisputeEvent(
+  event: { provenance_id?: string | null },
+  disputed: Set<string>,
+): boolean {
   return !!event.provenance_id && disputed.has(String(event.provenance_id));
 }

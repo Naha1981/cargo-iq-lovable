@@ -17,7 +17,9 @@ export function calculateDemurrage(input: DemurrageInput) {
   let total = 0;
   const dailyBreakdown: Array<{ day: number; rate: number; amount: number }> = [];
   for (let day = 1; day <= chargeable; day++) {
-    const tier = input.tieredRates.find((r) => day >= r.fromDay && (r.toDay == null || day <= r.toDay)) ?? input.tieredRates[input.tieredRates.length - 1];
+    const tier =
+      input.tieredRates.find((r) => day >= r.fromDay && (r.toDay == null || day <= r.toDay)) ??
+      input.tieredRates[input.tieredRates.length - 1];
     if (!tier) throw new Error("NO_RATE_RULE");
     const amount = tier.dailyRate * input.units;
     total += amount;

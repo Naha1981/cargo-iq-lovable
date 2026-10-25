@@ -21,6 +21,7 @@ import { Route as TermsRouteImport } from './routes/terms'
 import { Route as WhatsappQuotesRouteImport } from './routes/whatsapp-quotes'
 import { Route as CasesCaseIdRouteImport } from './routes/cases.$caseId'
 import { Route as DemoCufRouteImport } from './routes/demo.cuf'
+import { Route as InviteTokenRouteImport } from './routes/invite.$token'
 import { Route as AdminDisputesDisputeIdRouteImport } from './routes/admin.disputes.$disputeId'
 import { Route as ApiCctvIngestRouteImport } from './routes/api/cctv/ingest'
 import { Route as ApiWhatsappWebhookRouteImport } from './routes/api/whatsapp/webhook'
@@ -98,6 +99,11 @@ const CasesCaseIdRoute = CasesCaseIdRouteImport.update({
 const DemoCufRoute = DemoCufRouteImport.update({
   id: '/demo/cuf',
   path: '/demo/cuf',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InviteTokenRoute = InviteTokenRouteImport.update({
+  id: '/invite/$token',
+  path: '/invite/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminDisputesDisputeIdRoute = AdminDisputesDisputeIdRouteImport.update({
@@ -204,6 +210,7 @@ export interface FileRoutesByFullPath {
   '/whatsapp-quotes': typeof WhatsappQuotesRoute
   '/cases/$caseId': typeof CasesCaseIdRouteWithChildren
   '/demo/cuf': typeof DemoCufRoute
+  '/invite/$token': typeof InviteTokenRoute
   '/admin/disputes/$disputeId': typeof AdminDisputesDisputeIdRoute
   '/api/cctv/ingest': typeof ApiCctvIngestRoute
   '/api/whatsapp/webhook': typeof ApiWhatsappWebhookRoute
@@ -235,6 +242,7 @@ export interface FileRoutesByTo {
   '/terms': typeof TermsRoute
   '/whatsapp-quotes': typeof WhatsappQuotesRoute
   '/demo/cuf': typeof DemoCufRoute
+  '/invite/$token': typeof InviteTokenRoute
   '/admin/disputes/$disputeId': typeof AdminDisputesDisputeIdRoute
   '/api/cctv/ingest': typeof ApiCctvIngestRoute
   '/api/whatsapp/webhook': typeof ApiWhatsappWebhookRoute
@@ -268,6 +276,7 @@ export interface FileRoutesById {
   '/whatsapp-quotes': typeof WhatsappQuotesRoute
   '/cases/$caseId': typeof CasesCaseIdRouteWithChildren
   '/demo/cuf': typeof DemoCufRoute
+  '/invite/$token': typeof InviteTokenRoute
   '/admin/disputes/$disputeId': typeof AdminDisputesDisputeIdRoute
   '/api/cctv/ingest': typeof ApiCctvIngestRoute
   '/api/whatsapp/webhook': typeof ApiWhatsappWebhookRoute
@@ -302,6 +311,7 @@ export interface FileRouteTypes {
     | '/whatsapp-quotes'
     | '/cases/$caseId'
     | '/demo/cuf'
+    | '/invite/$token'
     | '/admin/disputes/$disputeId'
     | '/api/cctv/ingest'
     | '/api/whatsapp/webhook'
@@ -333,6 +343,7 @@ export interface FileRouteTypes {
     | '/terms'
     | '/whatsapp-quotes'
     | '/demo/cuf'
+    | '/invite/$token'
     | '/admin/disputes/$disputeId'
     | '/api/cctv/ingest'
     | '/api/whatsapp/webhook'
@@ -365,6 +376,7 @@ export interface FileRouteTypes {
     | '/whatsapp-quotes'
     | '/cases/$caseId'
     | '/demo/cuf'
+    | '/invite/$token'
     | '/admin/disputes/$disputeId'
     | '/api/cctv/ingest'
     | '/api/whatsapp/webhook'
@@ -398,6 +410,7 @@ export interface RootRouteChildren {
   WhatsappQuotesRoute: typeof WhatsappQuotesRoute
   CasesCaseIdRoute: typeof CasesCaseIdRouteWithChildren
   DemoCufRoute: typeof DemoCufRoute
+  InviteTokenRoute: typeof InviteTokenRoute
   ApiCctvIngestRoute: typeof ApiCctvIngestRoute
   ApiWhatsappWebhookRoute: typeof ApiWhatsappWebhookRoute
 }
@@ -486,6 +499,13 @@ declare module '@tanstack/react-router' {
       path: '/demo/cuf'
       fullPath: '/demo/cuf'
       preLoaderRoute: typeof DemoCufRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/invite/$token': {
+      id: '/invite/$token'
+      path: '/invite/$token'
+      fullPath: '/invite/$token'
+      preLoaderRoute: typeof InviteTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/disputes/$disputeId': {
@@ -680,6 +700,7 @@ const rootRouteChildren: RootRouteChildren = {
   WhatsappQuotesRoute: WhatsappQuotesRoute,
   CasesCaseIdRoute: CasesCaseIdRouteWithChildren,
   DemoCufRoute: DemoCufRoute,
+  InviteTokenRoute: InviteTokenRoute,
   ApiCctvIngestRoute: ApiCctvIngestRoute,
   ApiWhatsappWebhookRoute: ApiWhatsappWebhookRoute,
 }

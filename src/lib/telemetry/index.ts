@@ -1,40 +1,11 @@
 import { TELEMETRY_PRODUCT, type TelemetryEventName, type TelemetryPayload } from "./events";
 import { sanitizeTelemetry } from "./sanitizer";
+import { getTelemetryConfig, getTelemetryRuntimeEnv } from "./config";
 
-type TelemetryEnvironment = ImportMeta & {
-  env?: {
-    MODE?: string;
-    DEV?: boolean;
-    VITE_POSTHOG_PROJECT_TOKEN?: string;
-    VITE_POSTHOG_HOST?: string;
-    VITE_APP_VERSION?: string;
-  };
-};
-
-const env = (import.meta as TelemetryEnvironment).env ?? {};
 const DEFAULT_STORAGE_KEY = `nahalabs.telemetry.subject.${TELEMETRY_PRODUCT.toLowerCase()}`;
 
 let anonymousSubjectId: string | null = null;
 let initialized = false;
-
-function getConfig(): { apiHost: string; projectToken: string } | null {
-  const projectToken = env.VITE_POSTHOG_PROJECT_TOKEN?.trim() ?? "";
-  const apiHost = env.VITE_POSTHOG_HOST?.trim().replace(/\/+$/, "") ?? "";
-
-  if (!projectToken || !apiHost || typeof window === "undefined") {
-    return null;
-  }
-
-  try {
-    const parsed = new URL(apiHost);
-    if (parsed.protocol !== "https:") {
-      return null;
-    }
-    return { apiHost: parsed.toString().replace(/\/+$/, ""), projectToken };
-  } catch {
-    return null;
-  }
-}
 
 function getAnonymousSubjectId(): string {
   if (anonymousSubjectId) return anonymousSubjectId;
@@ -71,12 +42,14 @@ export function initTelemetry(): void {
   if (initialized) return;
   initialized = true;
 
-  if (!getConfig()) return;
+  if (!getTelemetryConfig()) return;
 
   void captureTelemetry("app_opened", {
     product: TELEMETRY_PRODUCT,
-    environment: env.MODE ?? "unknown",
-    ...(env.VITE_APP_VERSION ? { app_version: env.VITE_APP_VERSION } : {}),
+    environment: getTelemetryRuntimeEnv().mode,
+    ...(getTelemetryRuntimeEnv().appVersion
+      ? { app_version: getTelemetryRuntimeEnv().appVersion }
+      : {}),
     platform: "web",
   });
 }
@@ -85,7 +58,7 @@ export function captureTelemetry<E extends TelemetryEventName>(
   eventName: E,
   properties: TelemetryPayload<E>,
 ): void {
-  const config = getConfig();
+  const config = getTelemetryConfig();
   if (!config) return;
 
   const sanitized = sanitizeTelemetry(eventName, properties as Record<string, unknown>);

@@ -402,12 +402,14 @@ export function enabledFreeFallbacks(freeDataClass?: string) {
   return providers;
 }
 
-// Per-workspace daily cap on FREE provider ATTEMPTS (migrations 20261024221000 and
-// 20261025200000). Bounds actual outbound requests, not documents and not successful
-// extractions; a slot is never refunded on failure. This env value is the DEFAULT
-// (10 attempts/day/workspace); set-but-invalid config fails closed (0 = off). A
-// per-workspace owner override, set from the owner panel without a deploy, wins over
-// this default when one exists (resolution happens inside the reserve RPC).
+// GLOBAL control for FREE provider ATTEMPTS (migrations 20261024221000 and 20261025200000):
+// both the platform-wide daily default and the emergency off. Unset/empty = default 10
+// attempts/day/workspace; "0" = free extraction OFF everywhere; set-but-invalid fails
+// closed (0 = off). This global off overrides every per-workspace owner setting and is
+// never silently overruled - the reserve RPC checks it before reading any workspace row.
+// Per-workspace owner settings (owner panel, no deploy) sit beneath it: inherit / off /
+// own limit 1..10000. Bounds actual outbound requests, not documents and not successful
+// extractions; a slot is never refunded on failure.
 export function freeWorkspaceDailyAttemptCap(): number {
   const raw = process.env.CLAIM_FREE_WORKSPACE_DAILY_ATTEMPTS;
   if (raw === undefined || raw.trim() === "") return 10;
@@ -417,7 +419,7 @@ export function freeWorkspaceDailyAttemptCap(): number {
 // Fail CLOSED on any enforcement gap: if the cap RPC is missing (migration not applied) or the
 // check errors, no outbound free request is made. Free AI is simply OFF until enforcement is
 // verifiably active - the cap is never represented as active when it is not.
-type FreeSlot = "reserved" | "over_cap" | "no_cap_configured" | "rpc_missing" | "check_failed";
+type FreeSlot = "reserved" | "over_cap" | "no_cap_configured" | "tenant_disabled" | "rpc_missing" | "check_failed";
 async function reserveFreeAttempt(supabase: any, tenantId: string): Promise<FreeSlot> {
   try {
     const { data, error } = await supabase.rpc("reserve_free_extraction_attempt", { p_tenant_id: tenantId, p_daily_cap: freeWorkspaceDailyAttemptCap() });
@@ -763,6 +765,7 @@ export async function extractDocumentClaimsForPath(input: {
           // plain reason each; local text-import recovery below is untouched.
           if (m === "FREE_ATTEMPT_OVER_CAP") { fallbackErrors.push("free AI attempts for today are used up for this workspace - text import still works"); break; }
           if (m === "FREE_ATTEMPT_NO_CAP_CONFIGURED") { fallbackErrors.push("free AI daily-attempt cap is not configured - free AI is off until it is"); break; }
+          if (m === "FREE_ATTEMPT_TENANT_DISABLED") { fallbackErrors.push("free AI extraction is turned off for this workspace - text import still works"); break; }
           if (m === "FREE_ATTEMPT_RPC_MISSING") { fallbackErrors.push("free AI is off on this environment until the daily-attempt cap update is applied - text import still works"); break; }
           if (m === "FREE_ATTEMPT_CHECK_FAILED") { fallbackErrors.push("could not verify the free daily attempt limit - free AI skipped for this document; try again or use text import"); break; }
           fallbackErrors.push(provider + ": " + m.slice(0, 120)); /* bounded one attempt per enabled free provider, never paid retry */

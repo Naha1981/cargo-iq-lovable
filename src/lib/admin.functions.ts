@@ -74,10 +74,11 @@ export const getPlatformAdminDispute = createServerFn({ method: "GET" })
   });
 
 // Owner-settable per-workspace free-extraction daily caps (migration 20261025200000).
-// The override lives in the database so the owner changes it from this panel, without a
-// developer or a deploy. Effective cap = owner override when set, else the env default
-// (CLAIM_FREE_WORKSPACE_DAILY_ATTEMPTS, default 10); fail-closed semantics are unchanged
-// and live in reserve_free_extraction_attempt.
+// The setting lives in the database so the owner changes it from this panel, without a
+// developer or a deploy: NULL = inherit the global default, 0 = this workspace off,
+// 1..10000 = its daily limit. The global env control (CLAIM_FREE_WORKSPACE_DAILY_ATTEMPTS)
+// stays the platform-wide default AND emergency off: 0/invalid there turns free extraction
+// off everywhere, over every workspace row - enforcement lives in the reserve RPC.
 export type AdminTenantCap = { tenant_id: string; name: string; override: number | null; attempts_today: number };
 export type AdminTenantCaps = { rows: AdminTenantCap[]; total: number; default_cap: number };
 
@@ -93,7 +94,7 @@ export const getPlatformAdminTenantCaps = createServerFn({ method: "GET" })
   });
 
 export const setPlatformAdminTenantCap = createServerFn({ method: "POST" })
-  .validator(z.object({ tenantId: z.string().uuid(), dailyAttempts: z.number().int().min(1).max(10000).nullable() }).strict())
+  .validator(z.object({ tenantId: z.string().uuid(), dailyAttempts: z.number().int().min(0).max(10000).nullable() }).strict())
   .middleware([authedOnly])
   .handler(async ({ context, data }: any) => {
     const supabase = context?.supabase;

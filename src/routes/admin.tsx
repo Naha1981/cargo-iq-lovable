@@ -146,7 +146,9 @@ export function AdminOverviewView({ data, extra = {}, loadingMore = null, onLoad
           <h2 className="text-base font-medium">Free AI extraction - daily attempt limits ({caps.rows.length} of {caps.total})</h2>
           <p className="mt-1 text-sm text-muted-foreground">
             Bounds how many free-provider extraction attempts each business can make per day (provider day, Pacific midnight).
-            A business without its own limit uses the default of {caps.default_cap > 0 ? caps.default_cap : "off (no default configured)"}. Changes apply immediately; no deploy needed.
+            A business without its own setting uses the global default of {caps.default_cap > 0 ? caps.default_cap : "off"}. Set 0 to turn free AI extraction off for one
+            business. The global default is also the emergency off: setting it to 0 in configuration turns free extraction off everywhere, over every per-business setting.
+            Changes here apply immediately; no deploy needed.
           </p>
           <ul className="mt-3 divide-y divide-border rounded-xl border border-border">
             {caps.rows.map((t) => <TenantCapRow key={t.tenant_id} row={t} defaultCap={caps.default_cap} />)}
@@ -180,18 +182,18 @@ function TenantCapRow({ row, defaultCap }: { row: AdminTenantCaps["rows"][number
       <div className="flex items-center justify-between gap-4">
         <span className="text-sm font-medium">{row.name}</span>
         <span className="shrink-0 text-xs text-muted-foreground">
-          {row.attempts_today} used today · limit {effective > 0 ? effective : "off"}{row.override === null ? " (default)" : ""}
+          {row.attempts_today} used today · limit {row.override === 0 ? "off (set for this business)" : effective > 0 ? effective : "off"}{row.override === null ? " (default)" : ""}
         </span>
       </div>
       <div className="mt-2 flex items-center gap-2">
         <input
-          type="number" min={1} max={10000} value={value} placeholder={String(defaultCap)}
+          type="number" min={0} max={10000} value={value} placeholder={String(defaultCap)}
           onChange={(e) => setValue(e.target.value)}
           className="h-9 w-24 rounded-lg border border-border bg-background px-2 text-sm"
           aria-label={"Daily attempt limit for " + row.name}
         />
         <button
-          onClick={() => { const n = Number.parseInt(value, 10); if (Number.isFinite(n) && n >= 1 && n <= 10000) save(n); else setError("Enter a whole number from 1 to 10000."); }}
+          onClick={() => { const n = Number.parseInt(value, 10); if (Number.isFinite(n) && n >= 0 && n <= 10000) save(n); else setError("Enter a whole number from 0 (off) to 10000."); }}
           disabled={saving}
           className="min-h-9 rounded-lg bg-primary px-3 text-sm text-primary-foreground disabled:opacity-50"
         >

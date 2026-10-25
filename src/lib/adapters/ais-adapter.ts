@@ -75,7 +75,9 @@ export async function fetchAisSnapshot(options: {
       clearTimeout(timer);
       try {
         socket.close();
-      } catch {}
+      } catch {
+        // best-effort close; socket may already be closed
+      }
       resolve();
     };
     const timer = setTimeout(finish, timeoutMs);

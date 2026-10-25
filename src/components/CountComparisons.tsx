@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   countComparisonInput,
   evaluateCountComparison,
@@ -47,16 +47,16 @@ export function CountComparisons({
     }>({ comparisons: [], kpis: [], clocks: [], decisions: [] }),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
-  async function load() {
+  const load = useCallback(async () => {
     try {
       setCtx(await listCountComparisons({ data: { caseId } }));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
-  }
+  }, [caseId]);
   useEffect(() => {
     void load();
-  }, [caseId]);
+  }, [load]);
   async function save() {
     setBusy(true);
     setError("");

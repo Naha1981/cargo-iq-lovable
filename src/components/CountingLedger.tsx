@@ -1,5 +1,5 @@
 import { CountComparisons } from "./CountComparisons";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { appendCountRecord, appendCountRule, listCountLedger } from "@/lib/count-ledger.functions";
 import {
   countBases,
@@ -56,16 +56,16 @@ export function CountingLedger({ caseId, documents }: { caseId: string; document
   };
   const [record, setRecord] = useState<any>(blankRecord);
   const [rule, setRule] = useState<any>(blankRule);
-  async function load() {
+  const load = useCallback(async () => {
     try {
       setData(await listCountLedger({ data: { caseId } }));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
-  }
+  }, [caseId]);
   useEffect(() => {
     void load();
-  }, [caseId]);
+  }, [load]);
   async function save(kind: "record" | "rule") {
     setBusy(true);
     setError("");

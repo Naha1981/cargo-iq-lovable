@@ -131,6 +131,7 @@ export function validateRate(r: Rate): string[] {
     !r.exclusions?.trim() ||
     !r.sourceReference?.trim() ||
     [r.terms, r.exclusions, r.sourceReference].some(
+      // eslint-disable-next-line no-control-regex -- intentional: reject control chars to enforce plain one-line text
       (x) => x.length > 2000 || /[\u0000-\u001f]/.test(x),
     )
   )

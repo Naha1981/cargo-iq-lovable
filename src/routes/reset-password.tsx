@@ -26,7 +26,7 @@ function ResetPasswordPage() {
       if (data.session) setReady(true);
     });
     return () => sub.subscription.unsubscribe();
-  }, []);
+  }, [supabase.auth]);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();

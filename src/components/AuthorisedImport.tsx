@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   appointmentHeaders,
   countHeaders,
@@ -39,16 +39,16 @@ export function AuthorisedImport({ caseId, documents }: { caseId: string; docume
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [success, setSuccess] = useState("");
-  async function load() {
+  const load = useCallback(async () => {
     try {
       setRows(await listAuthorisedImports({ data: { caseId } }));
     } catch (e) {
       setError(errText(e));
     }
-  }
+  }, [caseId]);
   useEffect(() => {
     void load();
-  }, [caseId]);
+  }, [load]);
   function change(p: Partial<ImportInput>) {
     setForm({ ...form, ...p });
     setPreview(null);

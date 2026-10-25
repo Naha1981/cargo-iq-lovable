@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   appointmentLifecycleInput,
   currentLifecycle,
@@ -34,16 +34,16 @@ export function AppointmentLifecycle({ caseId, documents }: { caseId: string; do
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [history, setHistory] = useState(false);
-  async function load() {
+  const load = useCallback(async () => {
     try {
       setRows(await listAppointmentLifecycle({ data: { caseId } }));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
-  }
+  }, [caseId]);
   useEffect(() => {
     void load();
-  }, [caseId]);
+  }, [load]);
   async function save() {
     setBusy(true);
     setError("");

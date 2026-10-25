@@ -11,6 +11,13 @@ function db(blob: Blob, name: string, type: string) {
   const inserted: any[] = []; const audits: any[] = []; const docUpdates: any[] = [];
   const supabase = {
     storage: { from: () => ({ download: async () => ({ data: blob, error: null }) }) },
+    rpc: async (fn: string, args: any) => {
+      // Emulates migration 20261024217000 applied: insert claims, return their ids.
+      if (fn !== "replace_pending_claims") return { data: null, error: { code: "PGRST202", message: "missing" } };
+      const rows = (args._claims as any[]).map((c, i) => ({ id: "claim-" + (inserted.length + i + 1), status: "PENDING", ...c }));
+      inserted.push(...rows);
+      return { data: rows.map(r => ({ id: r.id, claim_text: r.claim_text })), error: null };
+    },
     from(table: string) {
       const q: any = { data: [], error: null, eq: () => q, select: () => q, update: (row: any) => { if (table === "documents") docUpdates.push(row); return q; },
         single: async () => ({ data: table === "documents" ? { name, file_type: type, file_path: "synthetic/test" } : { id: "r" + inserted.length }, error: null }),
@@ -35,7 +42,7 @@ describe("free Gemini test path contract", () => {
     // primary provider fails (no key) -> free path; both the first call and its single retry are not retried for shape errors
     vi.stubGlobal("fetch", vi.fn(async () => wrong.clone()));
     const mock = db(new Blob(["Gate out 2 Oct"]), "t.txt", "text/plain");
-    const out: any = await extractDocumentClaimsForPath({ ...base, supabase: mock.supabase, allowTestFallback: true });
+    const out: any = await extractDocumentClaimsForPath({ ...base, supabase: mock.supabase, freeDataClass: "public_synthetic" as const });
     expect(out.mode).toBe("text-fallback"); expect(out.providerUsed).toBe("none");
     expect(out.fallbackErrors?.[0]).toContain("EXTRACTION_SCHEMA_MISMATCH");
     expect(mock.audits[0].payload.fallbackErrors[0]).toContain("EXTRACTION_SCHEMA_MISMATCH");
@@ -44,7 +51,7 @@ describe("free Gemini test path contract", () => {
     gates();
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ candidates: [{ finishReason: "MAX_TOKENS", content: { parts: [{ text: "{\"claims\":[{" }] } }] }), { status: 200 })));
     const mock = db(new Blob(["x"]), "t.txt", "text/plain");
-    const out: any = await extractDocumentClaimsForPath({ ...base, supabase: mock.supabase, allowTestFallback: true });
+    const out: any = await extractDocumentClaimsForPath({ ...base, supabase: mock.supabase, freeDataClass: "public_synthetic" as const });
     expect(out.providerUsed).toBe("none"); expect(out.fallbackErrors?.[0]).toContain("FINISH_MAX_TOKENS");
   });
   it("a text PDF is sent as page-tagged sections with the claim schema enforced", async () => {
@@ -52,7 +59,7 @@ describe("free Gemini test path contract", () => {
     const fetch = vi.fn(async () => ok([{ page_number: 1, claim_text: "The court found X.", claim_type: "finding", value: "", evidence_class: "OFFICIAL_PUBLIC", nature: "OBSERVED", confidence: 0.9, timestamp_claimed: "", event_reference: "" }]));
     vi.stubGlobal("fetch", fetch);
     const mock = db(new Blob([fs.readFileSync("tests/fixtures/synthetic-recovery.pdf")]), "t.pdf", "application/pdf");
-    const out: any = await extractDocumentClaimsForPath({ ...base, supabase: mock.supabase, allowTestFallback: true });
+    const out: any = await extractDocumentClaimsForPath({ ...base, supabase: mock.supabase, freeDataClass: "public_synthetic" as const });
     expect(out.providerUsed).toBe("gemini-test"); expect(out.count).toBeGreaterThan(0);
     const body = JSON.parse((fetch.mock.calls[0] as any)[1].body);
     expect(body.generationConfig.responseSchema.properties.claims.items.required).toContain("claim_text");

@@ -109,7 +109,10 @@ export function resolveClaimAiProvider(): ClaimAiProvider {
   const openai = process.env["OPENAI_API_KEY"];
   const anthropic = process.env["ANTHROPIC_API_KEY"];
   const wanted = (process.env["CLAIM_AI_PROVIDER"] ?? "").toLowerCase();
-  if (wanted && !["openai", "anthropic", "gateway"].includes(wanted)) throw new Error("Unknown CLAIM_AI_PROVIDER. Choose openai, anthropic, or gateway.");
+  if (wanted && !["openai", "anthropic", "gateway", "free"].includes(wanted)) throw new Error("Unknown CLAIM_AI_PROVIDER. Choose openai, anthropic, gateway, or free.");
+  // Owner decision 25 Oct: free routes only until the first paying customer. "free" wins
+  // over every configured key - no paid provider is called even if its key exists.
+  if (wanted === "free") return { kind: "none", label: "Free routes only - paid AI disabled until the first paying customer" };
   if (wanted === "openai" && !openai) throw new Error("CLAIM_AI_PROVIDER is openai but OPENAI_API_KEY is not configured.");
   if (wanted === "anthropic" && !anthropic) throw new Error("CLAIM_AI_PROVIDER is anthropic but ANTHROPIC_API_KEY is not configured.");
   if (wanted === "gateway") {
@@ -124,13 +127,26 @@ export function resolveClaimAiProvider(): ClaimAiProvider {
   return { kind: "none", label: "No AI key configured" };
 }
 
+function paidModelForKind(kind: string): string {
+  if (kind === "anthropic") return process.env["CLAIM_AI_MODEL"] || "claude-3-5-sonnet-latest";
+  return process.env["CLAIM_AI_MODEL"] || "gpt-4o-mini";
+}
+
 async function readError(res: Response, name: string) {
   const msg = await res.text().catch(() => "");
   if (res.status === 401) return new Error(name + " rejected the API key (401). Check the key set for this project.");
+  // Provider-side hard spend limit (OpenAI project/org limit, or equivalent): this is the
+  // monthly budget being reached, NOT a transient rate limit - say so plainly.
+  if (res.status === 429 && /spend_limit_exceeded|billing_hard_limit|insufficient_quota/i.test(msg))
+    return new Error("AI_SPEND_LIMIT_REACHED: " + name + " reports the account spend limit is reached. Extraction continues on free/local routes only until the limit is raised.");
   if (res.status === 402 || res.status === 403) return new Error(name + " refused the request (" + res.status + "). Check the key, billing and model access.");
   if (res.status === 429) return new Error(name + " is rate limited - try again in a minute.");
   return new Error("AI_" + res.status + " " + msg.slice(0, 200));
 }
+
+// Set by the paid provider calls after a successful response; read by the orchestration
+// to record usage accounting. Module state mirrors the error-capture pattern in this repo.
+export let lastPaidUsage: { provider: string; model: string; inputTokens: number | null; outputTokens: number | null } | null = null;
 
 async function extractViaOpenAi(bytes: ArrayBuffer, mimeType: string, filename: string) {
   const key = process.env["OPENAI_API_KEY"]!;
@@ -152,6 +168,7 @@ async function extractViaOpenAi(bytes: ArrayBuffer, mimeType: string, filename: 
   });
   if (!res.ok) throw await readError(res, "OpenAI");
   const json: any = await res.json();
+  lastPaidUsage = { provider: "openai", model: String(json.model ?? (process.env["CLAIM_AI_MODEL"] || "gpt-4o-mini")), inputTokens: json.usage?.input_tokens ?? null, outputTokens: json.usage?.output_tokens ?? null };
   const text = json.output_text ?? (json.output ?? []).flatMap((o: any) => o.content ?? []).filter((c: any) => c.type === "output_text").map((c: any) => c.text).join("");
   return parseJsonModel(String(text ?? "")).map((c) => ({ ...c, timestamp_claimed: c.timestamp_claimed || undefined }));
 }
@@ -173,6 +190,7 @@ async function extractViaAnthropic(bytes: ArrayBuffer, mimeType: string, filenam
   });
   if (!res.ok) throw await readError(res, "Anthropic");
   const json: any = await res.json();
+  lastPaidUsage = { provider: "anthropic", model: String(json.model ?? (process.env["CLAIM_AI_MODEL"] || "claude-3-5-sonnet-latest")), inputTokens: json.usage?.input_tokens ?? null, outputTokens: json.usage?.output_tokens ?? null };
   const text = (json.content ?? []).filter((c: any) => c.type === "text").map((c: any) => c.text).join("");
   const start = text.indexOf("{"), end = text.lastIndexOf("}");
   return parseJsonModel(start >= 0 && end > start ? text.slice(start, end + 1) : text).map((c) => ({ ...c, timestamp_claimed: c.timestamp_claimed || undefined }));
@@ -182,7 +200,66 @@ async function extractWholeDocument(bytes: ArrayBuffer, mimeType: string, filena
   const provider = resolveClaimAiProvider();
   if (provider.kind === "openai") return extractViaOpenAi(bytes, mimeType, filename);
   if (provider.kind === "anthropic") return extractViaAnthropic(bytes, mimeType, filename);
+  if (provider.kind === "none") throw new Error("AI_PAID_DISABLED: paid extraction is off (CLAIM_AI_PROVIDER=free). Falling back to free/local routes.");
   return extractViaGateway(bytes, mimeType, filename);
+}
+
+// Price book for cost ESTIMATES only (USD per 1M tokens, input/output). Marked estimates:
+// the provider invoice is the source of truth; this exists for cap enforcement headroom.
+const MODEL_PRICES: Record<string, [number, number]> = {
+  "gpt-4o-mini": [0.15, 0.6],
+  "gemini-2.5-flash-lite": [0.1, 0.4],
+  "claude-3-5-sonnet-latest": [3, 15],
+};
+export function estimateCostUsd(model: string, inputTokens: number | null, outputTokens: number | null): number | null {
+  const p = MODEL_PRICES[model]; if (!p || inputTokens == null || outputTokens == null) return null;
+  return (inputTokens * p[0] + outputTokens * p[1]) / 1_000_000;
+}
+
+// Atomic spend reservation for paid extraction (migration 20261024220000). ONE database
+// call reads the cap, sums the month (completed spend + outstanding reservations) and
+// inserts a conservative UPPER-BOUND reservation, serialized per tenant - concurrent
+// requests cannot race an almost-full cap. Reservations complete with actual usage after
+// a successful call, are voided on known failure, and stale ones are voided hourly-side
+// by reconcile_extraction_reservations(). FAIL CLOSED: when accounting is unavailable,
+// paid extraction is refused - we cannot prove no cap exists, so we do not spend blind.
+// When the cap check returns "no_cap", behavior is unchanged from before caps existed.
+const PAID_MAX_OUTPUT_TOKENS = 8000; // matches max_tokens on the own-key provider calls
+const PAID_OUTPUT_TOKENS_GEMINI_STYLE = 8192;
+function conservativeReservedCostUsd(model: string, estimatedInputTokens: number): number | null {
+  // FAIL CLOSED: an unknown model rate is a refusal, not a guessed bound - the book max
+  // is only an upper bound for models actually in the book.
+  return estimateCostUsd(model, estimatedInputTokens, Math.max(PAID_MAX_OUTPUT_TOKENS, PAID_OUTPUT_TOKENS_GEMINI_STYLE));
+}
+export async function reservePaidExtraction(supabase: any, tenantId: string, model: string, estimatedInputTokens: number): Promise<string | null> {
+  const reservedCost = conservativeReservedCostUsd(model, estimatedInputTokens);
+  if (reservedCost == null) throw new Error("UNKNOWN_MODEL_RATE: no verified price for model " + model + " - refusing paid extraction rather than reserving blind.");
+  const requestId = crypto.randomUUID();
+  const { data, error } = await supabase.rpc("reserve_extraction_cost", {
+    p_tenant_id: tenantId, p_request_id: requestId, p_reserved_cost_usd: reservedCost,
+  });
+  if (error) throw new Error("SPEND_ACCOUNTING_UNAVAILABLE: spend accounting is unavailable - refusing paid extraction rather than spending blind. " + String(error.message ?? "").slice(0, 80));
+  if (data === "over_cap") throw new Error("AI_SPEND_CAP_REACHED: this workspace's monthly extraction cap is used (including reserved extractions in flight). Extraction continues on free/local routes only until the cap is raised.");
+  // A configured monthly cap IS the owner's grant for paid usage. "no_cap" means no
+  // grant exists, so paid extraction stays off - it never silently re-enables spend.
+  if (data !== "reserved") throw new Error("PAID_NOT_ENABLED: no monthly extraction spend cap is configured for this workspace. Paid extraction stays off until the owner sets a cap (commercial_rules rule_type AI_SPEND_CAP).");
+  return requestId;
+}
+// Completion writes actual usage; when no usage was captured the RESERVED (upper-bound)
+// amount is kept as the completed cost - never under-record. Errors never break extraction;
+// they surface in fallbackErrors and the row stays reconcilable.
+export async function completePaidExtraction(supabase: any, input: { tenantId: string; caseId: string; documentId: string }, requestId: string, reservedCostUsd?: number): Promise<string | null> {
+  const u = lastPaidUsage; lastPaidUsage = null;
+  const { error } = await supabase.rpc("complete_extraction_cost", {
+    p_tenant_id: input.tenantId, p_request_id: requestId, p_case_id: input.caseId, p_document_id: input.documentId,
+    p_provider: u?.provider ?? "unknown", p_model: u?.model ?? null,
+    p_input_tokens: u?.inputTokens ?? null, p_output_tokens: u?.outputTokens ?? null,
+    p_cost_usd: (u ? estimateCostUsd(u.model, u.inputTokens, u.outputTokens) : null) ?? reservedCostUsd ?? null,
+  });
+  return error ? "usage completion failed (row remains reconcilable): " + String(error.message ?? "error").slice(0, 100) : null;
+}
+export async function voidPaidExtraction(supabase: any, tenantId: string, requestId: string): Promise<void> {
+  await supabase.rpc("void_extraction_reservation", { p_tenant_id: tenantId, p_request_id: requestId }).catch(() => {});
 }
 
 /**
@@ -274,11 +351,17 @@ async function extractViaGateway(bytes: ArrayBuffer, mimeType: string, filename:
 }
 
 // Every free provider is opt-in. Never silently route to a paid model or paid OCR plugin.
-export function enabledFreeFallbacks(allowTestFallback = false) {
+// Free third-party providers (Gemini free tier, OpenRouter free, Groq free plan) may receive
+// ONLY documents the user explicitly classified "public_synthetic" for this extraction.
+// Our customer-confidentiality rule (owner decision 25 Oct): confidential files never go to
+// free AI APIs - without the explicit per-document classification, no free provider is called,
+// no matter which env flags are set, and extraction falls back to local text import.
+export function enabledFreeFallbacks(freeDataClass?: string) {
+  if (freeDataClass !== "public_synthetic") return [];
   const providers: ("openrouter" | "groq" | "gemini-test")[] = [];
   if (process.env.CLAIM_OPENROUTER_FREE_FALLBACK_ENABLED === "true" && process.env.OPENROUTER_API_KEY) providers.push("openrouter");
   if (process.env.CLAIM_GROQ_FREE_PLAN_CONFIRMED === "true" && process.env.GROQ_API_KEY) providers.push("groq");
-  if (allowTestFallback && process.env.CLAIM_GEMINI_TEST_FALLBACK_ENABLED === "true" && process.env.CLAIM_GEMINI_FREE_TIER_CONFIRMED === "true" && process.env.GEMINI_API_KEY) providers.push("gemini-test");
+  if (process.env.CLAIM_GEMINI_TEST_FALLBACK_ENABLED === "true" && process.env.CLAIM_GEMINI_FREE_TIER_CONFIRMED === "true" && process.env.GEMINI_API_KEY) providers.push("gemini-test");
   return providers;
 }
 
@@ -527,7 +610,9 @@ export function filterNewClaims<T extends { claim_text: string }>(claims: T[], e
 export async function extractDocumentClaimsForPath(input: {
   documentId: string;
   noAi?: boolean;
-  allowTestFallback?: boolean;
+  // Explicit per-document data classification. Free third-party AI providers are called
+  // only when this is exactly "public_synthetic"; anything else keeps documents local.
+  freeDataClass?: "public_synthetic";
   caseId: string;
   tenantId: string;
   supabase: SupabaseClient;
@@ -554,12 +639,20 @@ export async function extractDocumentClaimsForPath(input: {
   let claims: ClaimDraft[] = [];
   const fallbackErrors: string[] = [];
   const coverageWarnings: string[] = [];
+  let reservationId: string | null = null;
   if (input.noAi) claims = await importLines();
   else {
+    // App-side spend reservation before any customer-billed call (own OpenAI/Anthropic key).
+    // Gateway calls bill Lovable credits, not his provider account - no cap check there.
+    const resolvedProvider = resolveClaimAiProvider().kind;
+    if (resolvedProvider === "openai" || resolvedProvider === "anthropic")
+      // Conservative input bound: 1 token per byte (chars/4 UNDERESTIMATES dense text).
+      reservationId = await reservePaidExtraction(input.supabase, input.tenantId, paidModelForKind(resolvedProvider), bytes.byteLength);
     try { claims = await extractWithGemini(bytes, doc.file_type, doc.name, coverageWarnings); }
     catch (error) {
+      if (reservationId) { await voidPaidExtraction(input.supabase, input.tenantId, reservationId); reservationId = null; }
       let recovered = false;
-      for (const provider of enabledFreeFallbacks(input.allowTestFallback)) {
+      for (const provider of enabledFreeFallbacks(input.freeDataClass)) {
         try { claims = await extractFreeFallback(provider, bytes, doc.file_type, doc.name, coverageWarnings); if (claims.length) { providerUsed = provider; recovered = true; break; } }
         catch (e) { fallbackErrors.push(provider + ": " + (e instanceof Error ? e.message : "failed").slice(0, 120)); /* bounded one attempt per enabled free provider, never paid retry */ }
       }
@@ -576,23 +669,8 @@ export async function extractDocumentClaimsForPath(input: {
 
   // Re-running extraction on a document must not duplicate claims.
   // AI re-reads phrase the same facts differently, so exact-text dedupe is not enough:
-  // for AI runs, first drop the document's still-unverified (PENDING) claims and their
-  // open flags, then insert the fresh set. Verified and disputed claims are never touched.
-  if (!input.noAi) {
-    const { data: pendingRows, error: pendingError } = await input.supabase
-      .from("extracted_claims").select("id")
-      .eq("case_id", input.caseId).eq("document_id", input.documentId).eq("status", "PENDING");
-    if (pendingError) throw pendingError;
-    const pendingIds = (pendingRows ?? []).map((r: any) => String(r.id));
-    if (pendingIds.length) {
-      const inList = pendingIds.map((id) => `"${id}"`).join(",");
-      await input.supabase.from("timeline_events").delete().in("provenance_id", pendingIds);
-      await input.supabase.from("contradictions").delete().eq("case_id", input.caseId).eq("status", "FLAGGED")
-        .or(`claim_a_id.in.(${inList}),claim_b_id.in.(${inList})`);
-      const { error: delError } = await input.supabase.from("extracted_claims").delete().in("id", pendingIds);
-      if (delError) throw delError;
-    }
-  }
+  // for AI runs, the document's still-unverified (PENDING) claims and their open flags
+  // are replaced by the fresh set. Verified and disputed claims are never touched.
   const header = csvHeaderLine(bytes, doc.file_type, doc.name);
   const { data: existingRows, error: existingError } = await input.supabase
     .from("extracted_claims").select("claim_text")
@@ -603,41 +681,46 @@ export async function extractDocumentClaimsForPath(input: {
     return { claims: [], count: 0, skippedDuplicates: true, mode, providerUsed };
   }
 
-  const inserted: any[] = [];
-  let seq = 0;
-  for (const claim of claims) {
-    seq += 1;
-    const base = {
-      tenant_id: input.tenantId,
-      case_id: input.caseId,
-      document_id: input.documentId,
-      page_number: claim.page_number ?? null,
-      claim_text: claim.claim_text,
-      claim_type: claim.claim_type ?? null,
-      normalized_value: claim.event_reference ? { source_value: claim.normalized_value ?? null, event_reference: claim.event_reference } : claim.normalized_value ?? null,
-      evidence_class: claim.evidence_class || inferClass(doc.name),
-      nature: claim.nature,
-      status: "PENDING",
-      confidence: claim.confidence ?? 0.7,
-      timestamp_claimed: claim.timestamp_claimed ?? null,
-    };
-    // source_seq records reading order. If the column is not deployed yet, store without it rather than fail the analysis.
-    const { data: row, error } = await insertClaimRow(input.supabase, base, seq);
-    if (error) throw error;
-    inserted.push(row);
-
-    if (claim.timestamp_claimed) {
-      await input.supabase.from("timeline_events").insert({
-        tenant_id: input.tenantId,
-        case_id: input.caseId,
-        timestamp: claim.timestamp_claimed,
-        title: claim.claim_text,
-        source: doc.name,
-        evidence_class: claim.evidence_class || inferClass(doc.name),
-        nature: claim.nature,
-        provenance_id: row.id,
-      });
+  const claimPayload = claims.map((claim) => ({
+    page_number: claim.page_number ?? null,
+    claim_text: claim.claim_text,
+    claim_type: claim.claim_type ?? null,
+    normalized_value: claim.normalized_value ?? null,
+    evidence_class: claim.evidence_class || inferClass(doc.name),
+    nature: claim.nature,
+    confidence: claim.confidence ?? 0.7,
+    timestamp_claimed: claim.timestamp_claimed ?? null,
+    event_reference: claim.event_reference ?? undefined,
+    source_name: doc.name,
+  }));
+  // One RPC (migration 20261024217000) does cleanup + inserts + provenance timeline in a
+  // single transaction; until it is applied on an environment, the legacy multi-call path
+  // runs so code and migration roll out in either order (PGRST202/42883 = RPC missing).
+  let inserted: any[];
+  // Older/test clients without rpc() go straight to the legacy path.
+  const rpcCall = typeof input.supabase.rpc === "function"
+    ? await input.supabase.rpc("replace_pending_claims", {
+    _case_id: input.caseId, _document_id: input.documentId, _claims: claimPayload, _replace_pending: !input.noAi,
+  })
+    : { data: null, error: { code: "PGRST202" } };
+  const { data: rpcRows, error: rpcError } = rpcCall as any;
+  if (!rpcError) {
+    inserted = (rpcRows ?? []) as any[];
+  } else if (rpcError.code === "PGRST202" || rpcError.code === "42883") {
+    if (!input.noAi) {
+      // Re-extraction replaces unverified evidence. Without the transactional RPC the
+      // only alternative is separate delete + insert calls, which can destroy PENDING
+      // claims and their provenance if it dies half-way. Refuse loudly instead:
+      // no deletes happen, existing evidence stays intact.
+      throw new Error(
+        "REEXTRACTION_UNAVAILABLE: re-running AI extraction needs database migration 20261024217000 " +
+        "(atomic evidence replacement) applied first. No existing claims were changed.",
+      );
     }
+    // Import runs (noAi) only insert - non-destructive, safe on the legacy path.
+    inserted = await legacyInsertClaims(input, doc, claimPayload);
+  } else {
+    throw rpcError;
   }
 
   for (let i = 0; i < claims.length; i++) {
@@ -684,6 +767,11 @@ export async function extractDocumentClaimsForPath(input: {
     } catch (e) { discrepancyPass = "failed"; discrepancyError = (e instanceof Error ? e.message : "failed").slice(0, 120); fallbackErrors.push("discrepancy pass: " + discrepancyError); }
   }
 
+  if (reservationId) {
+    // Paid route succeeded and produced these claims: settle the reservation with actual usage.
+    const usageNote = await completePaidExtraction(input.supabase, input, reservationId);
+    if (usageNote) fallbackErrors.push(usageNote);
+  }
   const integrity = analysisStatus({ discrepancyPass, discrepancyError, fallbackErrors, coverageWarnings });
   // documents.extraction_status is part of the canonical pack payload, so the status reaches the pack with no schema change.
   const { error: statusError } = await input.supabase.from("documents").update({ extraction_status: encodeExtractionStatus(integrity) }).eq("id", input.documentId).eq("case_id", input.caseId);
@@ -699,6 +787,48 @@ export async function extractDocumentClaimsForPath(input: {
   });
 
   return { claims: inserted, count: inserted.length, mode, providerUsed, discrepancyFlags, analysisExtraction: integrity.extraction, analysisReview: integrity.review, analysisNotes: integrity.extractionNotes, reviewNote: integrity.reviewNote, ...(fallbackErrors.length ? { fallbackErrors } : {}), ...(coverageWarnings.length ? { coverageWarnings } : {}) };
+}
+
+
+// Legacy pre-RPC path for import (noAi) runs only: insert calls, no deletes - importing
+// never replaces evidence, so this path is non-destructive by construction.
+async function legacyInsertClaims(input: any, doc: any, claimPayload: any[]): Promise<any[]> {
+  const inserted: any[] = [];
+  let seq = 0;
+  for (const claim of claimPayload) {
+    seq += 1;
+    const base = {
+      tenant_id: input.tenantId,
+      case_id: input.caseId,
+      document_id: input.documentId,
+      page_number: claim.page_number ?? null,
+      claim_text: claim.claim_text,
+      claim_type: claim.claim_type ?? null,
+      normalized_value: claim.event_reference ? { source_value: claim.normalized_value ?? null, event_reference: claim.event_reference } : claim.normalized_value ?? null,
+      evidence_class: claim.evidence_class,
+      nature: claim.nature,
+      status: "PENDING",
+      confidence: claim.confidence ?? 0.7,
+      timestamp_claimed: claim.timestamp_claimed ?? null,
+    };
+    // source_seq records reading order. If the column is not deployed yet, store without it rather than fail the analysis.
+    const { data: row, error } = await insertClaimRow(input.supabase, base, seq);
+    if (error) throw error;
+    inserted.push(row);
+    if (claim.timestamp_claimed) {
+      await input.supabase.from("timeline_events").insert({
+        tenant_id: input.tenantId,
+        case_id: input.caseId,
+        timestamp: claim.timestamp_claimed,
+        title: claim.claim_text,
+        source: doc.name,
+        evidence_class: claim.evidence_class,
+        nature: claim.nature,
+        provenance_id: row.id,
+      });
+    }
+  }
+  return inserted;
 }
 
 export const extractionHealth = createServerFn({ method: "GET" }).handler(async () => {

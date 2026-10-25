@@ -184,7 +184,7 @@ export const getCaseWorkspace = createServerFn({ method: "GET" }).validator(idIn
     db.from("timeline_events").select("*").eq("case_id", data.caseId).order("timestamp", { ascending: true }),
     db.from("external_observations").select("*").eq("case_id", data.caseId).order("observed_at", { ascending: true }),
     db.from("financial_calculations").select("*").eq("case_id", data.caseId).order("created_at", { ascending: false }),
-    db.from("evidence_packs").select("id,version,sha256_hash,status,approved_by,generated_at,pack_payload").eq("case_id", data.caseId).order("version", { ascending: false }),
+    db.from("evidence_packs").select("id,version,sha256_hash,status,approved_by,generated_at").eq("case_id", data.caseId).order("version", { ascending: false }),
   ]);
   for (const item of [caseRow, documents, claims, contradictions, timeline, observations, calcs, packs]) if (item.error) throw item.error;
   return {
@@ -200,6 +200,23 @@ export const getCaseWorkspace = createServerFn({ method: "GET" }).validator(idIn
     packs: packs.data ?? [],
   };
 });
+
+export const getEvidencePackPayload = createServerFn({ method: "GET" })
+  .validator(z.object({ packId: z.string().uuid() }))
+  .middleware([tenantMiddleware])
+  .handler(async ({ data, context }) => {
+    // Pack payloads can reach ~20MB each, so they load one at a time on demand
+    // instead of riding along with every workspace load.
+    const { data: pack, error } = await context.supabase
+      .from("evidence_packs")
+      .select("id,case_id,version,sha256_hash,status,approved_by,generated_at,pack_payload")
+      .eq("id", data.packId)
+      .eq("tenant_id", context.tenantId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!pack) throw new Error("PACK_NOT_FOUND");
+    return pack;
+  });
 
 export const registerDocument = createServerFn({ method: "POST" })
   .validator(z.object({
@@ -237,7 +254,7 @@ export const registerDocument = createServerFn({ method: "POST" })
   });
 
 export const runDocumentExtraction = createServerFn({ method: "POST" })
-  .validator(z.object({ documentId: z.string().uuid(), caseId: z.string().uuid(), noAi: z.boolean().optional(), allowTestFallback: z.boolean().optional() }))
+  .validator(z.object({ documentId: z.string().uuid(), caseId: z.string().uuid(), noAi: z.boolean().optional(), freeDataClass: z.literal("public_synthetic").optional() }))
   .middleware([tenantMiddleware])
   .handler(async ({ data, context }) => {
     if (!["admin", "investigator"].includes(context.role)) throw new Error("Investigator access required");

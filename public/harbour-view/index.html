@@ -2,6 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<!-- CSP delivered in-document because the static host does not send response headers for
+     /harbour-view (verified 25 Oct). frame-ancestors is intentionally omitted: ignored in meta.
+     Keep in sync with public/_headers and src/server.ts. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://server.arcgisonline.com https://cdn.jsdelivr.net; connect-src 'self' https://yeaflwgwrjznigykplur.supabase.co wss://yeaflwgwrjznigykplur.supabase.co https://naha1981.github.io wss://cargoiq-gods-eye.onrender.com https://cargoiq-gods-eye.onrender.com https://api.open-meteo.com https://marine-api.open-meteo.com https://terrain.reearth.land https://cdn.jsdelivr.net https://server.arcgisonline.com; worker-src 'self' blob: https://cdn.jsdelivr.net; frame-src https://restreamer.cd.net.za; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>CargoIQ Live Harbour View - NahaLabs</title>
 <meta name="description" content="Live vessel picture over Durban and Richards Bay, with disputed-cargo evidence pinned on the map. A CargoIQ proof by NahaLabs.">

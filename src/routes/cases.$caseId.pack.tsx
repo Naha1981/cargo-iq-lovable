@@ -2,7 +2,7 @@ import { Route as CaseRoute } from "./cases.$caseId";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { Button, Panel } from "@/components/ui-kit";
-import { approveEvidencePack, generateEvidencePack } from "@/lib/case.functions";
+import { approveEvidencePack, generateEvidencePack, getEvidencePackPayload } from "@/lib/case.functions";
 import { buildEvidencePackPdf } from "@/lib/pack-pdf";
 import { cn } from "@/lib/utils";
 
@@ -42,16 +42,29 @@ function PackPage() {
     } finally { setBusy(false); }
   }
 
+  async function withPayload(pack: any, fn: (full: any) => void, fallback: string) {
+    setBusy(true); setMessage("");
+    try {
+      const full = await getEvidencePackPayload({ data: { packId: pack.id } });
+      fn({ ...pack, pack_payload: full.pack_payload });
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : fallback);
+    } finally { setBusy(false); }
+  }
+
   function exportJson(pack: any) {
-    const blob = new Blob([JSON.stringify(pack.pack_payload, null, 2)], { type: "application/json" });
+    withPayload(pack, (full) => {
+    const blob = new Blob([JSON.stringify(full.pack_payload, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url; a.download = caseId + "-evidence-pack-v" + pack.version + ".json"; a.click(); URL.revokeObjectURL(url);
+    }, "Could not load pack payload.");
   }
 
   function exportPdf(pack: any) {
+    withPayload(pack, (full) => {
     try {
-      const bytes = buildEvidencePackPdf(pack);
+      const bytes = buildEvidencePackPdf(full);
       const blob = new Blob([bytes as unknown as BlobPart], { type: "application/pdf" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -59,15 +72,18 @@ function PackPage() {
     } catch (err) {
       setMessage(err instanceof Error ? "Could not build the PDF: " + err.message : "Could not build the PDF.");
     }
+    }, "Could not load pack payload.");
   }
 
   function exportSummary(pack: any) {
-    const timeline = (pack.pack_payload.timeline ?? []).map((x: any) => x.timestamp + " — " + x.title).join("\n");
+    withPayload(pack, (full) => {
+    const timeline = (full.pack_payload.timeline ?? []).map((x: any) => x.timestamp + " — " + x.title).join("\n");
     const summary = "CargoIQ Evidence Pack v" + pack.version + "\nSHA-256: " + pack.sha256_hash + "\nStatus: " + pack.status + "\n\n" + timeline;
     const blob = new Blob([summary], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url; a.download = caseId + "-investigation-summary-v" + pack.version + ".txt"; a.click(); URL.revokeObjectURL(url);
+    }, "Could not load pack payload.");
   }
 
   return (

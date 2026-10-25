@@ -24,3 +24,15 @@ describe("atomic pack server routing", () => {
     expect(approve).not.toContain('.from("audit_log").insert');
   });
 });
+describe("on-demand pack payload", () => {
+  const onDemand = source.slice(source.indexOf("export const getEvidencePackPayload"), source.indexOf("export const getEvidencePackPayload") + 1200);
+  it("keeps heavy payloads out of the workspace load", () => {
+    expect(source).toContain('from("evidence_packs").select("id,version,sha256_hash,status,approved_by,generated_at")');
+    expect(onDemand).toContain('select("id,case_id,version,sha256_hash,status,approved_by,generated_at,pack_payload")');
+  });
+  it("scopes the payload fetch to the caller's tenant and one pack", () => {
+    expect(onDemand).toContain('.eq("id", data.packId)');
+    expect(onDemand).toContain('.eq("tenant_id", context.tenantId)');
+    expect(onDemand).toContain(".maybeSingle()");
+  });
+});

@@ -26,7 +26,7 @@ function DocsPage() {
   }
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [allowTestFallback, setAllowTestFallback] = useState(false);
+  const [freeDataClassConfirmed, setFreeDataClassConfirmed] = useState(false);
   const [notice, setNotice] = useState("");
   const [decisions, setDecisions] = useState<Record<string, "VERIFIED" | "DISPUTED">>({});
   const disputed = disputedClaimIds(data.contradictions);
@@ -74,7 +74,7 @@ function DocsPage() {
     setError("");
     try {
       setNotice("");
-      const result = await runDocumentExtraction({ data: { documentId: id, caseId, noAi, allowTestFallback } });
+      const result = await runDocumentExtraction({ data: { documentId: id, caseId, noAi, freeDataClass: freeDataClassConfirmed ? "public_synthetic" as const : undefined } });
       setNotice(result.skippedDuplicates ? "No new claims: these lines are already imported." : result.mode === "ai" ? `${result.count} AI claims extracted (${result.providerUsed}). Review each claim before verification.` : `${result.count} text lines imported without AI credits. No event understanding or automatic timestamps. Review each line; this is not AI extraction.`);
       await router.invalidate();
     } catch (err) {
@@ -117,7 +117,7 @@ function DocsPage() {
       }>
         {error && <div className="mb-3 rounded border border-disputed/40 bg-disputed/10 p-3 text-xs text-disputed">{error}</div>}
         <p className="mb-3 text-xs text-muted-foreground">PDF, TXT or CSV, up to 5 MB per file. Import text uses no AI credits (up to 500 lines, 200,000 characters and 20 PDF pages). Scanned PDFs need AI or a transcription. If AI is unavailable, readable text is imported and clearly labelled. Human review is always required.</p>
-        <label className="mb-3 flex gap-2 text-xs"><input type="checkbox" checked={allowTestFallback} onChange={e => setAllowTestFallback(e.target.checked)} />Optional Gemini test fallback: I confirm this is synthetic or non-confidential test data. Google unpaid API may use it for training or human review. Disabled unless configured by the owner.</label>
+        <label className="mb-3 flex gap-2 text-xs"><input type="checkbox" checked={freeDataClassConfirmed} onChange={e => setFreeDataClassConfirmed(e.target.checked)} />Optional Gemini test fallback: I confirm this is synthetic or non-confidential test data. Google unpaid API may use it for training or human review. Disabled unless configured by the owner.</label>
         {notice && <div role="status" className="mb-3 rounded border p-3 text-xs">{notice}</div>}
         <label className="mb-4 block text-sm">Source organization for this upload
           <input value={sourceParty} maxLength={200} onChange={e=>setSourceParty(e.target.value)} placeholder="Organization that supplied the record" className="mt-2 w-full rounded border bg-background p-2 text-sm" />

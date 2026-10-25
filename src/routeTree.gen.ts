@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as DiagnosticsRouteImport } from './routes/diagnostics'
 import { Route as NewCaseRouteImport } from './routes/new-case'
@@ -20,6 +21,7 @@ import { Route as TermsRouteImport } from './routes/terms'
 import { Route as WhatsappQuotesRouteImport } from './routes/whatsapp-quotes'
 import { Route as CasesCaseIdRouteImport } from './routes/cases.$caseId'
 import { Route as DemoCufRouteImport } from './routes/demo.cuf'
+import { Route as AdminDisputesDisputeIdRouteImport } from './routes/admin.disputes.$disputeId'
 import { Route as ApiCctvIngestRouteImport } from './routes/api/cctv/ingest'
 import { Route as ApiWhatsappWebhookRouteImport } from './routes/api/whatsapp/webhook'
 import { Route as CasesCaseIdIndexRouteImport } from './routes/cases.$caseId.index'
@@ -41,6 +43,11 @@ import { Route as CasesCaseIdPackRouteImport } from './routes/cases.$caseId.pack
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthRoute = AuthRouteImport.update({
@@ -92,6 +99,11 @@ const DemoCufRoute = DemoCufRouteImport.update({
   id: '/demo/cuf',
   path: '/demo/cuf',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AdminDisputesDisputeIdRoute = AdminDisputesDisputeIdRouteImport.update({
+  id: '/disputes/$disputeId',
+  path: '/disputes/$disputeId',
+  getParentRoute: () => AdminRoute,
 } as any)
 const ApiCctvIngestRoute = ApiCctvIngestRouteImport.update({
   id: '/api/cctv/ingest',
@@ -181,6 +193,7 @@ const CasesCaseIdPackRoute = CasesCaseIdPackRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
   '/diagnostics': typeof DiagnosticsRoute
   '/new-case': typeof NewCaseRoute
@@ -191,6 +204,7 @@ export interface FileRoutesByFullPath {
   '/whatsapp-quotes': typeof WhatsappQuotesRoute
   '/cases/$caseId': typeof CasesCaseIdRouteWithChildren
   '/demo/cuf': typeof DemoCufRoute
+  '/admin/disputes/$disputeId': typeof AdminDisputesDisputeIdRoute
   '/api/cctv/ingest': typeof ApiCctvIngestRoute
   '/api/whatsapp/webhook': typeof ApiWhatsappWebhookRoute
   '/cases/$caseId/appointments': typeof CasesCaseIdAppointmentsRoute
@@ -211,6 +225,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
   '/diagnostics': typeof DiagnosticsRoute
   '/new-case': typeof NewCaseRoute
@@ -220,6 +235,7 @@ export interface FileRoutesByTo {
   '/terms': typeof TermsRoute
   '/whatsapp-quotes': typeof WhatsappQuotesRoute
   '/demo/cuf': typeof DemoCufRoute
+  '/admin/disputes/$disputeId': typeof AdminDisputesDisputeIdRoute
   '/api/cctv/ingest': typeof ApiCctvIngestRoute
   '/api/whatsapp/webhook': typeof ApiWhatsappWebhookRoute
   '/cases/$caseId/appointments': typeof CasesCaseIdAppointmentsRoute
@@ -241,6 +257,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
   '/diagnostics': typeof DiagnosticsRoute
   '/new-case': typeof NewCaseRoute
@@ -251,6 +268,7 @@ export interface FileRoutesById {
   '/whatsapp-quotes': typeof WhatsappQuotesRoute
   '/cases/$caseId': typeof CasesCaseIdRouteWithChildren
   '/demo/cuf': typeof DemoCufRoute
+  '/admin/disputes/$disputeId': typeof AdminDisputesDisputeIdRoute
   '/api/cctv/ingest': typeof ApiCctvIngestRoute
   '/api/whatsapp/webhook': typeof ApiWhatsappWebhookRoute
   '/cases/$caseId/appointments': typeof CasesCaseIdAppointmentsRoute
@@ -273,6 +291,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/admin'
     | '/auth'
     | '/diagnostics'
     | '/new-case'
@@ -283,6 +302,7 @@ export interface FileRouteTypes {
     | '/whatsapp-quotes'
     | '/cases/$caseId'
     | '/demo/cuf'
+    | '/admin/disputes/$disputeId'
     | '/api/cctv/ingest'
     | '/api/whatsapp/webhook'
     | '/cases/$caseId/appointments'
@@ -303,6 +323,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/admin'
     | '/auth'
     | '/diagnostics'
     | '/new-case'
@@ -312,6 +333,7 @@ export interface FileRouteTypes {
     | '/terms'
     | '/whatsapp-quotes'
     | '/demo/cuf'
+    | '/admin/disputes/$disputeId'
     | '/api/cctv/ingest'
     | '/api/whatsapp/webhook'
     | '/cases/$caseId/appointments'
@@ -332,6 +354,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/admin'
     | '/auth'
     | '/diagnostics'
     | '/new-case'
@@ -342,6 +365,7 @@ export interface FileRouteTypes {
     | '/whatsapp-quotes'
     | '/cases/$caseId'
     | '/demo/cuf'
+    | '/admin/disputes/$disputeId'
     | '/api/cctv/ingest'
     | '/api/whatsapp/webhook'
     | '/cases/$caseId/appointments'
@@ -363,6 +387,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRouteWithChildren
   AuthRoute: typeof AuthRoute
   DiagnosticsRoute: typeof DiagnosticsRoute
   NewCaseRoute: typeof NewCaseRoute
@@ -384,6 +409,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth': {
@@ -455,6 +487,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/demo/cuf'
       preLoaderRoute: typeof DemoCufRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/admin/disputes/$disputeId': {
+      id: '/admin/disputes/$disputeId'
+      path: '/disputes/$disputeId'
+      fullPath: '/admin/disputes/$disputeId'
+      preLoaderRoute: typeof AdminDisputesDisputeIdRouteImport
+      parentRoute: typeof AdminRoute
     }
     '/api/cctv/ingest': {
       id: '/api/cctv/ingest'
@@ -578,6 +617,16 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AdminRouteChildren {
+  AdminDisputesDisputeIdRoute: typeof AdminDisputesDisputeIdRoute
+}
+
+const AdminRouteChildren: AdminRouteChildren = {
+  AdminDisputesDisputeIdRoute: AdminDisputesDisputeIdRoute,
+}
+
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
+
 interface CasesCaseIdRouteChildren {
   CasesCaseIdAppointmentsRoute: typeof CasesCaseIdAppointmentsRoute
   CasesCaseIdCctvRoute: typeof CasesCaseIdCctvRoute
@@ -620,6 +669,7 @@ const CasesCaseIdRouteWithChildren = CasesCaseIdRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRoute: AdminRouteWithChildren,
   AuthRoute: AuthRoute,
   DiagnosticsRoute: DiagnosticsRoute,
   NewCaseRoute: NewCaseRoute,

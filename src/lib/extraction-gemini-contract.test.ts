@@ -1,4 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+type FakeRow = Record<string, unknown>;
+type RpcArgs = Record<string, unknown>;
 import fs from "node:fs";
 import { Blob } from "node:buffer";
 import {
@@ -29,17 +33,17 @@ afterEach(() => {
   }
 });
 function db(blob: Blob, name: string, type: string) {
-  const inserted: any[] = [];
-  const audits: any[] = [];
-  const docUpdates: any[] = [];
+  const inserted: FakeRow[] = [];
+  const audits: FakeRow[] = [];
+  const docUpdates: FakeRow[] = [];
   const supabase = {
     storage: { from: () => ({ download: async () => ({ data: blob, error: null }) }) },
-    rpc: async (fn: string, args: any) => {
+    rpc: async (fn: string, args: RpcArgs) => {
       // Emulates migrations 20261024217000 + 20261024221000 applied.
       if (fn === "reserve_free_extraction_attempt") return { data: "reserved", error: null };
       if (fn !== "replace_pending_claims")
         return { data: null, error: { code: "PGRST202", message: "missing" } };
-      const rows = (args._claims as any[]).map((c, i) => ({
+      const rows: FakeRow[] = (args._claims as FakeRow[]).map((c, i) => ({
         id: "claim-" + (inserted.length + i + 1),
         status: "PENDING",
         ...c,
@@ -48,12 +52,12 @@ function db(blob: Blob, name: string, type: string) {
       return { data: rows.map((r) => ({ id: r.id, claim_text: r.claim_text })), error: null };
     },
     from(table: string) {
-      const q: any = {
+      const q = {
         data: [],
         error: null,
         eq: () => q,
         select: () => q,
-        update: (row: any) => {
+        update: (row: FakeRow) => {
           if (table === "documents") docUpdates.push(row);
           return q;
         },
@@ -64,7 +68,7 @@ function db(blob: Blob, name: string, type: string) {
               : { id: "r" + inserted.length },
           error: null,
         }),
-        insert: (row: any) => {
+        insert: (row: FakeRow) => {
           if (table === "extracted_claims") inserted.push(row);
           if (table === "audit_log") audits.push(row);
           return q;
@@ -73,7 +77,7 @@ function db(blob: Blob, name: string, type: string) {
       return q;
     },
   };
-  return { supabase: supabase as any, inserted, audits, docUpdates };
+  return { supabase, inserted, audits, docUpdates };
 }
 const base = { documentId: "d", caseId: "c", tenantId: "t", userId: "u" };
 function gates() {
@@ -82,7 +86,7 @@ function gates() {
   process.env.CLAIM_GEMINI_TEST_FALLBACK_ENABLED = "true";
   process.env.CLAIM_GEMINI_FREE_TIER_CONFIRMED = "true";
 }
-const ok = (claims: any[]) =>
+const ok = (claims: FakeRow[]) =>
   new Response(
     JSON.stringify({
       candidates: [
@@ -126,15 +130,19 @@ describe("free Gemini test path contract", () => {
       vi.fn(async () => wrong.clone()),
     );
     const mock = db(new Blob(["Gate out 2 Oct"]), "t.txt", "text/plain");
-    const out: any = await extractDocumentClaimsForPath({
+    const out = await extractDocumentClaimsForPath({
       ...base,
-      supabase: mock.supabase,
+      supabase: mock.supabase as unknown as SupabaseClient,
       freeDataClass: "public_synthetic" as const,
     });
     expect(out.mode).toBe("text-fallback");
     expect(out.providerUsed).toBe("none");
-    expect(out.fallbackErrors?.[0]).toContain("EXTRACTION_SCHEMA_MISMATCH");
-    expect(mock.audits[0].payload.fallbackErrors[0]).toContain("EXTRACTION_SCHEMA_MISMATCH");
+    expect((out as { fallbackErrors?: string[] }).fallbackErrors?.[0]).toContain(
+      "EXTRACTION_SCHEMA_MISMATCH",
+    );
+    expect((mock.audits[0].payload as { fallbackErrors: string[] }).fallbackErrors[0]).toContain(
+      "EXTRACTION_SCHEMA_MISMATCH",
+    );
   });
   it("a truncated model answer is rejected, never accepted as a complete chunk", async () => {
     gates();
@@ -153,13 +161,15 @@ describe("free Gemini test path contract", () => {
       ),
     );
     const mock = db(new Blob(["x"]), "t.txt", "text/plain");
-    const out: any = await extractDocumentClaimsForPath({
+    const out = await extractDocumentClaimsForPath({
       ...base,
-      supabase: mock.supabase,
+      supabase: mock.supabase as unknown as SupabaseClient,
       freeDataClass: "public_synthetic" as const,
     });
     expect(out.providerUsed).toBe("none");
-    expect(out.fallbackErrors?.[0]).toContain("FINISH_MAX_TOKENS");
+    expect((out as { fallbackErrors?: string[] }).fallbackErrors?.[0]).toContain(
+      "FINISH_MAX_TOKENS",
+    );
   });
   it("a text PDF is sent as page-tagged sections with the claim schema enforced", async () => {
     gates();
@@ -184,14 +194,14 @@ describe("free Gemini test path contract", () => {
       "t.pdf",
       "application/pdf",
     );
-    const out: any = await extractDocumentClaimsForPath({
+    const out = await extractDocumentClaimsForPath({
       ...base,
-      supabase: mock.supabase,
+      supabase: mock.supabase as unknown as SupabaseClient,
       freeDataClass: "public_synthetic" as const,
     });
     expect(out.providerUsed).toBe("gemini-test");
     expect(out.count).toBeGreaterThan(0);
-    const body = JSON.parse((fetch.mock.calls[0] as any)[1].body);
+    const body = JSON.parse((fetch.mock.calls[0] as unknown as [string, { body: string }])[1].body);
     expect(body.generationConfig.responseSchema.properties.claims.items.required).toContain(
       "claim_text",
     );
@@ -279,12 +289,12 @@ describe("evidence pack layout and labels", () => {
     pack_payload: {
       generatedAt: "2026-10-12T10:00:00Z",
       case: { reference_no: "R", counterparty: "C" },
-      documents: [{ id: "d1", name: "Doc.pdf", sha256_hash: "b".repeat(64) }],
-      timeline: [],
+      documents: [{ id: "d1", name: "Doc.pdf", sha256_hash: "b".repeat(64) }] as FakeRow[],
+      timeline: [] as { timestamp: string; nature: string; title: string; source: string }[],
       claims: Array.from({ length: 90 }, (_, i) => claim(i)),
-      contradictions: [],
-      financialCalculations: [],
-      externalObservations: [],
+      contradictions: [] as FakeRow[],
+      financialCalculations: [] as FakeRow[],
+      externalObservations: [] as FakeRow[],
     },
   });
   const pages = (bytes: Uint8Array) =>
@@ -301,7 +311,7 @@ describe("evidence pack layout and labels", () => {
     }
   });
   it("keeps each timeline entry whole on one page", () => {
-    const pk: any = pack("DRAFT");
+    const pk = pack("DRAFT");
     pk.pack_payload.timeline = Array.from({ length: 80 }, (_, i) => ({
       timestamp: "2013-02-01T00:00:00Z",
       nature: "OBSERVED",
@@ -329,7 +339,7 @@ describe("evidence pack layout and labels", () => {
     expect(t).not.toContain("canonical pack payload:");
   });
   it("orders the timeline chronologically and does not present a date-only value as a known midnight", () => {
-    const pk: any = pack("DRAFT");
+    const pk = pack("DRAFT");
     pk.pack_payload.timeline = [
       { timestamp: "2025-07-14T00:00:00.000Z", nature: "REPORTED", title: "LATE", source: "d" },
       { timestamp: "2022-08-09T00:00:00.000Z", nature: "OBSERVED", title: "EARLY", source: "d" },
@@ -344,7 +354,7 @@ describe("evidence pack layout and labels", () => {
   });
   it("extraction completeness and discrepancy-review coverage are reported separately", () => {
     const mk = (status: string) => {
-      const pk: any = pack("DRAFT");
+      const pk = pack("DRAFT");
       pk.pack_payload.documents = [
         { id: "d1", name: "Doc.pdf", sha256_hash: "abc", extraction_status: status },
       ];

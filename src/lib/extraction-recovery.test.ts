@@ -1,4 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+type FakeRow = Record<string, unknown>;
+type RpcArgs = Record<string, unknown>;
 import fs from "node:fs";
 import { Blob } from "node:buffer";
 import { enabledFreeFallbacks, extractDocumentClaimsForPath } from "./extraction.functions";
@@ -27,15 +31,15 @@ function clear() {
   for (const key of envKeys) delete process.env[key];
 }
 function db(blob: Blob, name: string, type: string) {
-  const inserted: any[] = [];
+  const inserted: FakeRow[] = [];
   const supabase = {
     storage: { from: () => ({ download: async () => ({ data: blob, error: null }) }) },
-    rpc: async (fn: string, args: any) => {
+    rpc: async (fn: string, args: RpcArgs) => {
       // Emulates migrations 20261024217000 + 20261024221000 applied.
       if (fn === "reserve_free_extraction_attempt") return { data: "reserved", error: null };
       if (fn !== "replace_pending_claims")
         return { data: null, error: { code: "PGRST202", message: "missing" } };
-      const rows = (args._claims as any[]).map((c, i) => ({
+      const rows: FakeRow[] = (args._claims as FakeRow[]).map((c, i) => ({
         id: "claim-" + (inserted.length + i + 1),
         status: "PENDING",
         ...c,
@@ -44,7 +48,7 @@ function db(blob: Blob, name: string, type: string) {
       return { data: rows.map((r) => ({ id: r.id, claim_text: r.claim_text })), error: null };
     },
     from(table: string) {
-      const query: any = {
+      const query = {
         data: [],
         error: null,
         eq: () => query,
@@ -57,7 +61,7 @@ function db(blob: Blob, name: string, type: string) {
               : { id: "claim-" + inserted.length },
           error: null,
         }),
-        insert: (row: any) => {
+        insert: (row: FakeRow) => {
           if (table === "extracted_claims") inserted.push(row);
           return query;
         },
@@ -65,7 +69,7 @@ function db(blob: Blob, name: string, type: string) {
       return query;
     },
   };
-  return { supabase: supabase as any, inserted };
+  return { supabase, inserted };
 }
 const base = {
   documentId: "synthetic-doc",
@@ -81,7 +85,7 @@ describe("bounded extraction recovery", () => {
     const mock = db(new Blob(["gate in\ngate out"]), "test.txt", "text/plain");
     const result = await extractDocumentClaimsForPath({
       ...base,
-      supabase: mock.supabase,
+      supabase: mock.supabase as unknown as SupabaseClient,
       noAi: true,
     });
     expect(fetch).not.toHaveBeenCalled();
@@ -101,7 +105,10 @@ describe("bounded extraction recovery", () => {
       "test.pdf",
       "application/pdf",
     );
-    const result = await extractDocumentClaimsForPath({ ...base, supabase: mock.supabase });
+    const result = await extractDocumentClaimsForPath({
+      ...base,
+      supabase: mock.supabase as unknown as SupabaseClient,
+    });
     expect(fetch).not.toHaveBeenCalled();
     expect(result.mode).toBe("pdf-text-fallback");
     expect(result.providerUsed).toBe("none");
@@ -154,7 +161,7 @@ describe("bounded extraction recovery", () => {
     );
     const result = await extractDocumentClaimsForPath({
       ...base,
-      supabase: mock.supabase,
+      supabase: mock.supabase as unknown as SupabaseClient,
       freeDataClass: "public_synthetic" as const,
     });
     expect(result.providerUsed).toBe("gemini-test");
@@ -191,7 +198,7 @@ describe("bounded extraction recovery", () => {
     // Synthetic fixture data, explicitly classified - the only state in which a free provider may be called.
     const result = await extractDocumentClaimsForPath({
       ...base,
-      supabase: mock.supabase,
+      supabase: mock.supabase as unknown as SupabaseClient,
       freeDataClass: "public_synthetic",
     });
     expect(result.providerUsed).toBe("openrouter");
@@ -208,7 +215,10 @@ describe("bounded extraction recovery", () => {
     const fetch = vi.fn().mockResolvedValueOnce(new Response("quota", { status: 402 }));
     vi.stubGlobal("fetch", fetch);
     const mock = db(new Blob(["Confidential line"]), "test.txt", "text/plain");
-    const result = await extractDocumentClaimsForPath({ ...base, supabase: mock.supabase });
+    const result = await extractDocumentClaimsForPath({
+      ...base,
+      supabase: mock.supabase as unknown as SupabaseClient,
+    });
     expect(result.providerUsed).toBe("none");
     expect(result.mode).toBe("text-fallback");
     expect(fetch).not.toHaveBeenCalled(); // no billed primary and no free call: OpenRouter never contacted
@@ -226,9 +236,9 @@ describe("bounded extraction recovery", () => {
       "application/pdf",
     );
     const noRpc = { ...mock.supabase, rpc: undefined };
-    await expect(extractDocumentClaimsForPath({ ...base, supabase: noRpc as any })).rejects.toThrow(
-      "REEXTRACTION_UNAVAILABLE",
-    );
+    await expect(
+      extractDocumentClaimsForPath({ ...base, supabase: noRpc as unknown as SupabaseClient }),
+    ).rejects.toThrow("REEXTRACTION_UNAVAILABLE");
     expect(mock.inserted.length).toBe(0);
   });
   it("explicit gateway without a verified rate is refused before any provider call (credits are spend)", async () => {
@@ -241,7 +251,10 @@ describe("bounded extraction recovery", () => {
     // The gateway model has no verified price in the book: the reservation refuses
     // closed rather than spending workspace AI credits blind.
     await expect(
-      extractDocumentClaimsForPath({ ...base, supabase: mock.supabase }),
+      extractDocumentClaimsForPath({
+        ...base,
+        supabase: mock.supabase as unknown as SupabaseClient,
+      }),
     ).rejects.toThrow("UNKNOWN_MODEL_RATE");
     expect(fetch).not.toHaveBeenCalled();
   });
@@ -255,15 +268,15 @@ describe("bounded extraction recovery", () => {
     const fetch = vi.fn();
     vi.stubGlobal("fetch", fetch);
     const mock = db(new Blob(["line"]), "test.txt", "text/plain");
-    const audited: any[] = [];
-    const baseFrom = mock.supabase.from.bind(mock.supabase);
-    mock.supabase.from = (table: string) => {
+    const audited: FakeRow[] = [];
+    const baseFrom = (mock.supabase as { from: (t: string) => unknown }).from.bind(mock.supabase);
+    mock.supabase.from = ((table: string) => {
       if (table === "app_errors")
         return {
-          insert: (row: any) => {
+          insert: (row: FakeRow) => {
             audited.push(row);
             return {
-              then: (cb: any) => {
+              then: (cb: (v: unknown) => unknown) => {
                 cb?.({});
                 return Promise.resolve({});
               },
@@ -271,7 +284,7 @@ describe("bounded extraction recovery", () => {
           },
         };
       return baseFrom(table);
-    };
+    }) as unknown as typeof mock.supabase.from;
     const noCap = {
       ...mock.supabase,
       rpc: async (fn: string) =>
@@ -280,9 +293,9 @@ describe("bounded extraction recovery", () => {
           : { data: null, error: { code: "PGRST202" } },
     };
     noCap.from = mock.supabase.from;
-    await expect(extractDocumentClaimsForPath({ ...base, supabase: noCap as any })).rejects.toThrow(
-      "PAID_NOT_ENABLED",
-    );
+    await expect(
+      extractDocumentClaimsForPath({ ...base, supabase: noCap as unknown as SupabaseClient }),
+    ).rejects.toThrow("PAID_NOT_ENABLED");
     expect(fetch).not.toHaveBeenCalled();
     expect(audited.length).toBe(1);
     expect(audited[0].message).toContain("EXTRACTION_SPEND_REFUSED");
@@ -298,20 +311,26 @@ describe("bounded extraction recovery", () => {
     });
     vi.stubGlobal("fetch", fetch);
     const mock = db(new Blob(["line one"]), "test.txt", "text/plain");
-    const rpcCalls: { fn: string; args: any }[] = [];
+    const rpcCalls: { fn: string; args: RpcArgs }[] = [];
     const spy = {
       ...mock.supabase,
-      rpc: async (fn: string, args: any) => {
+      rpc: async (fn: string, args: RpcArgs) => {
         rpcCalls.push({ fn, args });
         if (fn === "reserve_extraction_cost") return { data: "reserved", error: null };
         if (fn === "replace_pending_claims") {
-          const rows = (args._claims as any[]).map((c: any, i: number) => ({ id: "c" + i, ...c }));
+          const rows: FakeRow[] = (args._claims as FakeRow[]).map((c, i) => ({
+            id: "c" + i,
+            ...c,
+          }));
           return { data: rows.map((r) => ({ id: r.id, claim_text: r.claim_text })), error: null };
         }
         return { data: null, error: null };
       },
     };
-    const result = await extractDocumentClaimsForPath({ ...base, supabase: spy as any });
+    const result = await extractDocumentClaimsForPath({
+      ...base,
+      supabase: spy as unknown as SupabaseClient,
+    });
     expect(result.mode).toBe("text-fallback"); // local import still recovered
     const completed = rpcCalls.find((c) => c.fn === "complete_extraction_cost");
     expect(completed).toBeTruthy();
@@ -341,7 +360,10 @@ describe("bounded extraction recovery", () => {
     const fetch = vi.fn();
     vi.stubGlobal("fetch", fetch);
     const mock = db(new Blob(["line one\nline two"]), "test.txt", "text/plain");
-    const result = await extractDocumentClaimsForPath({ ...base, supabase: mock.supabase });
+    const result = await extractDocumentClaimsForPath({
+      ...base,
+      supabase: mock.supabase as unknown as SupabaseClient,
+    });
     expect(fetch).not.toHaveBeenCalled(); // zero provider calls: no gateway, no own-key, no free AI
     expect(result.providerUsed).toBe("none");
     expect(result.count).toBe(2);
@@ -362,14 +384,14 @@ describe("bounded extraction recovery", () => {
         : { data: [], error: null };
     const result = await extractDocumentClaimsForPath({
       ...base,
-      supabase: mock.supabase,
+      supabase: mock.supabase as unknown as SupabaseClient,
       freeDataClass: "public_synthetic",
     });
     expect(fetch).not.toHaveBeenCalled(); // fail-closed safety: LOVABLE_API_KEY presence alone is not consent - no gateway call at all, and no free request went out
     expect(result.providerUsed).toBe("none");
     expect(result.mode).toBe("text-fallback");
     expect(
-      (result as any).fallbackErrors?.some((e: string) =>
+      (result as { fallbackErrors?: string[] }).fallbackErrors?.some((e: string) =>
         e.includes("daily-attempt cap update is applied"),
       ),
     ).toBe(true);
@@ -383,20 +405,20 @@ describe("bounded extraction recovery", () => {
     vi.stubGlobal("fetch", fetch);
     const mock = db(new Blob(["Synthetic line"]), "test.txt", "text/plain");
     const realRpc = mock.supabase.rpc;
-    mock.supabase.rpc = async (fn: string, args: any) =>
+    mock.supabase.rpc = async (fn: string, args: RpcArgs) =>
       fn === "reserve_free_extraction_attempt"
         ? { data: "over_cap", error: null }
         : realRpc(fn, args);
     const result = await extractDocumentClaimsForPath({
       ...base,
-      supabase: mock.supabase,
+      supabase: mock.supabase as unknown as SupabaseClient,
       freeDataClass: "public_synthetic",
     });
     expect(fetch).not.toHaveBeenCalled(); // fail-closed safety: no gateway call; over-cap also blocks the free request
     expect(result.providerUsed).toBe("none");
     expect(result.mode).toBe("text-fallback");
     expect(
-      (result as any).fallbackErrors?.some(
+      (result as { fallbackErrors?: string[] }).fallbackErrors?.some(
         (e: string) =>
           e.includes("attempts for today are used up") && e.includes("text import still works"),
       ),
@@ -411,20 +433,20 @@ describe("bounded extraction recovery", () => {
     vi.stubGlobal("fetch", fetch);
     const mock = db(new Blob(["Synthetic line"]), "test.txt", "text/plain");
     const realRpc = mock.supabase.rpc;
-    mock.supabase.rpc = async (fn: string, args: any) => {
+    mock.supabase.rpc = async (fn: string, args: RpcArgs) => {
       if (fn === "reserve_free_extraction_attempt") throw new Error("connection reset");
       return realRpc(fn, args);
     };
     const result = await extractDocumentClaimsForPath({
       ...base,
-      supabase: mock.supabase,
+      supabase: mock.supabase as unknown as SupabaseClient,
       freeDataClass: "public_synthetic",
     });
     expect(fetch).not.toHaveBeenCalled(); // fail-closed safety: no gateway call; transient cap failure also blocks the free request
     expect(result.providerUsed).toBe("none");
     expect(result.mode).toBe("text-fallback");
     expect(
-      (result as any).fallbackErrors?.some((e: string) =>
+      (result as { fallbackErrors?: string[] }).fallbackErrors?.some((e: string) =>
         e.includes("could not verify the free daily attempt limit"),
       ),
     ).toBe(true);

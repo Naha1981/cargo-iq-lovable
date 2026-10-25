@@ -213,6 +213,33 @@ export function zoomViewBox(zoom: number, focus?: CanvasPoint | null): ViewBox {
   return { x, y, width, height };
 }
 
+/**
+ * Viewport-aspect-aware viewBox: the largest canvas window that matches the
+ * viewport's aspect ratio, so a portrait or squat viewport is filled instead of
+ * letterboxed with dead space. Centered on the focus point, clamped inside the
+ * canvas. Zoom shrinks the window preserving the viewport aspect. Geographic
+ * scale stays uniform because the window aspect equals the element aspect.
+ */
+export function fitViewBox(zoom: number, focus: CanvasPoint | null | undefined, aspect: number): ViewBox {
+  const z = clampZoom(zoom);
+  const canvasAspect = MAP_CANVAS.width / MAP_CANVAS.height;
+  let width: number;
+  let height: number;
+  if (!(aspect > 0) || !Number.isFinite(aspect) || Math.abs(aspect - canvasAspect) < 1e-6) {
+    width = MAP_CANVAS.width; height = MAP_CANVAS.height;
+  } else if (aspect > canvasAspect) {
+    width = MAP_CANVAS.width; height = width / aspect;
+  } else {
+    height = MAP_CANVAS.height; width = height * aspect;
+  }
+  width /= z; height /= z;
+  const cx = focus?.x ?? MAP_CANVAS.width / 2;
+  const cy = focus?.y ?? MAP_CANVAS.height / 2;
+  const x = Math.min(Math.max(cx - width / 2, 0), MAP_CANVAS.width - width);
+  const y = Math.min(Math.max(cy - height / 2, 0), MAP_CANVAS.height - height);
+  return { x, y, width, height };
+}
+
 export function viewBoxString(vb: ViewBox): string {
   const r = (n: number) => Math.round(n * 100) / 100;
   return r(vb.x) + " " + r(vb.y) + " " + r(vb.width) + " " + r(vb.height);

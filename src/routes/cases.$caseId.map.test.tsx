@@ -3,7 +3,7 @@
 // into HTML shells linked to the real built stylesheet for headless-Chrome
 // pixel inspection.
 import { describe, expect, it, vi, afterEach } from "vitest";
-import { act, fireEvent, render } from "@testing-library/react";
+import { act, fireEvent, render, within } from "@testing-library/react";
 import { writeFileSync } from "node:fs";
 
 const fakeCase = { id: "case-1", reference_no: "DUR-2026-0412", vessel_name: "MV Umhlanga Trader", voyage_no: "214S", container_no: "MSKU7748213" };
@@ -46,7 +46,7 @@ function renderMap(data: any) {
 
 // Whole-component dump: fixed overlays and controls are HTML, not SVG, so the
 // shell must carry the full markup plus the real built stylesheet.
-const APP_CSS = "file:///tmp/cq-mapfix/.output/public/assets/styles-BpaHtrmx.css";
+const APP_CSS = "file:///tmp/cq-mapfix/.output/public/assets/styles-Bv0oGQs_.css";
 function dumpPage(container: HTMLElement, name: string) {
   const html = "<!doctype html><html><head><meta charset=\"utf-8\">"
     + "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
@@ -96,6 +96,18 @@ describe("Harbour map rendering - evidence truth", () => {
     expect(container.textContent).toContain("VESSEL POSITION · LAST RECORDED 10:00Z"); // stale coords carry their last-recorded time
     expect(container.textContent).toContain("Upcoming"); // 14:20 event is after 12:00 playback - not yet evidence
     expect(container.textContent).toContain("No linked source record"); // fixture event has no source - said plainly, not fabricated
+    const { container: c2 } = renderMap({ ...base, observations: [fix1, fix2], timeline: [
+      { id: "ev2", timestamp: "2026-09-06T11:00:00.000Z", title: "Gate camera movement", nature: "observed", source: "CCTV / Gate 4", provenance_id: "obs-1" },
+      { id: "ev3", timestamp: "2026-09-06T10:30:00.000Z", title: "Demurrage claimed", nature: "claimed", source: "cm-letter.pdf", provenance_id: "claim-1" },
+      { id: "ev4", timestamp: "2026-09-06T10:00:00.000Z", title: "AIS position", nature: "observed", source: "AisHub feed", provenance_id: null },
+    ] });
+    fireEvent.change(within(c2).getByLabelText("Investigation timeline"), { target: { value: String(Date.parse("2026-09-06T12:00:00.000Z")) } });
+    const cctvLink = Array.from(c2.querySelectorAll("a")).find((a) => a.textContent?.includes("view CCTV evidence"));
+    expect(cctvLink).toBeTruthy(); // CCTV provenance navigates to the CCTV evidence route
+    const docLink = Array.from(c2.querySelectorAll("a")).find((a) => a.textContent?.includes("view case documents"));
+    expect(docLink).toBeTruthy(); // extracted-claim provenance navigates to the documents route
+    const feedLink = Array.from(c2.querySelectorAll("a")).find((a) => a.textContent?.includes("AisHub feed"));
+    expect(feedLink).toBeFalsy(); // plain provider text is never rendered as a link
     dumpPage(container, "map-page-tracked.html");
   });
 

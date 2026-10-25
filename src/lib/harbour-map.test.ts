@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   aisTrack, basisDescription, basisLabel, clampZoom, interpolateTrack, mapCoverageLine, panBy, positionGap, project,
-  scaleBarPx, splitTrackSegments, vesselIdentityLine, viewBoxString, zoomViewBox, GEO_WINDOW, MAP_CANVAS, ZOOM_MAX, ZOOM_MIN,
+  scaleBarPx, splitTrackSegments, vesselIdentityLine, viewBoxString, zoomViewBox, fitViewBox, GEO_WINDOW, MAP_CANVAS, ZOOM_MAX, ZOOM_MIN,
 } from "./harbour-map";
 
 const t0 = "2026-09-02T08:00:00.000Z";
@@ -162,5 +162,30 @@ describe("mapCoverageLine", () => {
     expect(mapCoverageLine(true, 5)).toBe("SAMPLE DATA");
     expect(mapCoverageLine(false, 5)).toBe("RECORDED OBSERVATIONS");
     expect(mapCoverageLine(false, 0)).toBe("NO VESSEL POSITIONS RECORDED");
+  });
+});
+
+describe("fitViewBox: viewport-aspect fill", () => {
+  it("portrait viewport crops width, fills height, centres on focus", () => {
+    const vb = fitViewBox(1, null, 390 / 694);
+    expect(vb.height).toBe(640); // full canvas height used
+    expect(vb.width).toBeCloseTo(640 * (390 / 694), 1); // width shrunk to viewport aspect
+    expect(vb.width / vb.height).toBeCloseTo(390 / 694, 3); // aspect preserved: no distortion
+  });
+  it("squat landscape crops height, fills width", () => {
+    const vb = fitViewBox(1, null, 844 / 240);
+    expect(vb.width).toBe(1000);
+    expect(vb.height).toBeCloseTo(1000 / (844 / 240), 1);
+  });
+  it("canvas-aspect viewport matches zoomViewBox", () => {
+    const a = fitViewBox(1.5, null, 1000 / 640);
+    const b = zoomViewBox(1.5);
+    expect(a.width).toBeCloseTo(b.width, 6);
+    expect(a.height).toBeCloseTo(b.height, 6);
+  });
+  it("zoom shrinks the window preserving the viewport aspect", () => {
+    const vb = fitViewBox(2, null, 0.5);
+    expect(vb.width / vb.height).toBeCloseTo(0.5, 3);
+    expect(vb.height).toBeCloseTo(320, 1);
   });
 });

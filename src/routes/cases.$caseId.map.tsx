@@ -8,13 +8,33 @@ import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { disputedClaimIds, disputedWindow, isDisputeEvent } from "@/lib/dispute";
 
-import { aisTrack, basisDescription, basisLabel, clampZoom, interpolateTrack, mapCoverageLine, panBy, positionGap, project, scaleBarPx, splitTrackSegments, vesselIdentityLine, viewBoxString, zoomViewBox, type PositionBasis, type TrackPoint, type ViewBox } from "@/lib/harbour-map";
+import { aisTrack, basisDescription, basisLabel, clampZoom, interpolateTrack, mapCoverageLine, fitViewBox, panBy, positionGap, project, scaleBarPx, splitTrackSegments, vesselIdentityLine, viewBoxString, zoomViewBox, type PositionBasis, type TrackPoint, type ViewBox } from "@/lib/harbour-map";
 import { DURBAN_COASTLINE } from "@/lib/durban-coastline";
 
 export const Route = createFileRoute("/cases/$caseId/map")({
   head: () => ({ meta: [{ title: "Harbour Evidence Map | CargoIQ" }] }),
   component: MapPage,
 });
+
+/**
+ * Source line for a timeline event. Links only where the writer's provenance is
+ * structurally known: CCTV events (source prefixed "CCTV /", provenance_id into
+ * cctv_observations) go to the CCTV evidence route; extracted-claim events
+ * (provenance_id into extracted_claims, source = document name) go to the case
+ * documents route; anything else is shown as plain text, and a missing source is
+ * said plainly. Never renders source text as a link itself - it is not a verified URL.
+ */
+function eventSourceNode(caseId: string, e: any) {
+  if (!e.source) return "No linked source record";
+  const src = String(e.source);
+  if (e.provenance_id && src.startsWith("CCTV /")) {
+    return <>Source: <Link to="/cases/$caseId/cctv" params={{ caseId }} className="underline decoration-dotted underline-offset-2 hover:text-white/80">{src} - view CCTV evidence</Link></>;
+  }
+  if (e.provenance_id) {
+    return <>Source: <Link to="/cases/$caseId/documents" params={{ caseId }} className="underline decoration-dotted underline-offset-2 hover:text-white/80">{src} - view case documents</Link></>;
+  }
+  return "Source: " + src;
+}
 
 export function MapPage() {
   const { caseId } = Route.useParams();
@@ -42,6 +62,7 @@ export function MapPage() {
   const [layers, setLayers] = useState({ ais: true, infrastructure: true });
   const [refreshing, setRefreshing] = useState(false);
   const [large, setLarge] = useState(false);
+  const [eventsOpen, setEventsOpen] = useState(true);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const dragRef = useRef<{ px: number; py: number; panX: number; panY: number } | null>(null);
@@ -77,7 +98,25 @@ export function MapPage() {
   const gap = useMemo(() => positionGap(track, time), [track, time]);
   const segments = useMemo(() => splitTrackSegments(track), [track]);
   const focus = pos && locked ? { x: pos.x, y: pos.y } : null;
-  const vbObj = panBy(zoomViewBox(zoom, focus), pan.x, pan.y);
+  const [stageAspect, setStageAspect] = useState<number | null>(null);
+  useEffect(() => {
+    if (!large) return;
+    const el = svgRef.current;
+    if (!el) return;
+    const update = () => {
+      const r = el.getBoundingClientRect();
+      if (r.width > 0 && r.height > 0) setStageAspect(r.width / r.height);
+    };
+    update();
+    window.addEventListener("resize", update);
+    let ro: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== "undefined") {
+      ro = new ResizeObserver(update);
+      ro.observe(el);
+    }
+    return () => { window.removeEventListener("resize", update); ro?.disconnect(); };
+  }, [large]);
+  const vbObj = panBy(large && stageAspect ? fitViewBox(zoom, focus, stageAspect) : zoomViewBox(zoom, focus), pan.x, pan.y);
   const vb = viewBoxString(vbObj);
   const coast = useMemo(() => DURBAN_COASTLINE.map((chain) => chain.map(([lon, lat]) => project(lat, lon))), []);
   const landPath = useMemo(() => coast.map((chain) => {
@@ -499,7 +538,7 @@ export function MapPage() {
 
           <div className="pointer-events-none hidden md:block absolute left-1/2 top-2 -translate-x-1/2 font-mono text-[10px] tracking-wider text-[#d2ff6b]/80">DURBAN HARBOUR · CASE EVIDENCE MAP</div>
 
-          <div className="relative mx-3 mt-3 md:absolute md:mx-0 md:mt-0 md:left-4 md:top-14 rounded border border-[#d2ff6b]/40 bg-black/65 px-3 py-2 font-mono text-[10px] backdrop-blur">
+          <div className={large ? "absolute left-4 top-14 max-w-[70%] rounded border border-[#d2ff6b]/40 bg-black/65 px-3 py-2 font-mono text-[10px] backdrop-blur" : "relative mx-3 mt-3 md:absolute md:mx-0 md:mt-0 md:left-4 md:top-14 rounded border border-[#d2ff6b]/40 bg-black/65 px-3 py-2 font-mono text-[10px] backdrop-blur"}>
             <div className="text-[#d2ff6b]">{!track.length ? "NO RECORDED POSITIONS" : !pos ? "NO RECORDED POSITION AT THIS TIME" : locked ? "FOLLOWING RECORDED POSITION" : "FOLLOW OFF"}</div>
             {pos && pos.basis.kind === "fix" && <div className="mt-1 text-white/70">RECORDED SPEED {pos.sog.toFixed(1)} kn · {hm(pos.basis.at)}</div>}
             {pos && pos.basis.kind === "stale" && <div className="mt-1 text-white/70">LAST RECORDED SPEED {pos.sog.toFixed(1)} kn · {hm(pos.basis.at)} - NO NEWER POSITIONS</div>}
@@ -508,23 +547,23 @@ export function MapPage() {
             {inDisputedWindow && <div className="mt-1 font-semibold" style={{ color: "var(--disputed)" }}>DISPUTED WINDOW</div>}
           </div>
 
-          <div className="relative mx-3 mt-3 md:absolute md:mx-0 md:mt-0 md:left-4 md:top-[8.25rem] md:w-64 md:max-w-[45%] rounded border border-[#d2ff6b]/40 bg-black/70 px-3 py-2 font-mono text-[10px] backdrop-blur">
-            <div className="flex items-center justify-between text-[#d2ff6b]"><span>EVENTS WITHIN 24H OF PLAYBACK</span><span className="text-white/60">{nearby.length}</span></div>
-            <ul className="mt-2 max-h-44 space-y-2 overflow-y-auto pr-1 md:max-h-[clamp(64px,calc(100vh-640px),34vh)]">
+          <div className={large ? "absolute left-4 top-[8.25rem] w-64 max-w-[70%] rounded border border-[#d2ff6b]/40 bg-black/70 px-3 py-2 font-mono text-[10px] backdrop-blur" : "relative mx-3 mt-3 md:absolute md:mx-0 md:mt-0 md:left-4 md:top-[8.25rem] md:w-64 md:max-w-[45%] rounded border border-[#d2ff6b]/40 bg-black/70 px-3 py-2 font-mono text-[10px] backdrop-blur"}>
+            <div className="flex items-center justify-between gap-2 text-[#d2ff6b]"><span>EVENTS WITHIN 24H OF PLAYBACK</span><span className="flex items-center gap-2"><span className="text-white/60">{nearby.length}</span><button onClick={() => setEventsOpen((v) => !v)} className="pointer-events-auto rounded border border-[#d2ff6b]/40 px-1.5 py-px text-[9px] uppercase tracking-wider text-[#d2ff6b] hover:bg-[#d2ff6b]/10">{eventsOpen ? "Hide" : "Show"}</button></span></div>
+            {eventsOpen && <ul className="mt-2 max-h-44 space-y-2 overflow-y-auto pr-1 md:max-h-[clamp(64px,calc(100vh-640px),34vh)]">
               {nearby.map((e: any) => (
                 <li key={e.id} className="border-t border-white/10 pt-1.5 first:border-t-0 first:pt-0">
                   <div className="flex items-center justify-between gap-2"><span className="text-white/60">{String(e.timestamp).slice(5, 16).replace("T", " ")}Z</span><span className="flex items-center gap-1.5">{Date.parse(String(e.timestamp)) > time
                       ? <span className="rounded border border-amber-300/60 px-1 py-px text-[8px] uppercase tracking-wider text-amber-300" title="After the selected playback time - not yet evidence at that moment">Upcoming</span>
                       : <span className="rounded border border-white/20 px-1 py-px text-[8px] uppercase tracking-wider text-white/50" title="At or before the selected playback time">Occurred</span>}{isDisputeEvent(e, disputed) && <DisputeBadge />}{(String(e.nature).toLowerCase() !== "disputed" || !isDisputeEvent(e, disputed)) && <NatureBadge n={String(e.nature).toLowerCase() as any} />}</span></div>
                   <div className="mt-0.5 font-sans text-[11px] leading-snug text-white/90">{e.title}</div>
-                  <div className="mt-0.5 font-sans text-[10px] text-white/50">{e.source ? "Source: " + String(e.source) : "No linked source record"}</div>
+                  <div className="mt-0.5 font-sans text-[10px] text-white/50">{eventSourceNode(caseId, e)}</div>
                 </li>
               ))}
               {!nearby.length && <li className="font-sans text-[11px] text-white/60">No events near the selected time.</li>}
-            </ul>
+            </ul>}
           </div>
 
-          <div className="relative mx-3 my-3 md:absolute md:mx-0 md:my-0 md:inset-x-3 md:bottom-3 rounded border border-[#d2ff6b]/40 bg-black/75 px-3 py-2 backdrop-blur">
+          <div className={large ? "absolute inset-x-3 bottom-3 rounded border border-[#d2ff6b]/40 bg-black/75 px-3 py-2 backdrop-blur" : "relative mx-3 my-3 md:absolute md:mx-0 md:my-0 md:inset-x-3 md:bottom-3 rounded border border-[#d2ff6b]/40 bg-black/75 px-3 py-2 backdrop-blur"}>
             <div className="flex flex-wrap items-center gap-2">
               {hasTemporalEvidence
                 ? <Button className="py-1 text-xs" onClick={() => setPlaying((value) => !value)}>{playing ? "Pause" : "Play timeline"}</Button>
@@ -538,7 +577,7 @@ export function MapPage() {
             <div className="flex justify-between font-mono text-[9px] text-white/50"><span>{new Date(initialTime).toISOString().slice(0, 16)}Z</span><span>{new Date(maxTime).toISOString().slice(0, 16)}Z</span></div>
           </div>
 
-          <div className="relative mx-3 mb-3 mt-1 flex flex-wrap gap-2 pr-1 md:absolute md:mx-0 md:mb-0 md:mt-0 md:right-4 md:top-8 md:max-w-[60%] md:justify-end md:gap-1 md:pr-0">
+          <div className={large ? "absolute right-4 top-8 flex max-w-[60%] flex-wrap justify-end gap-1" : "relative mx-3 mb-3 mt-1 flex flex-wrap gap-2 pr-1 md:absolute md:mx-0 md:mb-0 md:mt-0 md:right-4 md:top-8 md:max-w-[60%] md:justify-end md:gap-1 md:pr-0"}>
             <button aria-label="Zoom in" onClick={() => setZoom((z) => clampZoom(z * 1.5))} className="rounded border border-[#d2ff6b]/35 bg-black/65 px-2 py-1 font-mono text-[10px] uppercase text-[#d2ff6b]">+ Zoom in</button>
             <button aria-label="Zoom out" onClick={() => setZoom((z) => clampZoom(z / 1.5))} className="rounded border border-[#d2ff6b]/35 bg-black/65 px-2 py-1 font-mono text-[10px] uppercase text-[#d2ff6b]">- Zoom out</button>
             {zoom !== 1 && <button aria-label="Reset zoom" onClick={resetView} className="rounded border border-[#d2ff6b]/35 bg-black/65 px-2 py-1 font-mono text-[10px] uppercase text-[#d2ff6b]">Reset view</button>}

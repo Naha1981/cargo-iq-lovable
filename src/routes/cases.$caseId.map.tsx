@@ -8,31 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { disputedClaimIds, disputedWindow, isDisputeEvent } from "@/lib/dispute";
 
-type TrackPoint = { at: string; lat: number; lon: number; sog: number; cog: number | null; mmsi: string | null; vesselName: string | null };
-
-const DURBAN = { lat: -29.8833, lon: 31.05 };
-
-function project(lat: number, lon: number) {
-  const x = Math.max(20, Math.min(980, 500 + (lon - DURBAN.lon) * 1600));
-  const y = Math.max(20, Math.min(620, 320 - (lat - DURBAN.lat) * 1600));
-  return { x, y };
-}
-
-function aisTrack(observations: any[]): TrackPoint[] {
-  return observations
-    .filter((x) => x.observation_type === "AIS_POSITION" && x.latitude != null && x.longitude != null)
-    .map((x) => ({
-      at: String(x.observed_at),
-      lat: Number(x.latitude),
-      lon: Number(x.longitude),
-      sog: Number(x.payload?.sog ?? 0),
-      cog: x.payload?.cog == null ? null : Number(x.payload.cog),
-      mmsi: x.payload?.mmsi ? String(x.payload.mmsi) : null,
-      vesselName: x.payload?.vesselName ? String(x.payload.vesselName) : null,
-    }))
-    .filter((x) => Number.isFinite(Date.parse(x.at)))
-    .sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
-}
+import { aisTrack, clampZoom, interpolateTrack, mapCoverageLine, project, vesselIdentityLine, viewBoxString, zoomViewBox, type TrackPoint } from "@/lib/harbour-map";
 
 export const Route = createFileRoute("/cases/$caseId/map")({
   head: () => ({ meta: [{ title: "Harbour Evidence Map | CargoIQ" }] }),
@@ -64,6 +40,7 @@ function MapPage() {
   const [layers, setLayers] = useState({ ais: true, sar: true, optical: true, weather: false, infrastructure: true });
   const [refreshing, setRefreshing] = useState(false);
   const [large, setLarge] = useState(false);
+  const [zoom, setZoom] = useState(1);
   const [saving, setSaving] = useState(false);
   const [snapshotNotice, setSnapshotNotice] = useState("");
   const [snapshotError, setSnapshotError] = useState("");
@@ -90,24 +67,9 @@ function MapPage() {
     return () => window.clearInterval(id);
   }, [playing, initialTime, maxTime]);
 
-  const current = useMemo(() => {
-    if (!track.length) return { x: 500, y: 320, sog: 0, lat: DURBAN.lat, lon: DURBAN.lon, cog: null };
-    let a = track[0]!;
-    let b = track[track.length - 1]!;
-    for (let i = 1; i < track.length; i++) {
-      if (Date.parse(track[i]!.at) >= time) {
-        a = track[i - 1]!;
-        b = track[i]!;
-        break;
-      }
-    }
-    const ta = Date.parse(a.at);
-    const tb = Date.parse(b.at);
-    const f = tb === ta ? 1 : Math.max(0, Math.min(1, (time - ta) / (tb - ta)));
-    const lat = a.lat + (b.lat - a.lat) * f;
-    const lon = a.lon + (b.lon - a.lon) * f;
-    return { ...project(lat, lon), lat, lon, sog: a.sog + (b.sog - a.sog) * f, cog: a.cog ?? b.cog };
-  }, [track, time]);
+  // null when the case has no recorded positions: never render an invented location.
+  const pos = useMemo(() => interpolateTrack(track, time), [track, time]);
+  const vb = viewBoxString(zoomViewBox(zoom, pos && locked ? { x: pos.x, y: pos.y } : null));
 
   const nearby = data.timeline.filter((e: any) => Math.abs(Date.parse(e.timestamp) - time) <= 24 * 3600000).slice(0, 10);
   const flagged = data.contradictions.filter((x: any) => x.status === "FLAGGED").slice(0, 6);
@@ -181,10 +143,10 @@ function MapPage() {
           summary: {
             vesselName: last?.vesselName || data.case.vessel_name || null,
             mmsi: last?.mmsi ?? null,
-            lat: locked ? current.lat : null,
-            lon: locked ? current.lon : null,
-            sog: locked ? Number(current.sog.toFixed(1)) : null,
-            cog: current.cog == null ? null : Math.round(current.cog),
+            lat: pos && locked ? pos.lat : null,
+            lon: pos && locked ? pos.lon : null,
+            sog: pos && locked ? Number(pos.sog.toFixed(1)) : null,
+            cog: pos?.cog == null ? null : Math.round(pos.cog),
             inDisputedWindow,
             windowStart: dWindow ? new Date(dWindow.start).toISOString() : null,
             windowEnd: dWindow ? new Date(dWindow.end).toISOString() : null,
@@ -215,8 +177,8 @@ function MapPage() {
         ["Name", name + (data.case.voyage_no ? " · voyage " + data.case.voyage_no : "")],
         ["MMSI (radio ID)", last?.mmsi ?? "Not recorded"],
         ["Flag", "Not recorded"],
-        ["Speed", current.sog.toFixed(1) + " knots"],
-        ["Course", current.cog == null ? "Not recorded" : Math.round(current.cog) + "°"],
+        ["Speed", pos ? pos.sog.toFixed(1) + " knots" : "No recorded positions"],
+        ["Course", pos?.cog == null ? "Not recorded" : Math.round(pos.cog) + "°"],
         ["Destination", "Not recorded"],
         ["Last update", last ? fmt(Date.parse(last.at)) : "No positions recorded"],
       ];
@@ -301,6 +263,7 @@ function MapPage() {
     <div className="space-y-3">
       <div className="rounded border bg-card px-3 py-2">
         <p className="text-sm">This map shows where the case vessel was, minute by minute, and which satellite and terminal records back it up — so the disputed period can be checked against physical evidence.</p>
+        {!track.length && <p className="mt-1 text-sm text-muted-foreground">No vessel positions are recorded for this case yet. Playback still moves through the case events and satellite passes in time, and the vessel marker appears once AIS positions are stored - nothing on this map shows an invented location.</p>}
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">What to look at:</span>
           <button onClick={guideVessel} className="rounded border px-2.5 py-1 text-xs hover:bg-accent">The case vessel</button>
@@ -313,9 +276,9 @@ function MapPage() {
         {[
           ["DATA STATUS", inDisputedWindow ? "DISPUTED WINDOW" : isSample ? "SAMPLE DATA" : "RECORDED OBSERVATIONS · CORROBORATION"],
           ["TIME (UTC)", new Date(time).toISOString().replace("T", " ").slice(0, 19) + "Z"],
-          ["VESSEL POSITION", locked ? current.lat.toFixed(5) + " / " + current.lon.toFixed(5) : "NOT TRACKING"],
-          ["VESSEL COURSE", current.cog == null ? "—" : Math.round(current.cog) + "°"],
-          ["MAP COVERAGE", "35 KM RADIUS"],
+          ["VESSEL POSITION", pos ? (locked ? pos.lat.toFixed(5) + " / " + pos.lon.toFixed(5) : "NOT TRACKING") : "NO RECORDED POSITIONS"],
+          ["VESSEL COURSE", pos?.cog == null ? "—" : Math.round(pos.cog) + "°"],
+          ["MAP ZOOM", zoom + "×"],
         ].map(([label, value]) => (
           <div key={label} className={cn("min-w-0 rounded border bg-card px-3 py-2 font-mono", label === "DATA STATUS" && "col-span-2 md:col-span-1")}>
             <div className="text-[9px] tracking-[0.2em] text-muted-foreground">{label}</div>
@@ -344,7 +307,7 @@ function MapPage() {
           </div>
         )}
         <div className="relative">
-          <svg viewBox="0 0 1000 640" className="block h-auto aspect-[1000/640] md:aspect-auto w-full md:h-[calc(100vh-380px)] md:min-h-[340px]" role="img" aria-label="CargoIQ harbour evidence map">
+          <svg viewBox={vb} className={large ? "block h-[calc(100vh-150px)] min-h-[320px] w-full" : "block h-auto aspect-[1000/640] md:aspect-auto w-full md:h-[calc(100vh-380px)] md:min-h-[340px]"} role="img" aria-label="CargoIQ harbour evidence map">
             <defs>
               <pattern id="hud-grid" width="40" height="40" patternUnits="userSpaceOnUse">
                 <path d="M40 0H0V40" fill="none" stroke="#d2ff6b" strokeOpacity="0.09" />
@@ -397,13 +360,15 @@ function MapPage() {
                     </g>
                   );
                 })}
-                <g transform={"translate(" + current.x + "," + current.y + ")"} style={{ cursor: "pointer" }} onClick={() => tapPreview({ kind: "vessel" })} onMouseEnter={() => showPreview({ kind: "vessel" })} onMouseLeave={hoverOut}>
+                {pos && (
+                <g transform={"translate(" + pos.x + "," + pos.y + ")"} style={{ cursor: "pointer" }} onClick={() => tapPreview({ kind: "vessel" })} onMouseEnter={() => showPreview({ kind: "vessel" })} onMouseLeave={hoverOut}>
                   <circle r="30" fill="transparent" />
                   <circle r="18" fill="none" stroke={markerColor}>
                     <animate attributeName="r" values="12;28;12" dur="1.8s" repeatCount="indefinite" />
                   </circle>
                   <path d="M0 -10 L6 8 L0 4 L-6 8Z" fill={markerColor} />
                 </g>
+                )}
               </g>
             )}
 
@@ -428,28 +393,39 @@ function MapPage() {
               </g>
             ))}
 
+            {pos && (
             <g stroke={markerColor} opacity=".82">
-              <path d={"M" + (current.x - 30) + " " + current.y + "H" + (current.x + 30) + "M" + current.x + " " + (current.y - 30) + "V" + (current.y + 30)} />
-              <circle cx={current.x} cy={current.y} r="32" fill="none" />
-              <circle cx={current.x} cy={current.y} r="45" fill="none" strokeDasharray="2 8" />
+              <path d={"M" + (pos.x - 30) + " " + pos.y + "H" + (pos.x + 30) + "M" + pos.x + " " + (pos.y - 30) + "V" + (pos.y + 30)} />
+              <circle cx={pos.x} cy={pos.y} r="32" fill="none" />
+              <circle cx={pos.x} cy={pos.y} r="45" fill="none" strokeDasharray="2 8" />
             </g>
+            )}
+
+            {!track.length && (
+              <g>
+                <rect x="270" y="262" width="460" height="116" fill="#000000" fillOpacity=".72" stroke="#d2ff6b" strokeOpacity=".45" rx="6" />
+                <text x="500" y="296" textAnchor="middle" fill="#d2ff6b" fontFamily="JetBrains Mono" fontSize="13">{(data.case.vessel_name || "This vessel").toUpperCase()} - NO RECORDED POSITIONS</text>
+                <text x="500" y="322" textAnchor="middle" fill="#ffffff" fillOpacity=".8" fontFamily="JetBrains Mono" fontSize="11">Vessel positions appear here once AIS broadcasts are</text>
+                <text x="500" y="339" textAnchor="middle" fill="#ffffff" fillOpacity=".8" fontFamily="JetBrains Mono" fontSize="11">recorded for this case. Until then the map shows terminal</text>
+                <text x="500" y="356" textAnchor="middle" fill="#ffffff" fillOpacity=".8" fontFamily="JetBrains Mono" fontSize="11">zones, satellite coverage and case events only.</text>
+              </g>
+            )}
 
             <rect x="3" y="3" width="994" height="634" fill="url(#hud-vignette)" />
             <g fill="#d2ff6b" fontFamily="JetBrains Mono" fontSize="10">
-              <text x="18" y="40">COVERAGE 35 KM RADIUS · {isSample ? "SAMPLE DATA" : track.length ? "RECORDED OBSERVATIONS" : "AWAITING DATA REFRESH"}</text>
+              <text x="18" y="40">{mapCoverageLine(isSample, track.length)} · ZOOM {zoom}×</text>
+              <text x="18" y="58">{vesselIdentityLine(data.case)}</text>
               <text x="960" y="40">N ↑</text>
             </g>
           </svg>
 
           {renderPreview()}
 
-          <div className="pointer-events-none absolute inset-0 opacity-[0.07] [background-image:repeating-linear-gradient(to_bottom,transparent_0,transparent_2px,#d2ff6b_2px,#d2ff6b_3px)]" />
-
           <div className="pointer-events-none hidden md:block absolute left-1/2 top-2 -translate-x-1/2 font-mono text-[10px] tracking-wider text-[#d2ff6b]/80">DURBAN HARBOUR · CASE EVIDENCE MAP</div>
 
           <div className="relative mx-3 mt-3 md:absolute md:mx-0 md:mt-0 md:left-4 md:top-8 rounded border border-[#d2ff6b]/40 bg-black/65 px-3 py-2 font-mono text-[10px] backdrop-blur">
-            <div className="text-[#d2ff6b]">VESSEL {locked ? "TRACKING ON" : "TRACKING OFF"}</div>
-            <div className="mt-1 text-white/70">SPEED {current.sog.toFixed(1)} kn</div>
+            <div className="text-[#d2ff6b]">{track.length ? (locked ? "VESSEL TRACKING ON" : "VESSEL TRACKING OFF") : "NO RECORDED POSITIONS"}</div>
+            {pos && <div className="mt-1 text-white/70">SPEED {pos.sog.toFixed(1)} kn</div>}
             {inDisputedWindow && <div className="mt-1 font-semibold" style={{ color: "var(--disputed)" }}>DISPUTED WINDOW</div>}
           </div>
 
@@ -469,7 +445,7 @@ function MapPage() {
           <div className="relative mx-3 my-3 md:absolute md:mx-0 md:my-0 md:inset-x-3 md:bottom-3 rounded border border-[#d2ff6b]/40 bg-black/75 px-3 py-2 backdrop-blur">
             <div className="flex flex-wrap items-center gap-2">
               <Button className="py-1 text-xs" onClick={() => setPlaying((value) => !value)}>{playing ? "Pause" : "Play timeline"}</Button>
-              <Button variant="ghost" className="py-1 text-xs" onClick={() => setLocked((value) => !value)}>{locked ? "Tracking vessel" : "Not tracking"}</Button>
+              {track.length > 0 && <Button variant="ghost" className="py-1 text-xs" onClick={() => setLocked((value) => !value)}>{locked ? "Tracking vessel" : "Not tracking"}</Button>}
               <Button variant="ghost" className="py-1 text-xs" disabled={refreshing} onClick={refreshSensors}>{refreshing ? "Refreshing…" : "Refresh satellite & marine data"}</Button>
               <Button variant="ghost" className="py-1 text-xs" disabled={saving} onClick={saveSnapshot}>{saving ? "Sealing…" : "Add to evidence pack"}</Button>
               <span className="ml-auto font-mono text-[10px] text-white/70">{new Date(time).toISOString().replace("T", " ").slice(0, 16)}Z</span>
@@ -479,6 +455,9 @@ function MapPage() {
           </div>
 
           <div className="relative mx-3 mb-3 flex flex-wrap gap-1 md:absolute md:mx-0 md:mb-0 md:right-4 md:top-8 md:max-w-[60%] md:justify-end">
+            <button aria-label="Zoom in" onClick={() => setZoom((z) => clampZoom(z * 1.5))} className="rounded border border-[#d2ff6b]/35 bg-black/65 px-2 py-1 font-mono text-[10px] uppercase text-[#d2ff6b]">+ Zoom in</button>
+            <button aria-label="Zoom out" onClick={() => setZoom((z) => clampZoom(z / 1.5))} className="rounded border border-[#d2ff6b]/35 bg-black/65 px-2 py-1 font-mono text-[10px] uppercase text-[#d2ff6b]">- Zoom out</button>
+            {zoom !== 1 && <button aria-label="Reset zoom" onClick={() => setZoom(1)} className="rounded border border-[#d2ff6b]/35 bg-black/65 px-2 py-1 font-mono text-[10px] uppercase text-[#d2ff6b]">Reset view</button>}
             {Object.entries(layers).map(([key, enabled]) => (
               <button
                 key={key}

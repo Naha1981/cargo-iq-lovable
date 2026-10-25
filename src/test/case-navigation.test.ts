@@ -8,7 +8,10 @@ describe("case navigation cache safety", () => {
     expect(parent).toContain("getCaseWorkspace({ data: { caseId: params.caseId } })");
     expect(parent).not.toContain("beforeLoad:");
     expect(source("src/lib/case.functions.ts").replace(/\s+/g, "")).toContain(
-      'export const getCaseWorkspace = createServerFn({ method: "GET" }).validator(idInput).middleware([tenantMiddleware])'.replace(/\s+/g, ""),
+      'export const getCaseWorkspace = createServerFn({ method: "GET" }).validator(idInput).middleware([tenantMiddleware])'.replace(
+        /\s+/g,
+        "",
+      ),
     );
     expect(source("src/lib/auth-middleware.ts")).toContain("await getAuthed()");
   });

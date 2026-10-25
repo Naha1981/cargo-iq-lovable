@@ -8,7 +8,20 @@ export const matchInput = z
     rationale: z.string().trim().min(10).max(4000),
   })
   .refine((x) => x.claimAId !== x.claimBId, { message: "Select two distinct source claims" });
-export function classifyMatchedClaims(a: any, b: any) {
+export interface ClassifiableClaim {
+  claim_type?: string | null;
+  timestamp_claimed?: string | null;
+}
+export interface MatchClaimRow extends ClassifiableClaim {
+  id: string;
+  normalized_value?: unknown;
+  document_id?: string | null;
+}
+export interface MatchDocumentRow {
+  id: string;
+  source_party?: string | null;
+}
+export function classifyMatchedClaims(a: ClassifiableClaim, b: ClassifiableClaim) {
   if (!a.claim_type || a.claim_type !== b.claim_type || a.claim_type === "TEXT_RECORD")
     return {
       kind: "HUMAN_REVIEW",
@@ -34,13 +47,16 @@ export function classifyMatchedClaims(a: any, b: any) {
       "Source timestamps differ by less than the current one-hour detector threshold. This is not automatic verification or proof of exact agreement.",
   };
 }
-export function exactEventCandidates(claims: any[], documents: any[]) {
+export function exactEventCandidates(claims: MatchClaimRow[], documents: MatchDocumentRow[]) {
   const docs = new Map(documents.map((d) => [d.id, d]));
-  const groups = new Map<string, any[]>();
+  const groups = new Map<string, MatchClaimRow[]>();
   for (const c of claims) {
+    // JSON column: any shape is possible at runtime (a string has been observed in
+    // fixtures), so narrow before reading the one property this grouping needs.
+    const nv = c.normalized_value;
     const ref =
-      c.normalized_value && typeof c.normalized_value === "object"
-        ? c.normalized_value.event_reference
+      nv && typeof nv === "object"
+        ? (nv as { event_reference?: unknown }).event_reference
         : undefined;
     if (
       typeof ref !== "string" ||
@@ -58,9 +74,11 @@ export function exactEventCandidates(claims: any[], documents: any[]) {
       for (let j = i + 1; j < rows.length; j++) {
         const a = rows[i],
           b = rows[j],
-          pa = docs.get(a.document_id)?.source_party?.trim().toLowerCase(),
-          pb = docs.get(b.document_id)?.source_party?.trim().toLowerCase();
-        if (a.document_id !== b.document_id && pa && pb && pa !== pb) {
+          da = a.document_id ?? "",
+          db = b.document_id ?? "",
+          pa = docs.get(da)?.source_party?.trim().toLowerCase(),
+          pb = docs.get(db)?.source_party?.trim().toLowerCase();
+        if (da !== db && pa && pb && pa !== pb) {
           candidates.push({ a: a.id, b: b.id, reference: JSON.parse(key)[0] });
           if (candidates.length >= 50) return candidates;
         }

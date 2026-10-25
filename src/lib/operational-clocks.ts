@@ -55,8 +55,31 @@ export const clockInput = z
           "Appointment clocks require issuer, appointment reference, parties and source-backed terms (state unknown explicitly when not evidenced)",
       });
   });
-export function reconciledClockGroup(records: any[], decisions: any[] = []) {
-  if (!records.length) return { times: [] as number[], decision: null as any };
+export interface ClockRecord {
+  id: string;
+  kind: string;
+  physical_reference: string;
+  timestamp_original: string;
+  time_zone?: string | null;
+  source_party?: string | null;
+  source_document_id?: string | null;
+  source_reference?: string | null;
+  location_basis?: string | null;
+  appointment_issuer?: string | null;
+  appointment_reference?: string | null;
+  appointment_parties?: string | null;
+  appointment_terms?: string | null;
+}
+export interface ClockDecision {
+  id?: string;
+  physical_reference: string;
+  kind: string;
+  version: number;
+  selected_clock_id?: string | null;
+  considered_clock_ids?: string[] | null;
+}
+export function reconciledClockGroup(records: ClockRecord[], decisions: ClockDecision[] = []) {
+  if (!records.length) return { times: [] as number[], decision: null as ClockDecision | null };
   const allTimes = [...new Set(records.map((r) => Date.parse(r.timestamp_original)))];
   const latest = decisions
     .filter(
@@ -70,7 +93,7 @@ export function reconciledClockGroup(records: any[], decisions: any[] = []) {
     return { times: [Date.parse(selected.timestamp_original)], decision: latest };
   return { times: allTimes, decision: null };
 }
-export function compareClocks(rows: any[], decisions: any[] = []) {
+export function compareClocks(rows: ClockRecord[], decisions: ClockDecision[] = []) {
   const references = [...new Set(rows.map((r) => r.physical_reference))];
   return references.map((ref) => {
     const records = rows.filter((r) => r.physical_reference === ref);

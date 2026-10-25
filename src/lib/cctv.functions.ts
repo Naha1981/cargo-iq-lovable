@@ -7,13 +7,16 @@ import { encryptSecret, randomSecret } from "@/lib/cctv-crypto";
 const caseInput = z.object({ caseId: z.string().uuid() });
 const observationInput = z.object({ caseId: z.string().uuid(), observationId: z.string().uuid() });
 
+import type { getServiceClient } from "@/lib/cctv-server";
+type ServiceDb = ReturnType<typeof getServiceClient>;
+
 async function service() {
   const { getServiceClient, getCctvEncryptionMasterKey } = await import("@/lib/cctv-server");
   return { db: getServiceClient(), masterKey: getCctvEncryptionMasterKey() };
 }
 
 async function writeAudit(
-  db: any,
+  db: ServiceDb,
   tenantId: string,
   caseId: string | null,
   userId: string,
@@ -33,7 +36,7 @@ async function writeAudit(
   });
 }
 
-async function assertCase(db: any, tenantId: string, caseId: string) {
+async function assertCase(db: ServiceDb, tenantId: string, caseId: string) {
   const { data, error } = await db
     .from("cases")
     .select("id,reference_no")
@@ -211,7 +214,7 @@ export const getCaseCctv = createServerFn({ method: "GET" })
     ]);
     for (const error of [linkedError, readyError, sourcesError, camerasError])
       if (error) throw error;
-    const linkedIds = (linked ?? []).map((x: any) => x.id);
+    const linkedIds = (linked ?? []).map((x: { id: string }) => x.id);
     const { data: artifacts, error: artifactError } = linkedIds.length
       ? await db
           .from("cctv_evidence_artifacts")
@@ -263,7 +266,7 @@ export const linkCctvObservation = createServerFn({ method: "POST" })
           .eq("id", observation.camera_id)
           .eq("tenant_id", context.tenantId)
           .maybeSingle()
-      : { data: null as any };
+      : { data: null };
     const { data: zone } = observation.zone_id
       ? await db
           .from("cctv_zones")
@@ -271,7 +274,7 @@ export const linkCctvObservation = createServerFn({ method: "POST" })
           .eq("id", observation.zone_id)
           .eq("tenant_id", context.tenantId)
           .maybeSingle()
-      : { data: null as any };
+      : { data: null };
     const limitation = defaultCctvLimitation();
 
     const { data: external, error: externalError } = await db

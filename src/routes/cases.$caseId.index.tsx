@@ -4,6 +4,10 @@ import { useEffect, useState } from "react";
 import { Panel, Stat, NatureBadge, ClassTag, DisputeBadge } from "@/components/ui-kit";
 import { cn } from "@/lib/utils";
 import { disputedClaimIds, disputedWindow, isDisputeEvent } from "@/lib/dispute";
+import { type Nature } from "@/lib/case-data";
+import type { Database } from "@/integrations/supabase/types";
+
+type TimelineEventRow = Database["public"]["Tables"]["timeline_events"]["Row"];
 
 export const Route = createFileRoute("/cases/$caseId/")({
   head: () => ({ meta: [{ title: "Investigation timeline | CargoIQ" }] }),
@@ -20,20 +24,20 @@ function TimelinePage() {
     if (!selectedId && data.timeline[0]) setSelectedId(data.timeline[0].id);
   }, [data.timeline, selectedId]);
 
-  const selected = events.find((e: any) => e.id === selectedId) ?? events[0];
+  const selected = events.find((e) => e.id === selectedId) ?? events[0];
   const t0 = events.length ? Date.parse(events[0].timestamp) : Date.now();
   const t1 = events.length ? Date.parse(events[events.length - 1].timestamp) : t0 + 1;
   const pos = (s: string) => (t1 === t0 ? 50 : 6 + ((Date.parse(s) - t0) / (t1 - t0)) * 88);
 
   const docCount = data.documents.length;
   const claimCount = data.claims.length;
-  const openCount = data.contradictions.filter((c: any) => c.status === "FLAGGED").length;
+  const openCount = data.contradictions.filter((c) => c.status === "FLAGGED").length;
   const disputed = disputedClaimIds(data.contradictions);
   const window = disputedWindow(data.claims, disputed);
-  const showNature = (e: any) =>
+  const showNature = (e: TimelineEventRow) =>
     String(e.nature).toLowerCase() !== "disputed" || !isDisputeEvent(e, disputed);
-  const verifiedCount = data.claims.filter((c: any) => c.status === "VERIFIED").length;
-  const pendingCount = data.claims.filter((c: any) => c.status === "PENDING").length;
+  const verifiedCount = data.claims.filter((c) => c.status === "VERIFIED").length;
+  const pendingCount = data.claims.filter((c) => c.status === "PENDING").length;
   const nextAction =
     docCount === 0
       ? "Upload documents"
@@ -98,7 +102,7 @@ function TimelinePage() {
               </div>
             )}
             <ol aria-label="Timeline events" className="space-y-2 sm:hidden">
-              {events.map((e: any) => (
+              {events.map((e) => (
                 <li key={e.id}>
                   <button
                     onClick={() => setSelectedId(e.id)}
@@ -113,7 +117,9 @@ function TimelinePage() {
                     </span>
                     <span className="mt-1 block text-sm">{e.title}</span>
                     <span className="mt-2 flex flex-wrap gap-2">
-                      {showNature(e) && <NatureBadge n={String(e.nature).toLowerCase() as any} />}
+                      {showNature(e) && (
+                        <NatureBadge n={String(e.nature).toLowerCase() as Nature} />
+                      )}
                       {isDisputeEvent(e, disputed) && <DisputeBadge />}
                     </span>
                   </button>
@@ -141,7 +147,7 @@ function TimelinePage() {
                   </span>
                 </div>
               )}
-              {events.map((e: any, i: number) => (
+              {events.map((e, i) => (
                 <button
                   key={e.id}
                   onClick={() => setSelectedId(e.id)}
@@ -179,7 +185,7 @@ function TimelinePage() {
       <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
         <Panel title={"Event ledger · " + events.length}>
           <ol className="divide-y">
-            {events.map((e: any) => (
+            {events.map((e) => (
               <li key={e.id}>
                 <button
                   onClick={() => setSelectedId(e.id)}
@@ -197,7 +203,7 @@ function TimelinePage() {
                   </span>
                   <span className="flex flex-wrap items-center gap-2">
                     {isDisputeEvent(e, disputed) && <DisputeBadge />}
-                    {showNature(e) && <NatureBadge n={String(e.nature).toLowerCase() as any} />}
+                    {showNature(e) && <NatureBadge n={String(e.nature).toLowerCase() as Nature} />}
                   </span>
                 </button>
               </li>
@@ -210,7 +216,7 @@ function TimelinePage() {
             <div className="space-y-4 text-sm">
               <div className="flex flex-wrap gap-2">
                 {showNature(selected) && (
-                  <NatureBadge n={String(selected.nature).toLowerCase() as any} />
+                  <NatureBadge n={String(selected.nature).toLowerCase() as Nature} />
                 )}
                 {isDisputeEvent(selected, disputed) && <DisputeBadge />}
               </div>

@@ -69,3 +69,13 @@ design; session-mode would need the non-xact variant).
    and rejections carry Retry-After.
 2. Same file uploaded twice concurrently -> one row, one object.
 3. Advisory-lock behaviour confirmed through the pooler on staging.
+
+## Log evidence update (25 Oct 2026)
+
+Postgres did not run out of connections during the failing bursts (no 53300
+in postgres_logs); denials are RLS USING-expression failures by the storage
+server's own session, alternating with successes on identical statements.
+This STRENGTHENS the case for admission control in front of storage (fewer
+concurrent storage-server transactions -> fewer chances to hit the race),
+but it does not prove the semaphore fixes the root cause: the semaphore
+bounds blast radius and makes rejection explicit, root cause stays open.

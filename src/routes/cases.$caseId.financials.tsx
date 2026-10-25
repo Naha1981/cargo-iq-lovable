@@ -4,6 +4,20 @@ import { useState } from "react";
 import { Button, Panel, Stat } from "@/components/ui-kit";
 import { calculateCaseDemurrage } from "@/lib/case.functions";
 import { fmtMoney } from "@/lib/case-data";
+import type { Database } from "@/integrations/supabase/types";
+
+type CalcRow = Database["public"]["Tables"]["financial_calculations"]["Row"];
+
+type DemurrageTier = { fromDay: number; toDay?: number; dailyRate: number };
+
+type DemurrageInput = {
+  start?: string;
+  release?: string;
+  freeDays?: number | null;
+  units?: number | null;
+  dailyRate?: number | null;
+  tieredRates?: DemurrageTier[];
+};
 
 export const Route = createFileRoute("/cases/$caseId/financials")({
   head: () => ({ meta: [{ title: "Financial exposure | CargoIQ" }] }),
@@ -15,8 +29,8 @@ function FinPage() {
   const { caseId } = Route.useParams();
   const router = useRouter();
   // Do not relabel historic non-ZAR amounts or invent inputs for a new case.
-  const latest = data.calculations.find((row: any) => row.currency === "ZAR") as any;
-  const input = latest?.input_payload ?? {};
+  const latest = data.calculations.find((row) => row.currency === "ZAR");
+  const input = (latest?.input_payload ?? {}) as DemurrageInput;
   const storedTiers = Array.isArray(input.tieredRates) ? input.tieredRates : null;
   const [start, setStart] = useState<string>(input.start?.slice(0, 10) ?? "");
   const [release, setRelease] = useState<string>(input.release?.slice(0, 10) ?? "");
@@ -30,7 +44,7 @@ function FinPage() {
   const [dailyRate, setDailyRate] = useState<string>(
     input.dailyRate == null ? "" : String(input.dailyRate),
   );
-  const [result, setResult] = useState<any>(latest ?? null);
+  const [result, setResult] = useState<CalcRow | null>(latest ?? null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const currency = "ZAR";
@@ -48,10 +62,10 @@ function FinPage() {
     Number(units) > 0 &&
     (charged === "" || Number(charged) >= 0) &&
     tiers.length &&
-    tiers.every((t: any) => Number.isFinite(t.dailyRate) && t.dailyRate >= 0),
+    tiers.every((t) => Number.isFinite(t.dailyRate) && t.dailyRate >= 0),
   );
 
-  const openContradictions = data.contradictions.filter((c: any) => c.status === "FLAGGED").length;
+  const openContradictions = data.contradictions.filter((c) => c.status === "FLAGGED").length;
   const blocked = openContradictions > 0 || data.clockBlocked;
   const missing = [
     !start && "start date",
@@ -231,7 +245,7 @@ function FinPage() {
               </tr>
             </thead>
             <tbody>
-              {tiers.map((t: any, i: number) => (
+              {tiers.map((t, i: number) => (
                 <tr key={i} className="border-b">
                   <td className="py-2">Tier {i + 1}</td>
                   <td className="py-2">

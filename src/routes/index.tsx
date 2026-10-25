@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { AppHeader, Stat } from "@/components/ui-kit";
 import { getCurrentUser } from "@/lib/auth.functions";
 import { getCaseDashboardStats, getCaseRegisterPage } from "@/lib/case.functions";
+
+type RegisterRow = Awaited<ReturnType<typeof getCaseRegisterPage>>["rows"][number];
 import { fmtMoney } from "@/lib/case-data";
 import { cn } from "@/lib/utils";
 import { SiteFooter } from "@/components/SiteFooter";
@@ -14,7 +16,7 @@ export const Route = createFileRoute("/")({
   ssr: false,
   loader: async () => {
     const session = await getCurrentUser();
-    if (!session.user) return { session, stats: null as any, page: null as any };
+    if (!session.user) return { session, stats: null, page: null };
     const [stats, page] = await Promise.all([
       getCaseDashboardStats(),
       getCaseRegisterPage({ data: { limit: PAGE_SIZE } }),
@@ -45,7 +47,7 @@ const statusCls: Record<string, string> = {
 function Index() {
   const { session, stats, page } = Route.useLoaderData();
   const [q, setQ] = useState("");
-  const [rows, setRows] = useState<any[]>(page?.rows ?? []);
+  const [rows, setRows] = useState<RegisterRow[]>(page?.rows ?? []);
   const [cursor, setCursor] = useState<{ created_at: string; id: string } | null>(
     page?.nextCursor ?? null,
   );
@@ -85,8 +87,8 @@ function Index() {
       const p = await getCaseRegisterPage({ data: { q, cursor, limit: PAGE_SIZE } });
       if (seq !== reqSeq.current) return; // search changed while paging; discard
       setRows((prev) => {
-        const seen = new Set(prev.map((r: any) => r.id));
-        return [...prev, ...p.rows.filter((r: any) => !seen.has(r.id))];
+        const seen = new Set(prev.map((r) => r.id));
+        return [...prev, ...p.rows.filter((r) => !seen.has(r.id))];
       });
       setCursor(p.nextCursor);
     } finally {
@@ -180,7 +182,7 @@ function Index() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((c: any) => (
+              {rows.map((c) => (
                 <tr key={c.id} className="border-t bg-card transition-colors hover:bg-accent">
                   <td className="px-4 py-3">
                     <Link to="/cases/$caseId" params={{ caseId: c.id }} className="block">

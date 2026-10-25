@@ -80,11 +80,20 @@ describe("Harbour map rendering - evidence truth", () => {
     expect(svg.textContent).toContain("MV UMHLANGA TRADER"); // vessel named at the marker itself
     expect(container.textContent).toContain("RECORDED AIS FIX 08:00Z"); // playback starts exactly on the first fix
     expect(container.textContent).toContain("-29.80000 / 31.00000"); // real coordinates from first fix
+    expect(container.textContent).toContain("RECORDED SPEED 4.0 kn · 08:00Z"); // speed only as recorded
+    expect(container.textContent).toContain("VESSEL COURSE · RECORDED 08:00Z"); // course carries its recorded basis + time
+    expect(container.textContent).not.toContain("minute by minute"); // no coverage claim the record cannot support
+    expect(container.textContent).toContain("FOLLOWING RECORDED POSITION"); // follow, not live tracking
     fireEvent.change(getByLabelText("Investigation timeline"), { target: { value: String(Date.parse("2026-09-02T09:00:00.000Z")) } });
     expect(container.textContent).toContain("DERIVED BETWEEN FIXES 08:00Z-10:00Z"); // midpoint is derived, not recorded
-    expect(container.textContent).toContain("-29.85000 / 31.05000"); // interpolated, labelled as such
+    expect(container.textContent).toContain("VESSEL POSITION · DERIVED - NOT A RECORDING"); // interpolated coords labelled as derived
+    expect(container.textContent).toContain("-29.85000 / 31.05000"); // derived coords shown under that label
+    expect(container.textContent).toContain("SPEED DERIVED BETWEEN FIXES - APPROXIMATE"); // no precise-looking derived speed
     fireEvent.change(getByLabelText("Investigation timeline"), { target: { value: String(Date.parse("2026-09-06T12:00:00.000Z")) } });
     expect(container.textContent).toContain("LAST RECORDED 10:00Z - NO NEWER POSITIONS"); // stale, not current
+    expect(container.textContent).toContain("LAST RECORDED SPEED 8.0 kn · 10:00Z - NO NEWER POSITIONS"); // stale speed labelled, not implied live
+    expect(container.textContent).toContain("VESSEL COURSE · LAST RECORDED 10:00Z"); // stale course carries its last-recorded time
+    expect(container.textContent).toContain("VESSEL POSITION · LAST RECORDED 10:00Z"); // stale coords carry their last-recorded time
     dumpPage(container, "map-page-tracked.html");
   });
 
@@ -109,6 +118,10 @@ describe("Harbour map rendering - evidence truth", () => {
     expect(svg.querySelector("animate")).toBeNull(); // no marker inside an unsupported gap
     expect(container.textContent).toContain("POSITION GAP 08:00Z-16:00Z · NO RECORDED POSITIONS IN THIS WINDOW");
     expect(container.textContent).toContain("GAP - NO RECORDED DATA");
+    expect(container.textContent).toContain("NO RECORDED POSITION AT THIS TIME"); // no follow/tracking implication inside a gap
+    const follow = Array.from(container.querySelectorAll("button")).find((b) => b.textContent?.includes("No position to follow"));
+    expect(follow).toBeTruthy();
+    expect((follow as HTMLButtonElement).disabled).toBe(true); // cannot follow what is not recorded
     const polylines = svg.querySelectorAll('g[filter="url(#hud-glow)"] > polyline');
     expect(polylines.length).toBe(2); // track broken into segments, no line across the gap
     dumpPage(container, "map-page-gap.html");

@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { disputedClaimIds, disputedWindow, isDisputeEvent } from "@/lib/dispute";
 
-import { aisTrack, basisDescription, basisLabel, clampZoom, interpolateTrack, mapCoverageLine, panBy, positionGap, project, scaleBarPx, splitTrackSegments, vesselIdentityLine, viewBoxString, zoomViewBox, type TrackPoint, type ViewBox } from "@/lib/harbour-map";
+import { aisTrack, basisDescription, basisLabel, clampZoom, interpolateTrack, mapCoverageLine, panBy, positionGap, project, scaleBarPx, splitTrackSegments, vesselIdentityLine, viewBoxString, zoomViewBox, type PositionBasis, type TrackPoint, type ViewBox } from "@/lib/harbour-map";
 import { DURBAN_COASTLINE } from "@/lib/durban-coastline";
 
 export const Route = createFileRoute("/cases/$caseId/map")({
@@ -95,6 +95,11 @@ export function MapPage() {
   const statusLine = mapCoverageLine(isSample, track.length) + " · ZOOM " + zoom + "×";
   const identityLine = vesselIdentityLine(data.case);
   const hm = (iso: string) => iso.slice(11, 16) + "Z";
+  const gridBasis = (basis: PositionBasis) =>
+    basis.kind === "fix" ? "RECORDED " + hm(basis.at)
+    : basis.kind === "stale" ? "LAST RECORDED " + hm(basis.at)
+    : basis.kind === "before-first" ? "FIRST RECORDED " + hm(basis.at)
+    : "DERIVED - NOT A RECORDING";
   const gapLine = gap ? "POSITION GAP " + hm(gap.from) + "-" + hm(gap.to) + " · NO RECORDED POSITIONS IN THIS WINDOW" : null;
   const basisLine = gapLine ?? (pos ? basisLabel(pos.basis) : null);
   const attributionLine = "COASTLINE © OPENSTREETMAP CONTRIBUTORS · TERMINAL AREAS APPROXIMATE";
@@ -318,8 +323,9 @@ export function MapPage() {
   return (
     <div className="space-y-3">
       <div className="rounded border bg-card px-3 py-2">
-        <p className="text-sm">This map shows where the case vessel was, minute by minute, and which satellite and terminal records back it up — so the disputed period can be checked against physical evidence.</p>
-        {!track.length && <p className="mt-1 text-sm text-muted-foreground">No vessel positions are recorded for this case yet. Playback still moves through the case events and satellite passes in time, and the vessel marker appears once AIS positions are stored - nothing on this map shows an invented location.</p>}
+        <p className="text-sm">{track.length
+          ? "Recorded vessel positions for this case plotted in place and time, so the disputed period can be checked against physical evidence. Only recorded data appears: positions derived between fixes are labelled as derived, stale positions are labelled with their last recorded time, and recording gaps stay visible as gaps."
+          : "No vessel positions are recorded for this case yet. Playback still moves through the case events and satellite passes in time, and the vessel marker appears once AIS positions are stored - nothing on this map shows an invented location."}</p>
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">What to look at:</span>
           <button onClick={guideVessel} className="rounded border px-2.5 py-1 text-xs hover:bg-accent">The case vessel</button>
@@ -332,8 +338,8 @@ export function MapPage() {
         {[
           ["DATA STATUS", inDisputedWindow ? "DISPUTED WINDOW" : isSample ? "SAMPLE DATA" : "RECORDED OBSERVATIONS · CORROBORATION"],
           ["TIME (UTC)", new Date(time).toISOString().replace("T", " ").slice(0, 19) + "Z"],
-          ["VESSEL POSITION", pos ? (locked ? pos.lat.toFixed(5) + " / " + pos.lon.toFixed(5) : "NOT TRACKING") : gap ? "GAP - NO RECORDED DATA" : "NO RECORDED POSITIONS"],
-          ["VESSEL COURSE", pos?.cog == null ? "—" : Math.round(pos.cog) + "°"],
+          ["VESSEL POSITION" + (pos && locked ? " · " + gridBasis(pos.basis) : ""), !pos ? (gap ? "GAP - NO RECORDED DATA" : "NO RECORDED POSITIONS") : !locked ? "FOLLOW OFF" : pos.lat.toFixed(5) + " / " + pos.lon.toFixed(5)],
+          ["VESSEL COURSE" + (pos?.cog != null ? " · " + gridBasis(pos!.basis) : ""), pos?.cog == null ? "—" : Math.round(pos!.cog!) + "°"],
           ["MAP ZOOM", zoom + "×"],
         ].map(([label, value]) => (
           <div key={label} className={cn("min-w-0 rounded border bg-card px-3 py-2 font-mono", label === "DATA STATUS" && "col-span-2 md:col-span-1")}>
@@ -493,8 +499,11 @@ export function MapPage() {
           <div className="pointer-events-none hidden md:block absolute left-1/2 top-2 -translate-x-1/2 font-mono text-[10px] tracking-wider text-[#d2ff6b]/80">DURBAN HARBOUR · CASE EVIDENCE MAP</div>
 
           <div className="relative mx-3 mt-3 md:absolute md:mx-0 md:mt-0 md:left-4 md:top-14 rounded border border-[#d2ff6b]/40 bg-black/65 px-3 py-2 font-mono text-[10px] backdrop-blur">
-            <div className="text-[#d2ff6b]">{track.length ? (locked ? "VESSEL TRACKING ON" : "VESSEL TRACKING OFF") : "NO RECORDED POSITIONS"}</div>
-            {pos && <div className="mt-1 text-white/70">SPEED {pos.sog.toFixed(1)} kn</div>}
+            <div className="text-[#d2ff6b]">{!track.length ? "NO RECORDED POSITIONS" : !pos ? "NO RECORDED POSITION AT THIS TIME" : locked ? "FOLLOWING RECORDED POSITION" : "FOLLOW OFF"}</div>
+            {pos && pos.basis.kind === "fix" && <div className="mt-1 text-white/70">RECORDED SPEED {pos.sog.toFixed(1)} kn · {hm(pos.basis.at)}</div>}
+            {pos && pos.basis.kind === "stale" && <div className="mt-1 text-white/70">LAST RECORDED SPEED {pos.sog.toFixed(1)} kn · {hm(pos.basis.at)} - NO NEWER POSITIONS</div>}
+            {pos && pos.basis.kind === "before-first" && <div className="mt-1 text-white/70">FIRST RECORDED SPEED {pos.sog.toFixed(1)} kn · {hm(pos.basis.at)} - NO EARLIER POSITIONS</div>}
+            {pos && pos.basis.kind === "interpolated" && <div className="mt-1 text-white/70">SPEED DERIVED BETWEEN FIXES - APPROXIMATE</div>}
             {inDisputedWindow && <div className="mt-1 font-semibold" style={{ color: "var(--disputed)" }}>DISPUTED WINDOW</div>}
           </div>
 
@@ -516,7 +525,7 @@ export function MapPage() {
               {hasTemporalEvidence
                 ? <Button className="py-1 text-xs" onClick={() => setPlaying((value) => !value)}>{playing ? "Pause" : "Play timeline"}</Button>
                 : <span className="px-2 py-1 text-xs text-white/50">Play timeline - no recorded positions, satellite passes or case events yet</span>}
-              {track.length > 0 && <Button variant="ghost" className="py-1 text-xs" onClick={() => setLocked((value) => !value)}>{locked ? "Tracking vessel" : "Not tracking"}</Button>}
+              {track.length > 0 && <Button variant="ghost" className="py-1 text-xs" disabled={!pos} title={pos ? "Centre the map on the recorded or derived position" : "No recorded position at this time to follow"} onClick={() => setLocked((value) => !value)}>{!pos ? "No position to follow" : locked ? "Following position" : "Follow recorded position"}</Button>}
               <Button variant="ghost" className="py-1 text-xs" disabled={refreshing} onClick={refreshSensors}>{refreshing ? "Refreshing…" : "Refresh satellite & marine data"}</Button>
               <Button variant="ghost" className="py-1 text-xs" disabled={saving} onClick={saveSnapshot}>{saving ? "Sealing…" : "Add to evidence pack"}</Button>
               <span className="ml-auto font-mono text-[10px] text-white/70">{new Date(time).toISOString().replace("T", " ").slice(0, 16)}Z</span>

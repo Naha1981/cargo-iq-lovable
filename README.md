@@ -79,7 +79,12 @@ Database deployment order (review the target database first; do not replay CREAT
 3. CCTV extension: `supabase/migrations/20261005190000_cctv_evidence.sql`.
 4. Evidenced resolutions: `supabase/migrations/20261015141000_evidenced_resolution.sql`.
 
-These are currently split migration histories. `supabase db push` alone does not discover the core Drizzle files. For a new environment, use the reviewed SQL files in the order above through the database SQL runner and record each applied migration. For an existing environment, inspect migration history and schema and apply only missing changes. Do not duplicate the core schema into Supabase history without an explicit baselining plan. The Drizzle schema.ts is intentionally blank; the SQL migration is the current core schema source.
+These are split migration histories. `supabase db push` alone does not discover the core Drizzle files. For a NEW environment the supported path is the versioned runner:
+
+    PGHOST=... PGPORT=5432 PGDATABASE=postgres PGUSER=postgres.<ref> PGPASSWORD=... PGSSLMODE=require \
+    node scripts/db-migrate.mjs from-zero
+
+It applies both layers once, in the proven order (38 files at time of writing), records each file's SHA-256 in a locked `public.schema_migrations` ledger, refuses to run from-zero against a populated database, and fails on checksum drift. `status`, `apply` (pending only) and `adopt` (hand-built databases only) cover the other states. Backup scope and the measured restore procedure live in docs/DB-OPERATIONS.md. For an existing environment, inspect migration history and schema and apply only missing changes. Do not duplicate the core schema into Supabase history without an explicit baselining plan. The Drizzle schema.ts is intentionally blank; the SQL migration is the current core schema source.
 
 Deploy migration 4 before the new resolution UI/server code. If its trigger or audit insert fails, resolution must remain blocked. Test this against staging before publishing; a source merge is not evidence of a successful database deployment.
 

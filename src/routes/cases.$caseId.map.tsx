@@ -400,18 +400,25 @@ export function MapPage() {
         <span aria-hidden className="text-primary">→</span>
       </Link>
 
-      <div ref={stageRef} className={large ? "fixed inset-0 z-50 overflow-y-auto bg-[#061016]" : "overflow-hidden rounded-lg border bg-[#061016]"}>
+      <div ref={stageRef} className={large ? "fixed inset-0 z-50 flex flex-col bg-[#061016]" : "overflow-hidden rounded-lg border bg-[#061016]"}>
         {large && (
-          <div className="sticky top-0 z-10 flex items-center justify-between gap-2 border-b border-[#d2ff6b]/20 bg-black/80 px-3 py-2 backdrop-blur">
+          <div className="flex items-center justify-between gap-2 border-b border-[#d2ff6b]/20 bg-black/80 px-3 py-2">
             <span className="font-mono text-[10px] tracking-[0.2em] text-[#d2ff6b]">HARBOUR EVIDENCE MAP · FULL SCREEN</span>
             <button onClick={() => setLarge(false)} className="rounded border border-[#d2ff6b]/40 px-3 py-1 text-xs text-[#d2ff6b]">Close full screen</button>
           </div>
         )}
-        <div className="relative">
+        {large && (
+          <div className="border-b border-[#d2ff6b]/20 px-3 py-1.5 font-mono text-[10px] leading-relaxed text-[#d2ff6b]">
+            <div>{statusLine}</div>
+            <div>{identityLine}</div>
+            {basisLine && <div>{basisLine}</div>}
+          </div>
+        )}
+        <div className={large ? "relative flex min-h-0 flex-1 flex-col overflow-y-auto" : "relative"}>
           <svg
             ref={svgRef}
             viewBox={vb}
-            className={large ? "block h-[calc(100vh-150px)] min-h-[320px] w-full" : "block h-auto aspect-[1000/640] md:aspect-auto w-full md:h-[calc(100vh-380px)] md:min-h-[340px]"}
+            className={large ? "block w-full min-h-[180px] flex-1" : "block h-auto aspect-[1000/640] md:aspect-auto w-full md:h-[calc(100vh-380px)] md:min-h-[340px]"}
             role="img"
             aria-label="CargoIQ harbour evidence map"
             style={{ cursor: zoom > 1 ? (dragRef.current ? "grabbing" : "grab") : "default", touchAction: "none" }}
@@ -524,21 +531,38 @@ export function MapPage() {
           </svg>
 
           {/* fixed overlays: readable at every zoom, drawn into evidence exports separately */}
+          {!large && (
           <div className="pointer-events-none absolute left-3 top-2 font-mono text-[10px] leading-relaxed text-[#d2ff6b]" style={{ textShadow: "0 1px 3px #000" }}>
             <div>{statusLine}</div>
             <div>{identityLine}</div>
             {basisLine && <div>{basisLine}</div>}
           </div>
+          )}
           <div className="pointer-events-none absolute right-3 top-2 font-mono text-[10px] text-[#d2ff6b]" style={{ textShadow: "0 1px 3px #000" }}>N ↑</div>
-          <div className="pointer-events-none absolute bottom-2 right-3 hidden md:block font-mono text-[9px] text-[#d2ff6b]/80" style={{ textShadow: "0 1px 3px #000" }}>{attributionLine}</div>
-          <div className="mx-3 mb-3 mt-1 md:hidden font-mono text-[9px] leading-relaxed text-[#d2ff6b]/80">{attributionLine}</div>
-          {zoom > 1 && <div className="pointer-events-none absolute bottom-2 left-3 font-mono text-[9px] text-[#d2ff6b]/80" style={{ textShadow: "0 1px 3px #000" }}>DRAG TO PAN</div>}
+          {!large && <div className="pointer-events-none absolute bottom-2 right-3 hidden md:block font-mono text-[9px] text-[#d2ff6b]/80" style={{ textShadow: "0 1px 3px #000" }}>{attributionLine}</div>}
+          {!large && <div className="mx-3 mb-3 mt-1 md:hidden font-mono text-[9px] leading-relaxed text-[#d2ff6b]/80">{attributionLine}</div>}
+          {!large && zoom > 1 && <div className="pointer-events-none absolute bottom-2 left-3 font-mono text-[9px] text-[#d2ff6b]/80" style={{ textShadow: "0 1px 3px #000" }}>DRAG TO PAN</div>}
 
           {renderPreview()}
 
-          <div className="pointer-events-none hidden md:block absolute left-1/2 top-2 -translate-x-1/2 font-mono text-[10px] tracking-wider text-[#d2ff6b]/80">DURBAN HARBOUR · CASE EVIDENCE MAP</div>
+          {!large && <div className="pointer-events-none hidden md:block absolute left-1/2 top-2 -translate-x-1/2 font-mono text-[10px] tracking-wider text-[#d2ff6b]/80">DURBAN HARBOUR · CASE EVIDENCE MAP</div>}
 
-          <div className={large ? "absolute left-4 top-14 max-w-[70%] rounded border border-[#d2ff6b]/40 bg-black/65 px-3 py-2 font-mono text-[10px] backdrop-blur" : "relative mx-3 mt-3 md:absolute md:mx-0 md:mt-0 md:left-4 md:top-14 rounded border border-[#d2ff6b]/40 bg-black/65 px-3 py-2 font-mono text-[10px] backdrop-blur"}>
+          <div className={large ? "mx-3 mt-2 flex flex-wrap gap-1" : "relative mx-3 mb-3 mt-1 flex flex-wrap gap-2 pr-1 md:absolute md:mx-0 md:mb-0 md:mt-0 md:right-4 md:top-8 md:max-w-[60%] md:justify-end md:gap-1 md:pr-0"}>
+            <button aria-label="Zoom in" onClick={() => setZoom((z) => clampZoom(z * 1.5))} className="rounded border border-[#d2ff6b]/35 bg-black/65 px-2 py-1 font-mono text-[10px] uppercase text-[#d2ff6b]">+ Zoom in</button>
+            <button aria-label="Zoom out" onClick={() => setZoom((z) => clampZoom(z / 1.5))} className="rounded border border-[#d2ff6b]/35 bg-black/65 px-2 py-1 font-mono text-[10px] uppercase text-[#d2ff6b]">- Zoom out</button>
+            {zoom !== 1 && <button aria-label="Reset zoom" onClick={resetView} className="rounded border border-[#d2ff6b]/35 bg-black/65 px-2 py-1 font-mono text-[10px] uppercase text-[#d2ff6b]">Reset view</button>}
+            {Object.entries(layers).map(([key, enabled]) => (
+              <button
+                key={key}
+                onClick={() => setLayers((value) => ({ ...value, [key]: !enabled }))}
+                className={cn("rounded border border-[#d2ff6b]/35 bg-black/65 px-2 py-1 font-mono text-[10px] uppercase text-[#d2ff6b]", !enabled && "opacity-30")}
+              >
+                {({ ais: "Vessel track", infrastructure: "Terminal areas" } as Record<string, string>)[key] ?? key}
+              </button>
+            ))}
+          </div>
+
+          <div className={large ? "mx-3 mt-2 rounded border border-[#d2ff6b]/40 bg-black/65 px-3 py-2 font-mono text-[10px]" : "relative mx-3 mt-3 md:absolute md:mx-0 md:mt-0 md:left-4 md:top-14 rounded border border-[#d2ff6b]/40 bg-black/65 px-3 py-2 font-mono text-[10px] backdrop-blur"}>
             <div className="text-[#d2ff6b]">{!track.length ? "NO RECORDED POSITIONS" : !pos ? "NO RECORDED POSITION AT THIS TIME" : locked ? "FOLLOWING RECORDED POSITION" : "FOLLOW OFF"}</div>
             {pos && pos.basis.kind === "fix" && <div className="mt-1 text-white/70">RECORDED SPEED {pos.sog.toFixed(1)} kn · {hm(pos.basis.at)}</div>}
             {pos && pos.basis.kind === "stale" && <div className="mt-1 text-white/70">LAST RECORDED SPEED {pos.sog.toFixed(1)} kn · {hm(pos.basis.at)} - NO NEWER POSITIONS</div>}
@@ -547,7 +571,7 @@ export function MapPage() {
             {inDisputedWindow && <div className="mt-1 font-semibold" style={{ color: "var(--disputed)" }}>DISPUTED WINDOW</div>}
           </div>
 
-          <div className={large ? "absolute left-4 top-[8.25rem] w-64 max-w-[70%] rounded border border-[#d2ff6b]/40 bg-black/70 px-3 py-2 font-mono text-[10px] backdrop-blur" : "relative mx-3 mt-3 md:absolute md:mx-0 md:mt-0 md:left-4 md:top-[8.25rem] md:w-64 md:max-w-[45%] rounded border border-[#d2ff6b]/40 bg-black/70 px-3 py-2 font-mono text-[10px] backdrop-blur"}>
+          <div className={large ? "mx-3 mt-2 rounded border border-[#d2ff6b]/40 bg-black/70 px-3 py-2 font-mono text-[10px]" : "relative mx-3 mt-3 md:absolute md:mx-0 md:mt-0 md:left-4 md:top-[8.25rem] md:w-64 md:max-w-[45%] rounded border border-[#d2ff6b]/40 bg-black/70 px-3 py-2 font-mono text-[10px] backdrop-blur"}>
             <div className="flex items-center justify-between gap-2 text-[#d2ff6b]"><span>EVENTS WITHIN 24H OF PLAYBACK</span><span className="flex items-center gap-2"><span className="text-white/60">{nearby.length}</span><button onClick={() => setEventsOpen((v) => !v)} className="pointer-events-auto rounded border border-[#d2ff6b]/40 px-1.5 py-px text-[9px] uppercase tracking-wider text-[#d2ff6b] hover:bg-[#d2ff6b]/10">{eventsOpen ? "Hide" : "Show"}</button></span></div>
             {eventsOpen && <ul className="mt-2 max-h-44 space-y-2 overflow-y-auto pr-1 md:max-h-[clamp(64px,calc(100vh-640px),34vh)]">
               {nearby.map((e: any) => (
@@ -563,7 +587,7 @@ export function MapPage() {
             </ul>}
           </div>
 
-          <div className={large ? "absolute inset-x-3 bottom-3 rounded border border-[#d2ff6b]/40 bg-black/75 px-3 py-2 backdrop-blur" : "relative mx-3 my-3 md:absolute md:mx-0 md:my-0 md:inset-x-3 md:bottom-3 rounded border border-[#d2ff6b]/40 bg-black/75 px-3 py-2 backdrop-blur"}>
+          <div className={large ? "mx-3 my-2 rounded border border-[#d2ff6b]/40 bg-black/75 px-3 py-2" : "relative mx-3 my-3 md:absolute md:mx-0 md:my-0 md:inset-x-3 md:bottom-3 rounded border border-[#d2ff6b]/40 bg-black/75 px-3 py-2 backdrop-blur"}>
             <div className="flex flex-wrap items-center gap-2">
               {hasTemporalEvidence
                 ? <Button className="py-1 text-xs" onClick={() => setPlaying((value) => !value)}>{playing ? "Pause" : "Play timeline"}</Button>
@@ -577,20 +601,8 @@ export function MapPage() {
             <div className="flex justify-between font-mono text-[9px] text-white/50"><span>{new Date(initialTime).toISOString().slice(0, 16)}Z</span><span>{new Date(maxTime).toISOString().slice(0, 16)}Z</span></div>
           </div>
 
-          <div className={large ? "absolute right-4 top-8 flex max-w-[60%] flex-wrap justify-end gap-1" : "relative mx-3 mb-3 mt-1 flex flex-wrap gap-2 pr-1 md:absolute md:mx-0 md:mb-0 md:mt-0 md:right-4 md:top-8 md:max-w-[60%] md:justify-end md:gap-1 md:pr-0"}>
-            <button aria-label="Zoom in" onClick={() => setZoom((z) => clampZoom(z * 1.5))} className="rounded border border-[#d2ff6b]/35 bg-black/65 px-2 py-1 font-mono text-[10px] uppercase text-[#d2ff6b]">+ Zoom in</button>
-            <button aria-label="Zoom out" onClick={() => setZoom((z) => clampZoom(z / 1.5))} className="rounded border border-[#d2ff6b]/35 bg-black/65 px-2 py-1 font-mono text-[10px] uppercase text-[#d2ff6b]">- Zoom out</button>
-            {zoom !== 1 && <button aria-label="Reset zoom" onClick={resetView} className="rounded border border-[#d2ff6b]/35 bg-black/65 px-2 py-1 font-mono text-[10px] uppercase text-[#d2ff6b]">Reset view</button>}
-            {Object.entries(layers).map(([key, enabled]) => (
-              <button
-                key={key}
-                onClick={() => setLayers((value) => ({ ...value, [key]: !enabled }))}
-                className={cn("rounded border border-[#d2ff6b]/35 bg-black/65 px-2 py-1 font-mono text-[10px] uppercase text-[#d2ff6b]", !enabled && "opacity-30")}
-              >
-                {({ ais: "Vessel track", infrastructure: "Terminal areas" } as Record<string, string>)[key] ?? key}
-              </button>
-            ))}
-          </div>
+
+          {large && <div className="mx-3 mb-2 font-mono text-[9px] leading-relaxed text-[#d2ff6b]/80">{attributionLine}</div>}
         </div>
       </div>
 

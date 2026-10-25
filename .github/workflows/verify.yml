@@ -15,7 +15,11 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci --legacy-peer-deps
+      # Fail on high or critical vulnerabilities in any dependency (dev included).
+      - run: npm audit --audit-level=high
       - run: npx tsc --noEmit
+      # Lint is a required gate: eslint errors (incl. no-explicit-any) fail the build.
+      - run: npm run lint
       - run: npm test
       - run: node scripts/verification/atomic-pack-check.mjs
       - run: node scripts/verification/brenda-registers-check.mjs

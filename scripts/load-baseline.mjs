@@ -41,7 +41,8 @@ await Promise.all(Array.from({ length: concurrency }, worker));
 const wallMs = performance.now() - wallStart;
 
 latencies.sort((a, b) => a - b);
-const pct = (p) => latencies[Math.min(latencies.length - 1, Math.floor((p / 100) * latencies.length))];
+const pct = (p) =>
+  latencies[Math.min(latencies.length - 1, Math.floor((p / 100) * latencies.length))];
 const result = {
   concurrency,
   perWorker,

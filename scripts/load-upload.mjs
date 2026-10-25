@@ -16,7 +16,10 @@
 // per run so token expiry cannot masquerade as a server failure.
 const { API, ANON, BENCH_EMAIL, BENCH_PASSWORD, TENANT } = process.env;
 for (const k of ["API", "ANON", "BENCH_EMAIL", "BENCH_PASSWORD", "TENANT"])
-  if (!process.env[k]) { console.error(k + " is required"); process.exit(2); }
+  if (!process.env[k]) {
+    console.error(k + " is required");
+    process.exit(2);
+  }
 
 const conc = Number(process.argv[2] ?? 5);
 const per = Number(process.argv[3] ?? 10);
@@ -29,7 +32,10 @@ const authRes = await fetch(API + "/auth/v1/token?grant_type=password", {
   body: JSON.stringify({ email: BENCH_EMAIL, password: BENCH_PASSWORD }),
 });
 const auth = await authRes.json();
-if (!auth.access_token) { console.error("auth failed: " + JSON.stringify(auth)); process.exit(2); }
+if (!auth.access_token) {
+  console.error("auth failed: " + JSON.stringify(auth));
+  process.exit(2);
+}
 const TOKEN = auth.access_token;
 const H = () => ({ apikey: ANON, Authorization: "Bearer " + TOKEN });
 
@@ -46,28 +52,41 @@ async function one(w, i) {
     const r = await fetch(API + "/storage/v1/object/case-documents/" + p, {
       method: "POST",
       headers: { ...H(), "content-type": "application/octet-stream", "x-upsert": "true" },
-      body, signal: AbortSignal.timeout(120000),
+      body,
+      signal: AbortSignal.timeout(120000),
     });
     const text = await r.text();
     rec.ms = Math.round(performance.now() - t);
     rec.status = r.status;
-    if (r.ok) { rec.ok = true; paths.push(p); }
-    else {
+    if (r.ok) {
+      rec.ok = true;
+      paths.push(p);
+    } else {
       rec.ok = false;
-      try { const j = JSON.parse(text); rec.code = j.code ?? j.error; rec.msg = (j.message ?? "").slice(0, 120); }
-      catch { rec.code = "unparsed"; rec.msg = text.slice(0, 120); }
+      try {
+        const j = JSON.parse(text);
+        rec.code = j.code ?? j.error;
+        rec.msg = (j.message ?? "").slice(0, 120);
+      } catch {
+        rec.code = "unparsed";
+        rec.msg = text.slice(0, 120);
+      }
     }
   } catch (e) {
     rec.ms = Math.round(performance.now() - t);
-    rec.ok = false; rec.code = "exception"; rec.msg = String(e).slice(0, 120);
+    rec.ok = false;
+    rec.code = "exception";
+    rec.msg = String(e).slice(0, 120);
   }
   lines.push(rec);
 }
 
-await Promise.all(Array.from({ length: conc }, async (_, w) => {
-  if (staggerMs) await sleep(w * staggerMs);
-  for (let i = 0; i < per; i++) await one(w, i);
-}));
+await Promise.all(
+  Array.from({ length: conc }, async (_, w) => {
+    if (staggerMs) await sleep(w * staggerMs);
+    for (let i = 0; i < per; i++) await one(w, i);
+  }),
+);
 
 const ok = lines.filter((l) => l.ok);
 const byCode = {};
@@ -80,19 +99,36 @@ const pct = (p) => lat[Math.min(lat.length - 1, Math.floor((p / 100) * lat.lengt
 
 // Cleanup: per-object Storage API DELETE (the batch endpoint was observed
 // returning 200 while deleting nothing on this project, 25 Oct 2026).
-let cleaned = 0, cleanFailed = 0;
+let cleaned = 0,
+  cleanFailed = 0;
 for (let i = 0; i < paths.length; i += 5) {
-  await Promise.all(paths.slice(i, i + 5).map(async (p) => {
-    const r = await fetch(API + "/storage/v1/object/case-documents/" + p, { method: "DELETE", headers: H() });
-    if (r.ok) cleaned++; else cleanFailed++;
-  }));
+  await Promise.all(
+    paths.slice(i, i + 5).map(async (p) => {
+      const r = await fetch(API + "/storage/v1/object/case-documents/" + p, {
+        method: "DELETE",
+        headers: H(),
+      });
+      if (r.ok) cleaned++;
+      else cleanFailed++;
+    }),
+  );
 }
 
-console.log(JSON.stringify({
-  conc, per, sizeKB, staggerMs, total: lines.length, ok: ok.length,
-  failed: lines.length - ok.length, failuresByCode: byCode,
-  p50: pct(50), p95: pct(95), max: lat[lat.length - 1] ?? null,
-  cleanup: { deleted: cleaned, failed: cleanFailed },
-}));
+console.log(
+  JSON.stringify({
+    conc,
+    per,
+    sizeKB,
+    staggerMs,
+    total: lines.length,
+    ok: ok.length,
+    failed: lines.length - ok.length,
+    failuresByCode: byCode,
+    p50: pct(50),
+    p95: pct(95),
+    max: lat[lat.length - 1] ?? null,
+    cleanup: { deleted: cleaned, failed: cleanFailed },
+  }),
+);
 for (const l of lines.filter((l) => !l.ok)) console.error("JSONL " + JSON.stringify(l));
 if (cleanFailed > 0) console.error("WARNING: " + cleanFailed + " bench objects left in bucket");

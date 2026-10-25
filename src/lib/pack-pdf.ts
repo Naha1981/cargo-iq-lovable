@@ -153,14 +153,208 @@ function stamp(s: unknown) {
     : iso.replace("T", " ").slice(0, 16) + "Z";
 }
 
-export function buildEvidencePackPdf(pack: any): Uint8Array {
-  const p = pack.pack_payload ?? {};
+
+// pack_payload row shapes as read from the frozen JSON export. Everything is
+// optional: the payload is data, and a missing field renders as "n/a", never a crash.
+interface PackDocument {
+  id?: string;
+  name?: string;
+  source_party?: string;
+  uploaded_at?: string;
+  sha256_hash?: string;
+  extraction_status?: unknown;
+}
+
+interface PackClaim {
+  id?: string | number;
+  document_id?: string;
+  page_number?: number;
+  source_seq?: number;
+  created_at?: string;
+  status?: string;
+  nature?: string;
+  claim_type?: string;
+  claim_text?: string;
+  timestamp_claimed?: string;
+  confidence?: number | string;
+}
+
+interface PackTimelineEvent {
+  timestamp?: string;
+  nature?: string;
+  title?: string;
+  source?: string;
+}
+
+interface PackContradiction {
+  title?: string;
+  status?: string;
+  description?: string;
+  claim_a_id?: string;
+  claim_b_id?: string;
+  resolution_note?: string;
+  resolved_at?: string;
+  resolution_document_id?: string;
+  resolution_evidence_reference?: string;
+}
+
+interface PackCalculation {
+  calculation_type?: string;
+  rule_version?: string;
+  calculated_amount_minor?: number | string | null;
+  charged_amount_minor?: number | string | null;
+  variance_minor?: number | string | null;
+  currency?: string;
+  input_payload?: { start?: string; release?: string; freeDays?: number; units?: number };
+  created_at?: string;
+}
+
+interface MapSnapshotPayload {
+  inDisputedWindow?: boolean;
+  windowStart?: string;
+  windowEnd?: string;
+  vesselName?: string;
+  mmsi?: string | number;
+  sog?: string | number;
+  cog?: string | number;
+  note?: string;
+  document_id?: string;
+  sha256?: string;
+}
+
+interface PackObservation {
+  observation_type?: string;
+  observed_at?: string;
+  source?: string;
+  latitude?: string | number;
+  longitude?: string | number;
+  payload?: MapSnapshotPayload;
+}
+
+// Operational ledger records (count sources, rules, appointments, clocks,
+// reconciliations, gaps) share one wide shape in the frozen payload; every
+// field is optional and rendered as plain text.
+interface PackOperationalRecord {
+  [key: string]: unknown;
+  name?: string;
+  party?: string;
+  physical_reference?: string;
+  version?: string | number;
+  status?: string;
+  quantity?: string | number;
+  basis?: string;
+  metric?: string;
+  gate_kind?: string;
+  gate_kinds?: string[];
+  containers20?: string | number;
+  containers40?: string | number;
+  occurred_at?: string;
+  limitations?: string;
+  acceptance?: string;
+  input_basis?: string;
+  output_unit?: string;
+  calculation?: string;
+  numerator?: string | number;
+  denominator?: string | number;
+  effective_from?: string;
+  effective_to?: string;
+  rationale?: string;
+  physical_references?: string[];
+  rule_ids?: string[];
+  kpi_definition_id?: string;
+  appointment_reference?: string;
+  record_type?: string;
+  issuer?: string;
+  start_at?: string;
+  end_at?: string;
+  claim_target?: string;
+  outcome?: string;
+  explanation?: string;
+  terms_reference?: string;
+  dataset?: string;
+  row_count?: string | number;
+  source_party?: string;
+  exported_at?: string;
+  created_at?: string;
+  created_by?: string;
+  raw_sha256?: string;
+  authorization_basis?: string;
+  unit?: string;
+  rule?: string;
+  original_source_text?: string;
+  acceptance_basis?: string;
+  kind?: string;
+  timestamp_original?: string;
+  time_zone?: string;
+  location_basis?: string;
+  appointment_issuer?: string;
+  appointment_parties?: string;
+  appointment_terms?: string;
+  appointment_clock_id?: string;
+  claimant?: string;
+  assertion?: string;
+  start_kind?: string;
+  end_kind?: string;
+  definition?: string;
+  benchmark_hours?: string | number;
+  benchmark_basis?: string;
+  event_reference?: string;
+  result?: string;
+  claim_a_id?: string;
+  claim_b_id?: string;
+  match_id?: string;
+  selected_clock_id?: string;
+  considered_clock_ids?: string[];
+  required_event?: string;
+  requirement_basis?: string;
+  document_ids?: string[];
+  evidence_reference?: string;
+  source_document_id?: string;
+  source_reference?: string;
+}
+
+interface PackPayload {
+  case?: {
+    reference_no?: string;
+    title?: string;
+    vessel_name?: string;
+    voyage_no?: string;
+    container_no?: string;
+    port_code?: string;
+    counterparty?: string;
+    dispute_type?: string;
+  };
+  documents?: PackDocument[];
+  claims?: PackClaim[];
+  timeline?: PackTimelineEvent[];
+  contradictions?: PackContradiction[];
+  financialCalculations?: PackCalculation[];
+  externalObservations?: PackObservation[];
+  truthRule?: string;
+  generatedAt?: string;
+  [key: string]: unknown;
+}
+
+export interface EvidencePackInput {
+  status?: string;
+  version?: string | number;
+  generated_at?: string;
+  sha256_hash?: string;
+  test_hash?: boolean;
+  approved_by?: string | null;
+  pack_payload?: PackPayload;
+}
+
+export function buildEvidencePackPdf(pack: EvidencePackInput): Uint8Array {
+  const p: PackPayload = pack.pack_payload ?? {};
   const c = p.case ?? {};
-  const docs: any[] = p.documents ?? [];
-  const docName = new Map<string, string>(docs.map((d: any) => [d.id, d.name]));
+  const docs: PackDocument[] = p.documents ?? [];
+  const docName = new Map<string, string>(
+    docs.map((d) => [String(d.id ?? ""), String(d.name ?? "")] as [string, string]),
+  );
   // Database order is by id (random). Read in document, then page order so claim numbers follow the source.
-  const claims: any[] = [...(p.claims ?? [])].sort(
-    (a: any, b: any) =>
+  const claims: PackClaim[] = [...(p.claims ?? [])].sort(
+    (a, b) =>
       String(a.document_id ?? "").localeCompare(String(b.document_id ?? "")) ||
       (a.page_number ?? 1e9) - (b.page_number ?? 1e9) ||
       (a.source_seq ?? 1e9) - (b.source_seq ?? 1e9) ||
@@ -169,8 +363,12 @@ export function buildEvidencePackPdf(pack: any): Uint8Array {
   );
   // No stored source-order column exists: within one page the order is reading order when source_seq is recorded, otherwise deterministic (created_at, then id) but not guaranteed reading order. The claim ID printed below is the durable reference.
   const statusRank = (s: string) => (s === "VERIFIED" ? 0 : s === "PENDING" ? 1 : 2);
-  const shown: any[] = [...claims].sort((a, b) => statusRank(a.status) - statusRank(b.status));
-  const claimNo = new Map<string, number>(shown.map((c: any, i: number) => [String(c.id), i + 1]));
+  const shown: PackClaim[] = [...claims].sort(
+    (a, b) => statusRank(a.status ?? "") - statusRank(b.status ?? ""),
+  );
+  const claimNo = new Map<string, number>(
+    shown.map((c, i) => [String(c.id), i + 1] as [string, number]),
+  );
   const d = new Doc();
 
   d.text("CargoIQ", { size: 10, bold: true, gray: 0.4 });
@@ -226,13 +424,13 @@ export function buildEvidencePackPdf(pack: any): Uint8Array {
   if (!(p.timeline ?? []).length) d.text("No timeline events recorded.", { indent: 4 });
   // Chronological, stable for equal times; undated or unreadable times go last.
   const orderedTimeline = (p.timeline ?? [])
-    .map((e: any, i: number) => ({ e, i, t: Date.parse(String(e.timestamp ?? "")) }))
+    .map((e, i) => ({ e, i, t: Date.parse(String(e.timestamp ?? "")) }))
     .sort(
-      (a: any, b: any) =>
+      (a, b) =>
         (Number.isFinite(a.t) ? a.t : Infinity) - (Number.isFinite(b.t) ? b.t : Infinity) ||
         a.i - b.i,
     )
-    .map((x: any) => x.e);
+    .map((x) => x.e);
   for (const e of orderedTimeline) {
     const evHead = stamp(e.timestamp) + "  [" + String(e.nature ?? "").toUpperCase() + "]";
     const evBody = String(e.title ?? "") + "  - Source: " + String(e.source ?? "n/a");
@@ -246,7 +444,7 @@ export function buildEvidencePackPdf(pack: any): Uint8Array {
   // Raw imported lines (text/PDF import, claim_type TEXT_RECORD) are preserved as source
   // material but are NOT claims: they are listed in their own section so a document header
   // is never presented as a substantive claim, and no confidence is shown for them.
-  const isRawImport = (x: any) => x.claim_type === "TEXT_RECORD";
+  const isRawImport = (x: PackClaim) => x.claim_type === "TEXT_RECORD";
   const substantive = shown.filter((x) => !isRawImport(x));
   const rawLines = shown.filter(isRawImport);
   const verified = substantive.filter((x) => x.status === "VERIFIED");
@@ -265,7 +463,7 @@ export function buildEvidencePackPdf(pack: any): Uint8Array {
       "] " +
       x.claim_text;
     const src =
-      (docName.get(x.document_id) ?? "unknown document") +
+      (docName.get(String(x.document_id ?? "")) ?? "unknown document") +
       (x.page_number ? ", page " + x.page_number : "");
     const srcLine =
       "Source: " +
@@ -293,7 +491,7 @@ export function buildEvidencePackPdf(pack: any): Uint8Array {
       const line = i + 1 + ". [" + String(x.status ?? "").toUpperCase() + "] " + x.claim_text;
       const src =
         "Source: " +
-        (docName.get(x.document_id) ?? "unknown document") +
+        (docName.get(String(x.document_id ?? "")) ?? "unknown document") +
         (x.page_number ? ", page " + x.page_number : "");
       d.reserve(d.height(line, { indent: 4 }) + d.height(src, { indent: 14, size: 8 }));
       d.text(line, { indent: 4 });
@@ -301,9 +499,9 @@ export function buildEvidencePackPdf(pack: any): Uint8Array {
     });
   }
 
-  const contr: any[] = p.contradictions ?? [];
+  const contr: PackContradiction[] = p.contradictions ?? [];
   d.heading("5. Contradictions and resolutions (" + contr.length + ")");
-  const sts = docs.map((x: any) => ({
+  const sts = docs.map((x) => ({
     name: x.name,
     ...parseExtractionStatus(x.extraction_status),
   }));
@@ -354,13 +552,13 @@ export function buildEvidencePackPdf(pack: any): Uint8Array {
     d.text(i + 1 + ". " + x.title + "  [" + x.status + "]", { indent: 4, bold: true });
     if (x.description) d.text(x.description, { indent: 14 });
     const refs = [x.claim_a_id, x.claim_b_id]
-      .filter(Boolean)
-      .map((id: string) =>
+      .filter((id): id is string => id != null)
+      .map((id) =>
         claimNo.has(String(id))
           ? "claim " +
             claimNo.get(String(id)) +
             " (page " +
-            (claims.find((c: any) => String(c.id) === String(id))?.page_number ?? "?") +
+            (claims.find((c) => String(c.id) === String(id))?.page_number ?? "?") +
             ", ID " +
             id +
             ")"
@@ -380,14 +578,14 @@ export function buildEvidencePackPdf(pack: any): Uint8Array {
     if (x.resolution_document_id || x.resolution_evidence_reference)
       d.text(
         "Resolution evidence: " +
-          (docName.get(x.resolution_document_id) ?? x.resolution_document_id ?? "n/a") +
+          (docName.get(x.resolution_document_id ?? "") ?? x.resolution_document_id ?? "n/a") +
           ", " +
           (x.resolution_evidence_reference ?? "n/a"),
         { indent: 14, size: 8 },
       );
   });
 
-  const calcs: any[] = p.financialCalculations ?? [];
+  const calcs: PackCalculation[] = p.financialCalculations ?? [];
   d.heading("6. Financial summary");
   if (!calcs.length)
     d.text("No financial calculation recorded. No amount is stated or implied.", { indent: 4 });
@@ -426,7 +624,7 @@ export function buildEvidencePackPdf(pack: any): Uint8Array {
       });
   });
 
-  const allObs: any[] = p.externalObservations ?? [];
+  const allObs: PackObservation[] = p.externalObservations ?? [];
   const snapshots = allObs.filter((o) => o.observation_type === "MAP_SNAPSHOT");
   const obs = allObs.filter((o) => o.observation_type !== "MAP_SNAPSHOT");
   if (obs.length) {
@@ -488,7 +686,7 @@ export function buildEvidencePackPdf(pack: any): Uint8Array {
       if (pl.note) d.text("Note: " + String(pl.note), { indent: 14, size: 8.5 });
       d.text(
         "Image: " +
-          (docName.get(pl.document_id) ?? "case document") +
+          (docName.get(pl.document_id ?? "") ?? "case document") +
           "  |  SHA-256 " +
           String(pl.sha256 ?? "n/a"),
         { indent: 14, size: 8, gray: 0.35 },
@@ -496,7 +694,7 @@ export function buildEvidencePackPdf(pack: any): Uint8Array {
     });
   }
 
-  const operationalSections: [string, string, (x: any) => string][] = [
+  const operationalSections: [string, string, (x: PackOperationalRecord) => string][] = [
     [
       "countSourceRecords",
       "Raw count source ledger (all versions)",
@@ -547,7 +745,7 @@ export function buildEvidencePackPdf(pack: any): Uint8Array {
         " to " +
         (x.effective_to ?? "open") +
         "; gates " +
-        x.gate_kinds.join(", ") +
+        (x.gate_kinds ?? []).join(", ") +
         "\nRationale: " +
         x.rationale,
     ],
@@ -561,9 +759,9 @@ export function buildEvidencePackPdf(pack: any): Uint8Array {
         " [" +
         x.acceptance +
         "]\nPhysical scope: " +
-        x.physical_references.join(", ") +
+        (x.physical_references ?? []).join(", ") +
         "\nMappings: " +
-        x.rule_ids.join(", ") +
+        (x.rule_ids ?? []).join(", ") +
         "; duration definition " +
         (x.kpi_definition_id ?? "none") +
         "\nAgreement / limitations: " +
@@ -774,7 +972,7 @@ export function buildEvidencePackPdf(pack: any): Uint8Array {
     ],
   ];
   for (const [key, title, describe] of operationalSections) {
-    const records: any[] = p[key] ?? [];
+    const records = ((p as Record<string, unknown>)[key] as PackOperationalRecord[] | undefined) ?? [];
     if (!records.length) continue;
     d.heading(title + " (" + records.length + ")");
     for (const x of records) {
@@ -880,7 +1078,7 @@ export function buildEvidencePackPdf(pack: any): Uint8Array {
   return serialize(d.pages, pack);
 }
 
-function serialize(pages: { ops: Op[]; rules: Rule[] }[], pack: any): Uint8Array {
+function serialize(pages: { ops: Op[]; rules: Rule[] }[], pack: EvidencePackInput): Uint8Array {
   const total = pages.length;
   const objs: string[] = [];
   const add = (s: string) => {

@@ -6,9 +6,19 @@ import { describe, expect, it } from "vitest";
 // The server fn itself needs the TanStack server runtime; here we verify the
 // filter/cursor semantics the fn depends on.
 
-function fakeCases(rows: any[]) {
+type CaseRow = {
+  id: string;
+  created_at: string;
+  reference_no?: string;
+  vessel_name?: string;
+  container_no?: string;
+  port_code?: string;
+  status?: string;
+};
+
+function fakeCases(rows: CaseRow[]) {
   const ops: { ors: string[]; limitN: number | null } = { ors: [], limitN: null };
-  const applyOr = (rs: any[], f: string) => {
+  const applyOr = (rs: CaseRow[], f: string) => {
     if (f.startsWith("reference_no.ilike.")) {
       const term = f.split(".ilike.")[1].split(",")[0].replace(/^%|%$/g, "").toLowerCase();
       return rs.filter((r) =>
@@ -22,12 +32,21 @@ function fakeCases(rows: any[]) {
       return rs.filter((r) => r.created_at < m![1] || (r.created_at === m![2] && r.id < m![3]));
     throw new Error("unexpected or: " + f);
   };
-  const builder: any = {
+  const builder: {
+    or: (f: string) => typeof builder;
+    then: (
+      res: (v: { data: CaseRow[]; error: null }) => unknown,
+      rej?: (e: unknown) => unknown,
+    ) => Promise<unknown>;
+  } = {
     or: (f: string) => {
       ops.ors.push(f);
       return builder;
     },
-    then: (res: any, rej: any) => {
+    then: (
+      res: (v: { data: CaseRow[]; error: null }) => unknown,
+      rej?: (e: unknown) => unknown,
+    ) => {
       let rs = [...rows].sort((a, b) =>
         b.created_at !== a.created_at
           ? b.created_at.localeCompare(a.created_at)
@@ -43,10 +62,10 @@ function fakeCases(rows: any[]) {
     },
   };
   return {
-    from: () => ({
-      select: () => ({
-        order: () => ({
-          order: () => ({
+    from: (_t?: string) => ({
+      select: (_cols?: string) => ({
+        order: (_col?: string, _opts?: unknown) => ({
+          order: (_col?: string, _opts?: unknown) => ({
             limit: (n: number) => {
               ops.limitN = n;
               return builder;
@@ -58,7 +77,7 @@ function fakeCases(rows: any[]) {
   };
 }
 
-function mk(n: number, prefix = "c", overrides: any = {}) {
+function mk(n: number, prefix = "c", overrides: Partial<CaseRow> = {}) {
   return Array.from({ length: n }, (_, i) => ({
     id: `${prefix}-${String(i).padStart(4, "0")}`,
     created_at: new Date(Date.UTC(2026, 9, 1, 8, 0, 0) - i * 60000).toISOString(),
@@ -71,7 +90,14 @@ function mk(n: number, prefix = "c", overrides: any = {}) {
 }
 
 // Mirror of the fn's page logic over the fake (lookahead + cursor extraction).
-async function pageQuery(db: any, { q, cursor, limit }: any) {
+async function pageQuery(
+  db: ReturnType<typeof fakeCases>,
+  {
+    q,
+    cursor,
+    limit,
+  }: { q?: string; cursor?: { created_at: string; id: string } | null; limit: number },
+) {
   let query = db
     .from("cases")
     .select("*")
@@ -107,12 +133,12 @@ describe("register page query semantics", () => {
   it("search narrows to matching fields and combines with the keyset cursor (AND)", async () => {
     const db = fakeCases(mk(60));
     const p1 = await pageQuery(db, { q: "umhlanga", limit: 10 });
-    expect(p1.rows.every((r: any) => r.vessel_name === "MV Umhlanga Trader")).toBe(true);
+    expect(p1.rows.every((r) => r.vessel_name === "MV Umhlanga Trader")).toBe(true);
     expect(p1.rows).toHaveLength(10); // 20 matches (i%3==0), first page 10
     const p2 = await pageQuery(db, { q: "umhlanga", limit: 10, cursor: p1.nextCursor });
     expect(p2.rows).toHaveLength(10);
     expect(p2.nextCursor).toBeNull();
-    const ids = new Set([...p1.rows, ...p2.rows].map((r: any) => r.id));
+    const ids = new Set([...p1.rows, ...p2.rows].map((r) => r.id));
     expect(ids.size).toBe(20); // no overlap across pages
   });
 

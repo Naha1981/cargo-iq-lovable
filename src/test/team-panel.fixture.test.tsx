@@ -3,7 +3,7 @@
 // built CSS for pixel inspection. No DB, no auth, no network.
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { readFileSync, writeFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, readdirSync } from "node:fs";
 
 vi.mock("@/lib/invitations.functions", () => ({
   listInvitations: vi.fn(async () => [
@@ -57,14 +57,18 @@ describe("TeamPanel fixture render (not live)", () => {
     expect(screen.getByText(/\/invite\/fixture-token-7f3a9c2e/)).toBeTruthy();
 
     // emit standalone HTML with the real built stylesheet for pixel inspection
-    const cssFile = readdirSync(".output/public/assets").find((f) => f.endsWith(".css"));
-    expect(cssFile).toBeTruthy();
-    const css = readFileSync(`.output/public/assets/${cssFile}`, "utf8");
+    // Static-HTML emission needs the compiled stylesheet, which only exists after a
+    // local build. CI runs tests before build, so emission is local-only; every
+    // assertion above runs unconditionally everywhere.
+    const cssFile = existsSync(".output/public/assets")
+      ? readdirSync(".output/public/assets").find((f) => f.endsWith(".css"))
+      : undefined;
+    const css = cssFile ? readFileSync(`.output/public/assets/${cssFile}`, "utf8") : "";
     const html = `<!doctype html>
 <html lang="en" class="light">
 <head><meta charset="utf-8"><title>FIXTURE - Team panel (not live)</title><style>${css}</style></head>
 <body><div style="max-width:52rem;margin:0 auto;padding:2rem;">${document.body.innerHTML}</div></body>
 </html>`;
-    writeFileSync("/tmp/team-panel-fixture.html", html);
+    if (cssFile) writeFileSync("/tmp/team-panel-fixture.html", html);
   });
 });

@@ -3,7 +3,7 @@
 // real built CSS for pixel inspection.
 import { describe, it, expect, vi } from "vitest";
 import { render } from "@testing-library/react";
-import { readFileSync, writeFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, readdirSync } from "node:fs";
 import type { ReactNode } from "react";
 
 vi.mock("@tanstack/react-router", () => ({
@@ -25,8 +25,13 @@ const states: Array<[string, InviteState]> = [
 
 describe("Invite accept states fixture render (not live)", () => {
   it("renders all seven states and emits static HTML", () => {
-    const cssFile = readdirSync(".output/public/assets").find((f) => f.endsWith(".css"));
-    const css = readFileSync(`.output/public/assets/${cssFile}`, "utf8");
+    // Static-HTML emission needs the compiled stylesheet, which only exists after a
+    // local build. CI runs tests before build, so emission is local-only; every
+    // assertion above runs unconditionally everywhere.
+    const cssFile = existsSync(".output/public/assets")
+      ? readdirSync(".output/public/assets").find((f) => f.endsWith(".css"))
+      : undefined;
+    const css = cssFile ? readFileSync(`.output/public/assets/${cssFile}`, "utf8") : "";
     const sections: string[] = [];
     for (const [name, state] of states) {
       const { container, unmount } = render(<InviteStateView state={state} />);
@@ -41,6 +46,6 @@ describe("Invite accept states fixture render (not live)", () => {
 <head><meta charset="utf-8"><title>FIXTURE - invite accept states (not live)</title><style>${css}</style></head>
 <body><div style="max-width:44rem;margin:0 auto;padding:2rem;">${sections.join("\n")}</div></body>
 </html>`;
-    writeFileSync("/tmp/invite-states-fixture.html", html);
+    if (cssFile) writeFileSync("/tmp/invite-states-fixture.html", html);
   });
 });

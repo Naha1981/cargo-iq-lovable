@@ -5,6 +5,11 @@ import {
   previewImport,
   type ImportInput,
 } from "@/lib/authorised-import";
+import type { Database } from "@/integrations/supabase/types";
+
+type DocRow = Database["public"]["Tables"]["documents"]["Row"];
+type ImportRow = Awaited<ReturnType<typeof listAuthorisedImports>>[number];
+type PreviewRow = ReturnType<typeof previewImport>[number];
 import { executeAuthorisedImport, listAuthorisedImports } from "@/lib/authorised-import.functions";
 function errText(e: unknown) {
   if (e instanceof Error) return e.message;
@@ -22,7 +27,7 @@ function errText(e: unknown) {
   }
 }
 const cl = "mt-1 w-full min-w-0 rounded border bg-background p-2 text-sm";
-export function AuthorisedImport({ caseId, documents }: { caseId: string; documents: any[] }) {
+export function AuthorisedImport({ caseId, documents }: { caseId: string; documents: DocRow[] }) {
   const [form, setForm] = useState<ImportInput>({
     caseId,
     sourceDocumentId: "",
@@ -34,8 +39,8 @@ export function AuthorisedImport({ caseId, documents }: { caseId: string; docume
     confirmed: true,
   });
   const [confirmed, setConfirmed] = useState(false),
-    [preview, setPreview] = useState<any[] | null>(null),
-    [rows, setRows] = useState<any[]>([]),
+    [preview, setPreview] = useState<PreviewRow[] | null>(null),
+    [rows, setRows] = useState<ImportRow[]>([]),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [success, setSuccess] = useState("");

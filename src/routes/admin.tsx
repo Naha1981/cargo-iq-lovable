@@ -24,7 +24,7 @@ function AdminPage() {
     retry: false,
     staleTime: 60_000,
   });
-  const [extra, setExtra] = useState<Partial<Record<Section, AdminPage<any>[]>>>({});
+  const [extra, setExtra] = useState<Partial<Record<Section, AdminPage<unknown>[]>>>({});
   const [loadingMore, setLoadingMore] = useState<Section | null>(null);
   const caps = useQuery({
     queryKey: ["platform-admin-tenant-caps"],
@@ -75,7 +75,7 @@ export function AdminOverviewView({
   caps = null,
 }: {
   data: AdminOverview;
-  extra?: Partial<Record<Section, AdminPage<any>[]>>;
+  extra?: Partial<Record<Section, AdminPage<unknown>[]>>;
   loadingMore?: Section | null;
   onLoadMore?: (section: Section, cursor: string) => void;
   caps?: AdminTenantCaps | null;
@@ -86,7 +86,7 @@ export function AdminOverviewView({
   ];
   const rows = <T,>(section: Section, first: AdminPage<T>): T[] =>
     pages(section, first).flatMap((p) => p.rows);
-  const lastCursor = (section: Section, first: AdminPage<any>) => {
+  const lastCursor = (section: Section, first: AdminPage<unknown>) => {
     const ps = pages(section, first);
     return ps[ps.length - 1].next_cursor;
   };
@@ -97,7 +97,7 @@ export function AdminOverviewView({
   const disputes = rows("disputes", data.disputes);
   const tenantName = new Map(tenants.map((t) => [t.id, t.name]));
 
-  const moreButton = (section: Section, first: AdminPage<any>) => {
+  const moreButton = (section: Section, first: AdminPage<unknown>) => {
     const cursor = lastCursor(section, first);
     if (!cursor) return null;
     return (

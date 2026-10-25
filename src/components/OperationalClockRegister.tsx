@@ -7,6 +7,11 @@ import {
   listClockReconciliations,
   reconcileOperationalClock,
 } from "@/lib/operational-clocks.functions";
+import type { Database } from "@/integrations/supabase/types";
+
+type DocRow = Database["public"]["Tables"]["documents"]["Row"];
+type ClockRow = Database["public"]["Tables"]["operational_clocks"]["Row"];
+type DecisionRow = Database["public"]["Tables"]["clock_reconciliations"]["Row"];
 const empty = {
   physicalReference: "",
   kind: "QUEUE_ARRIVAL",
@@ -26,15 +31,15 @@ export function OperationalClockRegister({
   documents,
 }: {
   caseId: string;
-  documents: any[];
+  documents: DocRow[];
 }) {
   const router = useRouter();
-  const [decisions, setDecisions] = useState<any[]>([]),
+  const [decisions, setDecisions] = useState<DecisionRow[]>([]),
     [selectedClock, setSelectedClock] = useState(""),
     [decisionDoc, setDecisionDoc] = useState(""),
     [decisionRef, setDecisionRef] = useState(""),
     [decisionNote, setDecisionNote] = useState("");
-  const [rows, setRows] = useState<any[]>([]),
+  const [rows, setRows] = useState<ClockRow[]>([]),
     [f, setF] = useState(empty),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);

@@ -4,6 +4,10 @@ import {
   addOperationalDefinition,
 } from "@/lib/operational-definitions.functions";
 import { latestDefinitions, definitionInput } from "@/lib/operational-definitions";
+import type { Database } from "@/integrations/supabase/types";
+
+type DocRow = Database["public"]["Tables"]["documents"]["Row"];
+type DefRow = Database["public"]["Tables"]["operational_definitions"]["Row"];
 const blank = {
   party: "",
   metric: "HATCH_COVER",
@@ -23,9 +27,9 @@ export function OperationalDefinitionRegister({
   documents,
 }: {
   caseId: string;
-  documents: any[];
+  documents: DocRow[];
 }) {
-  const [rows, setRows] = useState<any[]>([]),
+  const [rows, setRows] = useState<DefRow[]>([]),
     [form, setForm] = useState(blank),
     [history, setHistory] = useState(false);
   const [busy, setBusy] = useState(false),
@@ -65,7 +69,7 @@ export function OperationalDefinitionRegister({
       setBusy(false);
     }
   }
-  function revise(r: any) {
+  function revise(r: DefRow) {
     setForm({
       party: r.party,
       metric: r.metric,

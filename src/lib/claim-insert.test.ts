@@ -1,11 +1,13 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { describe, it, expect } from "vitest";
 import { insertClaimRow } from "./claim-insert";
 
-function fake(results: any[]) {
-  const calls: any[] = [];
+type FakeResult = { data: unknown; error: { code?: string; message?: string } | null };
+function fake(results: FakeResult[]) {
+  const calls: Record<string, unknown>[] = [];
   const supabase = {
     from: () => ({
-      insert: (row: any) => {
+      insert: (row: Record<string, unknown>) => {
         calls.push(row);
         const r = results[calls.length - 1] ?? {
           data: null,
@@ -15,7 +17,8 @@ function fake(results: any[]) {
       },
     }),
   };
-  return { supabase, calls };
+  // The fake only implements the chain insertClaimRow touches; cast at the boundary.
+  return { supabase: supabase as unknown as SupabaseClient, calls };
 }
 const ok = { data: { id: "c1" }, error: null };
 describe("insertClaimRow", () => {

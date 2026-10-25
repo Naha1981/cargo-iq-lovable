@@ -13,6 +13,7 @@ import {
 } from "./extraction-policy";
 import { createServerFn } from "@tanstack/react-start";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Json } from "@/integrations/supabase/types";
 
 type ClaimDraft = {
   page_number?: number;
@@ -25,6 +26,56 @@ type ClaimDraft = {
   timestamp_claimed?: string;
   event_reference?: string;
 };
+
+// Narrow provider/API response shapes - no `any` for wire payloads.
+type OpenAiResponsesApi = {
+  model?: string;
+  usage?: { input_tokens?: number | null; output_tokens?: number | null };
+  output_text?: string;
+  output?: { content?: { type?: string; text?: string }[] }[];
+};
+type AnthropicMessagesApi = {
+  model?: string;
+  usage?: { input_tokens?: number | null; output_tokens?: number | null };
+  content?: { type?: string; text?: string }[];
+};
+type GeminiGenerateResponse = {
+  candidates?: { finishReason?: string; content?: { parts?: { text?: string }[] } }[];
+};
+type GeminiPart = { text: string } | { inline_data: { mime_type: string; data: string } };
+type RawClaimRow = {
+  page_number?: unknown;
+  claim_text?: unknown;
+  claim_type?: unknown;
+  event_reference?: unknown;
+  normalized_value?: unknown;
+  value?: unknown;
+  evidence_class?: unknown;
+  nature?: unknown;
+  confidence?: unknown;
+  timestamp_claimed?: unknown;
+};
+type OpenAiContentPart =
+  | { type: "input_text"; text: string }
+  | { type: "input_image"; image_url: string }
+  | { type: "input_file"; filename: string; file_data: string };
+type AnthropicContentPart =
+  | { type: "text"; text: string }
+  | { type: "image"; source: { type: string; media_type: string; data: string } }
+  | { type: "document"; source: { type: string; media_type: string; data: string } };
+type ClaimInsertPayload = {
+  page_number: number | null;
+  claim_text: string;
+  claim_type: string | null;
+  normalized_value: unknown;
+  evidence_class: string;
+  nature: ClaimDraft["nature"];
+  confidence: number;
+  timestamp_claimed: string | null;
+  event_reference?: string;
+  source_name: string;
+};
+type InsertedClaimRow = { id: string } & Record<string, Json>;
 
 // Match whole filename tokens, not substrings: "report.pdf" must not match "port".
 export function inferClass(name: string) {
@@ -88,21 +139,21 @@ function parseJsonModel(text: string): ClaimDraft[] {
   const parsed = JSON.parse(cleaned);
   const rows = Array.isArray(parsed) ? parsed : parsed.claims;
   if (!Array.isArray(rows)) throw new Error("EXTRACTION_JSON_SHAPE");
-  const mapped = rows.map((row: any) => ({
+  const mapped = rows.map((row: RawClaimRow) => ({
     page_number: Number.isFinite(Number(row.page_number)) ? Number(row.page_number) : undefined,
     claim_text: String(row.claim_text ?? "").trim(),
     claim_type: row.claim_type ? String(row.claim_type) : undefined,
     event_reference: row.event_reference ? String(row.event_reference).trim() : undefined,
     normalized_value: row.normalized_value ?? row.value ?? null,
     evidence_class: String(row.evidence_class ?? "CUSTOMER_PRIMARY"),
-    nature: ["OBSERVED", "REPORTED", "DERIVED", "INFERRED"].includes(row.nature)
-      ? row.nature
+    nature: ["OBSERVED", "REPORTED", "DERIVED", "INFERRED"].includes(String(row.nature))
+      ? (String(row.nature) as ClaimDraft["nature"])
       : "REPORTED",
     confidence: Number.isFinite(Number(row.confidence))
       ? Math.max(0, Math.min(1, Number(row.confidence)))
       : 0.7,
     timestamp_claimed:
-      row.timestamp_claimed &&
+      typeof row.timestamp_claimed === "string" &&
       !isNaN(Date.parse(row.timestamp_claimed)) &&
       dayAnchored(String(row.claim_text ?? ""), String(row.timestamp_claimed))
         ? new Date(row.timestamp_claimed).toISOString()
@@ -261,7 +312,7 @@ async function extractViaOpenAi(bytes: ArrayBuffer, mimeType: string, filename: 
   const isText = /^text\//.test(mimeType) || /\.(csv|txt)$/i.test(filename);
   const isImage = /^image\//.test(mimeType);
   const b64 = isText ? "" : bytesToBase64(new Uint8Array(bytes));
-  const content: any[] = [{ type: "input_text", text: claimPrompt(filename) }];
+  const content: OpenAiContentPart[] = [{ type: "input_text", text: claimPrompt(filename) }];
   if (isText)
     content.push({
       type: "input_text",
@@ -288,7 +339,7 @@ async function extractViaOpenAi(bytes: ArrayBuffer, mimeType: string, filename: 
     }),
   });
   if (!res.ok) throw await readError(res, "OpenAI");
-  const json: any = await res.json();
+  const json = (await res.json()) as OpenAiResponsesApi;
   lastPaidUsage = {
     provider: "openai",
     model: String(json.model ?? (process.env["CLAIM_AI_MODEL"] || "gpt-4o-mini")),
@@ -298,9 +349,9 @@ async function extractViaOpenAi(bytes: ArrayBuffer, mimeType: string, filename: 
   const text =
     json.output_text ??
     (json.output ?? [])
-      .flatMap((o: any) => o.content ?? [])
-      .filter((c: any) => c.type === "output_text")
-      .map((c: any) => c.text)
+      .flatMap((o) => o.content ?? [])
+      .filter((c) => c.type === "output_text")
+      .map((c) => c.text)
       .join("");
   return parseJsonModel(String(text ?? "")).map((c) => ({
     ...c,
@@ -313,7 +364,7 @@ async function extractViaAnthropic(bytes: ArrayBuffer, mimeType: string, filenam
   const isText = /^text\//.test(mimeType) || /\.(csv|txt)$/i.test(filename);
   const isImage = /^image\//.test(mimeType);
   const b64 = isText ? "" : bytesToBase64(new Uint8Array(bytes));
-  const content: any[] = [];
+  const content: AnthropicContentPart[] = [];
   if (isText)
     content.push({
       type: "text",
@@ -351,7 +402,7 @@ async function extractViaAnthropic(bytes: ArrayBuffer, mimeType: string, filenam
     }),
   });
   if (!res.ok) throw await readError(res, "Anthropic");
-  const json: any = await res.json();
+  const json = (await res.json()) as AnthropicMessagesApi;
   lastPaidUsage = {
     provider: "anthropic",
     model: String(json.model ?? (process.env["CLAIM_AI_MODEL"] || "claude-3-5-sonnet-latest")),
@@ -359,8 +410,8 @@ async function extractViaAnthropic(bytes: ArrayBuffer, mimeType: string, filenam
     outputTokens: json.usage?.output_tokens ?? null,
   };
   const text = (json.content ?? [])
-    .filter((c: any) => c.type === "text")
-    .map((c: any) => c.text)
+    .filter((c) => c.type === "text")
+    .map((c) => c.text)
     .join("");
   const start = text.indexOf("{"),
     end = text.lastIndexOf("}");
@@ -419,7 +470,7 @@ function conservativeReservedCostUsd(model: string, estimatedInputTokens: number
   );
 }
 export async function reservePaidExtraction(
-  supabase: any,
+  supabase: SupabaseClient,
   tenantId: string,
   model: string,
   estimatedInputTokens: number,
@@ -458,7 +509,7 @@ export async function reservePaidExtraction(
 // amount is kept as the completed cost - never under-record. Errors never break extraction;
 // they surface in fallbackErrors and the row stays reconcilable.
 export async function completePaidExtraction(
-  supabase: any,
+  supabase: SupabaseClient,
   input: { tenantId: string; caseId: string; documentId: string },
   requestId: string,
   reservedCostUsd?: number,
@@ -490,7 +541,7 @@ export async function completePaidExtraction(
 // marker, never an extraction_usage row. Best-effort, insert-only table, never blocks
 // or alters the refusal itself.
 async function logSpendRefusal(
-  supabase: any,
+  supabase: SupabaseClient,
   userId: string,
   provider: string,
   error: unknown,
@@ -509,13 +560,20 @@ async function logSpendRefusal(
   }
 }
 export async function voidPaidExtraction(
-  supabase: any,
+  supabase: SupabaseClient,
   tenantId: string,
   requestId: string,
 ): Promise<void> {
-  await supabase
-    .rpc("void_extraction_reservation", { p_tenant_id: tenantId, p_request_id: requestId })
-    .catch(() => {});
+  // Best-effort void: the daily reconciler also clears stale reservations, so a
+  // transient failure here must not fail the extraction run.
+  try {
+    await supabase.rpc("void_extraction_reservation", {
+      p_tenant_id: tenantId,
+      p_request_id: requestId,
+    });
+  } catch {
+    // Intentionally ignored.
+  }
 }
 
 /**
@@ -611,7 +669,7 @@ async function extractViaGateway(bytes: ArrayBuffer, mimeType: string, filename:
   const isText = /^text\//.test(mimeType) || /\.(csv|txt)$/i.test(filename);
   const isImage = /^image\//.test(mimeType);
   const b64 = isText ? "" : bytesToBase64(new Uint8Array(bytes));
-  const content: any[] = [{ type: "input_text", text: prompt }];
+  const content: OpenAiContentPart[] = [{ type: "input_text", text: prompt }];
   if (isText)
     content.push({
       type: "input_text",
@@ -739,7 +797,7 @@ type FreeSlot =
   | "tenant_disabled"
   | "rpc_missing"
   | "check_failed";
-async function reserveFreeAttempt(supabase: any, tenantId: string): Promise<FreeSlot> {
+async function reserveFreeAttempt(supabase: SupabaseClient, tenantId: string): Promise<FreeSlot> {
   try {
     const { data, error } = await supabase.rpc("reserve_free_extraction_attempt", {
       p_tenant_id: tenantId,
@@ -837,7 +895,7 @@ const GEMINI_RESPONSE_SCHEMA = {
   },
 };
 async function geminiCall(
-  parts: any[],
+  parts: GeminiPart[],
   attempt = 0,
   onAttempt?: FreeAttemptGate,
 ): Promise<ClaimDraft[]> {
@@ -848,7 +906,7 @@ async function geminiCall(
     throw e;
   }
 }
-async function geminiCallOnce(parts: any[], onAttempt?: FreeAttemptGate) {
+async function geminiCallOnce(parts: GeminiPart[], onAttempt?: FreeAttemptGate) {
   await onAttempt?.();
   const res = await fetch(
     "https://generativelanguage.googleapis.com/v1beta/models/" +
@@ -873,12 +931,12 @@ async function geminiCallOnce(parts: any[], onAttempt?: FreeAttemptGate) {
     },
   );
   if (!res.ok) throw new Error("FREE_GEMINI_" + res.status);
-  const json: any = await res.json();
+  const json = (await res.json()) as GeminiGenerateResponse;
   const reason = json.candidates?.[0]?.finishReason;
   // A cut-off answer is invalid JSON; never accept a partial chunk as if it were complete.
   if (reason && reason !== "STOP") throw new Error("FREE_GEMINI_FINISH_" + reason);
   return parseJsonModel(
-    (json.candidates?.[0]?.content?.parts ?? []).map((p: any) => p.text ?? "").join(""),
+    (json.candidates?.[0]?.content?.parts ?? []).map((p) => p.text ?? "").join(""),
   );
 }
 
@@ -1074,11 +1132,11 @@ async function findGeminiDiscrepancies(
     },
   );
   if (!res.ok) throw new Error("FREE_GEMINI_" + res.status);
-  const json: any = await res.json();
+  const json = (await res.json()) as GeminiGenerateResponse;
   if (json.candidates?.[0]?.finishReason && json.candidates[0].finishReason !== "STOP")
     throw new Error("FREE_GEMINI_FINISH_" + json.candidates[0].finishReason);
   return parseDiscrepancies(
-    (json.candidates?.[0]?.content?.parts ?? []).map((p: any) => p.text ?? "").join(""),
+    (json.candidates?.[0]?.content?.parts ?? []).map((p) => p.text ?? "").join(""),
     claims.length,
   );
 }
@@ -1130,7 +1188,9 @@ async function extractFreeFallback(
     },
   );
   if (!res.ok) throw new Error("FREE_" + provider.toUpperCase() + "_" + res.status);
-  const json: any = await res.json();
+  const json = (await res.json()) as {
+    choices?: { message?: { content?: string } }[];
+  };
   return parseJsonModel(json.choices?.[0]?.message?.content ?? "");
 }
 
@@ -1530,7 +1590,7 @@ export async function extractDocumentClaimsForPath(input: {
   if (existingError) throw existingError;
   claims = filterNewClaims(
     claims,
-    (existingRows ?? []).map((r: any) => String(r.claim_text ?? "")),
+    (existingRows ?? []).map((r: { claim_text?: string | null }) => String(r.claim_text ?? "")),
     header,
   );
   if (!claims.length) {
@@ -1552,7 +1612,7 @@ export async function extractDocumentClaimsForPath(input: {
   // One RPC (migration 20261024217000) does cleanup + inserts + provenance timeline in a
   // single transaction; until it is applied on an environment, the legacy multi-call path
   // runs so code and migration roll out in either order (PGRST202/42883 = RPC missing).
-  let inserted: any[];
+  let inserted: InsertedClaimRow[];
   // Older/test clients without rpc() go straight to the legacy path.
   const rpcCall =
     typeof input.supabase.rpc === "function"
@@ -1563,9 +1623,12 @@ export async function extractDocumentClaimsForPath(input: {
           _replace_pending: !input.noAi,
         })
       : { data: null, error: { code: "PGRST202" } };
-  const { data: rpcRows, error: rpcError } = rpcCall as any;
+  const { data: rpcRows, error: rpcError } = rpcCall as {
+    data: unknown;
+    error: { code?: string; message?: string } | null;
+  };
   if (!rpcError) {
-    inserted = (rpcRows ?? []) as any[];
+    inserted = (rpcRows ?? []) as InsertedClaimRow[];
   } else if (rpcError.code === "PGRST202" || rpcError.code === "42883") {
     if (!input.noAi) {
       // Re-extraction replaces unverified evidence. Without the transactional RPC the
@@ -1712,8 +1775,12 @@ export async function extractDocumentClaimsForPath(input: {
 
 // Legacy pre-RPC path for import (noAi) runs only: insert calls, no deletes - importing
 // never replaces evidence, so this path is non-destructive by construction.
-async function legacyInsertClaims(input: any, doc: any, claimPayload: any[]): Promise<any[]> {
-  const inserted: any[] = [];
+async function legacyInsertClaims(
+  input: Parameters<typeof extractDocumentClaimsForPath>[0],
+  doc: { name: string },
+  claimPayload: ClaimInsertPayload[],
+): Promise<InsertedClaimRow[]> {
+  const inserted: InsertedClaimRow[] = [];
   let seq = 0;
   for (const claim of claimPayload) {
     seq += 1;

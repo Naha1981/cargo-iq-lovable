@@ -1,7 +1,9 @@
 // Evidence-truth rendering tests for the Harbour Evidence Map, plus a harness
-// that writes the rendered SVG to /tmp for headless-Chrome pixel inspection.
-import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render } from "@testing-library/react";
+// that writes the whole rendered component (map + fixed overlays + controls)
+// into HTML shells linked to the real built stylesheet for headless-Chrome
+// pixel inspection.
+import { describe, expect, it, vi, afterEach } from "vitest";
+import { act, fireEvent, render } from "@testing-library/react";
 import { writeFileSync } from "node:fs";
 
 const fakeCase = { id: "case-1", reference_no: "DUR-2026-0412", vessel_name: "MV Umhlanga Trader", voyage_no: "214S", container_no: "MSKU7748213" };
@@ -42,11 +44,18 @@ function renderMap(data: any) {
   return render(<MapPage />);
 }
 
-function dumpSvg(container: HTMLElement, name: string) {
-  const svg = container.querySelector("svg");
-  if (!svg) throw new Error("no svg rendered");
-  writeFileSync("/tmp/" + name, "<!doctype html><html><body style=\"margin:0;background:#061016\">" + svg.outerHTML + "</body></html>");
+// Whole-component dump: fixed overlays and controls are HTML, not SVG, so the
+// shell must carry the full markup plus the real built stylesheet.
+const APP_CSS = "file:///tmp/cq-mapfix/.output/public/assets/styles-CABeGiMA.css";
+function dumpPage(container: HTMLElement, name: string) {
+  const html = "<!doctype html><html><head><meta charset=\"utf-8\">"
+    + "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+    + "<link rel=\"stylesheet\" href=\"" + APP_CSS + "\">"
+    + "</head><body style=\"margin:0\">" + container.innerHTML + "</body></html>";
+  writeFileSync("/tmp/" + name, html);
 }
+
+afterEach(() => { vi.useRealTimers(); });
 
 describe("Harbour map rendering - evidence truth", () => {
   it("empty track: no vessel marker, no coordinates, explicit no-positions notice with case identity", () => {
@@ -61,7 +70,7 @@ describe("Harbour map rendering - evidence truth", () => {
     expect(all).toContain("COASTLINE © OPENSTREETMAP CONTRIBUTORS · TERMINAL AREAS APPROXIMATE");
     expect(all).toContain("NO RECORDED POSITIONS"); // status card
     expect(all).not.toContain("35 KM RADIUS");
-    dumpSvg(container, "map-empty.html");
+    dumpPage(container, "map-page-empty.html");
   });
 
   it("tracked: marker renders from recorded fixes; provenance distinguishes fix vs derived", () => {
@@ -76,7 +85,7 @@ describe("Harbour map rendering - evidence truth", () => {
     expect(container.textContent).toContain("-29.85000 / 31.05000"); // interpolated, labelled as such
     fireEvent.change(getByLabelText("Investigation timeline"), { target: { value: String(Date.parse("2026-09-06T12:00:00.000Z")) } });
     expect(container.textContent).toContain("LAST RECORDED 10:00Z - NO NEWER POSITIONS"); // stale, not current
-    dumpSvg(container, "map-tracked.html");
+    dumpPage(container, "map-page-tracked.html");
   });
 
   it("zoom in crops the viewBox towards the vessel; reset restores", () => {
@@ -89,7 +98,7 @@ describe("Harbour map rendering - evidence truth", () => {
     const [, , w, h] = cropped.split(" ").map(Number);
     expect(w).toBeCloseTo(1000 / 1.5, 0);
     expect(h).toBeCloseTo(640 / 1.5, 0);
-    dumpSvg(container, "map-zoomed.html");
+    dumpPage(container, "map-page-zoomed.html");
   });
 
   it("long gap in the record: no marker, no implied route, explicit gap state", () => {
@@ -102,11 +111,31 @@ describe("Harbour map rendering - evidence truth", () => {
     expect(container.textContent).toContain("GAP - NO RECORDED DATA");
     const polylines = svg.querySelectorAll('g[filter="url(#hud-glow)"] > polyline');
     expect(polylines.length).toBe(2); // track broken into segments, no line across the gap
+    dumpPage(container, "map-page-gap.html");
   });
 
   it("no temporal evidence at all: playback replaced by a plain no-play state", () => {
     const { container, queryByText } = renderMap({ ...base, observations: [], timeline: [] });
     expect(queryByText("Play timeline")).toBeNull();
     expect(container.textContent).toContain("no recorded positions, satellite passes or case events yet");
+  });
+
+  it("interaction renders: full screen keeps overlays readable; playing state advances the clock", () => {
+    const { container, getByText } = renderMap({ ...base, observations: [fix1, fix2], timeline: [event] });
+    fireEvent.click(getByText("Full screen"));
+    const stage = container.querySelector("div.fixed.inset-0");
+    expect(stage).not.toBeNull(); // true full-screen stage
+    expect(container.textContent).toContain("Close full screen");
+    expect(container.textContent).toContain("DUR-2026-0412 · MV Umhlanga Trader · voyage 214S · Container MSKU7748213"); // overlay still present
+    dumpPage(container, "map-page-fullscreen.html");
+    fireEvent.click(getByText("Close full screen"));
+    expect(container.querySelector("div.fixed.inset-0")).toBeNull();
+
+    vi.useFakeTimers();
+    fireEvent.click(getByText("Play timeline"));
+    expect(getByText("Pause")).toBeTruthy();
+    act(() => { vi.advanceTimersByTime(1000); }); // several playback ticks
+    dumpPage(container, "map-page-playing.html");
+    fireEvent.click(getByText("Pause"));
   });
 });

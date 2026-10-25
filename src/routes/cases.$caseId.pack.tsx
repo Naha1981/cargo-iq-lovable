@@ -7,7 +7,13 @@ import {
   generateEvidencePack,
   getEvidencePackPayload,
 } from "@/lib/case.functions";
-import { buildEvidencePackPdf } from "@/lib/pack-pdf";
+import { buildEvidencePackPdf, type EvidencePackInput } from "@/lib/pack-pdf";
+import type { Database } from "@/integrations/supabase/types";
+
+type PackRow = Pick<
+  Database["public"]["Tables"]["evidence_packs"]["Row"],
+  "id" | "version" | "sha256_hash" | "status" | "approved_by" | "generated_at"
+>;
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/cases/$caseId/pack")({
@@ -35,7 +41,7 @@ function PackPage() {
   const data = CaseRoute.useLoaderData();
   const router = useRouter();
   const evidenceBlocked =
-    data.clockBlocked || data.contradictions.some((c: any) => c.status === "FLAGGED");
+    data.clockBlocked || data.contradictions.some((c) => c.status === "FLAGGED");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -71,12 +77,16 @@ function PackPage() {
     }
   }
 
-  async function withPayload(pack: any, fn: (full: any) => void, fallback: string) {
+  async function withPayload(
+    pack: PackRow,
+    fn: (full: PackRow & EvidencePackInput) => void,
+    fallback: string,
+  ) {
     setBusy(true);
     setMessage("");
     try {
       const full = await getEvidencePackPayload({ data: { packId: pack.id } });
-      fn({ ...pack, pack_payload: full.pack_payload });
+      fn({ ...pack, pack_payload: full.pack_payload as EvidencePackInput["pack_payload"] });
     } catch (err) {
       setMessage(err instanceof Error ? err.message : fallback);
     } finally {
@@ -84,7 +94,7 @@ function PackPage() {
     }
   }
 
-  function exportJson(pack: any) {
+  function exportJson(pack: PackRow) {
     withPayload(
       pack,
       (full) => {
@@ -97,7 +107,7 @@ function PackPage() {
     );
   }
 
-  function exportPdf(pack: any) {
+  function exportPdf(pack: PackRow) {
     withPayload(
       pack,
       (full) => {
@@ -117,12 +127,12 @@ function PackPage() {
     );
   }
 
-  function exportSummary(pack: any) {
+  function exportSummary(pack: PackRow) {
     withPayload(
       pack,
       (full) => {
-        const timeline = (full.pack_payload.timeline ?? [])
-          .map((x: any) => x.timestamp + " — " + x.title)
+        const timeline = (full.pack_payload?.timeline ?? [])
+          .map((x) => String(x.timestamp ?? "") + " — " + String(x.title ?? ""))
           .join("\n");
         const summary =
           "CargoIQ Evidence Pack v" +
@@ -162,7 +172,7 @@ function PackPage() {
           </div>
         )}
         <ul className="space-y-3">
-          {data.packs.map((p: any) => (
+          {data.packs.map((p) => (
             <li
               key={p.id}
               className={cn("rounded-md border p-4", p.status === "SUPERSEDED" && "opacity-60")}

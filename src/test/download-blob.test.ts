@@ -21,11 +21,11 @@ describe("downloadBlob", () => {
 
   it("attaches, clicks, removes the anchor, and defers revoke", () => {
     let attachedAtClick = false;
-    const clickSpy = vi
-      .spyOn(HTMLAnchorElement.prototype, "click")
-      .mockImplementation(function (this: HTMLAnchorElement) {
-        attachedAtClick = document.body.contains(this);
-      });
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
+      attachedAtClick = document.body.contains(this);
+    });
     downloadBlob(new Blob(["x"], { type: "application/pdf" }), "DUR-1-pack-v2.pdf", 1000);
 
     expect(URL.createObjectURL).toHaveBeenCalledOnce();

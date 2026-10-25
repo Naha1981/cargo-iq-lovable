@@ -30,7 +30,6 @@ export function downloadBlob(blob: Blob, filename: string, revokeDelayMs = 1000)
   setTimeout(() => URL.revokeObjectURL(url), revokeDelayMs);
 }
 
-
 function PackPage() {
   const { caseId } = Route.useParams();
   const data = CaseRoute.useLoaderData();

@@ -19,11 +19,14 @@ export const definitionInput = z
     message: "Effective end must be after start",
     path: ["effectiveTo"],
   });
-export function latestDefinitions(rows: any[]) {
-  const latest = new Map<string, any>();
+export function latestDefinitions<T extends { party: string; metric: string; version: number }>(
+  rows: T[],
+) {
+  const latest = new Map<string, T>();
   for (const row of rows) {
     const key = JSON.stringify([row.party.trim().toLowerCase(), row.metric]);
-    if (!latest.has(key) || row.version > latest.get(key).version) latest.set(key, row);
+    const cur = latest.get(key);
+    if (!cur || row.version > cur.version) latest.set(key, row);
   }
   return [...latest.values()];
 }

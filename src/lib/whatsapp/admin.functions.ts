@@ -4,7 +4,7 @@ import { tenantMiddleware } from "@/lib/auth-middleware";
 import { parseRateCsv } from "./rate-csv";
 import { rateFromRow } from "./rows";
 import { simulate, draftQuote } from "./quote-engine";
-function admin(context: any) {
+function admin(context: { role: string }) {
   if (context.role !== "admin") throw new Error("WA_ADMIN_REQUIRED");
 }
 export const loadQuoteAdmin = createServerFn({ method: "GET" })

@@ -64,7 +64,7 @@ const tabs = [
 function CaseLayout() {
   const data = Route.useLoaderData();
   const c = data.case;
-  const openDisputes = data.contradictions.filter((x: any) => x.status === "FLAGGED").length;
+  const openDisputes = data.contradictions.filter((x) => x.status === "FLAGGED").length;
 
   return (
     <div className="min-h-screen">

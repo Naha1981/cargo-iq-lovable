@@ -65,7 +65,7 @@ describe("aisTrack", () => {
   });
   it("returns an empty track for no usable observations", () => {
     expect(aisTrack([])).toEqual([]);
-    expect(aisTrack(undefined as any)).toEqual([]);
+    expect(aisTrack(undefined)).toEqual([]);
   });
 });
 

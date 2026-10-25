@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { z } from "zod";
 import { cctvIngestSchema, defaultCctvLimitation } from "@/lib/cctv-contract";
 import {
   constantTimeEqual,
@@ -93,7 +94,7 @@ export const Route = createFileRoute("/api/cctv/ingest")({
           .delete()
           .lt("observed_at", new Date(Date.now() - 15 * 60 * 1000).toISOString());
 
-        let event: any;
+        let event: z.infer<typeof cctvIngestSchema>;
         try {
           event = cctvIngestSchema.parse(JSON.parse(rawBody));
         } catch (error) {

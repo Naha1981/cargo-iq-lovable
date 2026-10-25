@@ -65,17 +65,16 @@ export function reportLovableError(error: unknown, context: Record<string, unkno
     import("@/lib/supabase/client")
       .then(({ createClient }) => {
         try {
-          const client = createClient() as any;
-          client
-            .from("app_errors")
-            .insert({
+          const client = createClient();
+          const boundary = (context as Record<string, unknown>).boundary;
+          void Promise.resolve(
+            client.from("app_errors").insert({
               route,
               message: String(message).slice(0, 2000),
               stack: stack ? String(stack).slice(0, 4000) : null,
-              source: (context as Record<string, unknown>).boundary ?? "client",
-            })
-            .then(() => {})
-            .catch(() => {});
+              source: typeof boundary === "string" ? boundary : "client",
+            }),
+          ).catch(() => {});
         } catch {
           /* ignore */
         }

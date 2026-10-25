@@ -46,20 +46,31 @@ export function scaleBarPx(meters: number): number {
 }
 
 /** Parse AIS_POSITION observations into an ordered vessel track. */
-export function aisTrack(observations: any[]): TrackPoint[] {
+interface AisObsInput {
+  observation_type?: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  observed_at?: string | number | Date;
+  payload?: unknown;
+}
+
+export function aisTrack(observations: AisObsInput[] | undefined): TrackPoint[] {
   return (observations ?? [])
     .filter(
       (x) => x.observation_type === "AIS_POSITION" && x.latitude != null && x.longitude != null,
     )
-    .map((x) => ({
-      at: String(x.observed_at),
-      lat: Number(x.latitude),
-      lon: Number(x.longitude),
-      sog: Number(x.payload?.sog ?? 0),
-      cog: x.payload?.cog == null ? null : Number(x.payload.cog),
-      mmsi: x.payload?.mmsi ? String(x.payload.mmsi) : null,
-      vesselName: x.payload?.vesselName ? String(x.payload.vesselName) : null,
-    }))
+    .map((x) => {
+      const p = (x.payload ?? {}) as Record<string, unknown>;
+      return {
+        at: String(x.observed_at),
+        lat: Number(x.latitude),
+        lon: Number(x.longitude),
+        sog: Number(p.sog ?? 0),
+        cog: p.cog == null ? null : Number(p.cog),
+        mmsi: p.mmsi ? String(p.mmsi) : null,
+        vesselName: p.vesselName ? String(p.vesselName) : null,
+      };
+    })
     .filter((x) => Number.isFinite(Date.parse(x.at)))
     .sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
 }

@@ -3,7 +3,16 @@ import { computeDashboardStats, caseSearchOrFilter } from "./case.functions";
 import { caseRecovery } from "./recovery-gate";
 
 // Old client-side derivation (pre-bounded dashboard), replicated verbatim for equivalence.
-function oldDerivation(enriched: any[]) {
+type OldEnriched = {
+  currency: string;
+  status: string;
+  contradictions: number;
+  exposure: number;
+  recovery?: number | null;
+  clockConflicts?: boolean;
+};
+
+function oldDerivation(enriched: OldEnriched[]) {
   const zar = enriched.filter((c) => c.currency === "ZAR");
   return {
     openCases: enriched.filter((c) => c.status !== "CLOSED").length,
@@ -63,7 +72,7 @@ function fixture() {
 describe("computeDashboardStats equivalence with previous client derivation", () => {
   it("matches exactly on a mixed fixture (multi-currency, blocked, closed, calc-less)", () => {
     const { cases, calcs, contradictions, blocked } = fixture();
-    const latest = new Map<string, any>();
+    const latest = new Map<string, (typeof calcs)[number]>();
     for (const r of [...calcs].sort((a, b) => b.created_at.localeCompare(a.created_at)))
       if (!latest.has(r.case_id)) latest.set(r.case_id, r);
     const enriched = cases.map((c) => {

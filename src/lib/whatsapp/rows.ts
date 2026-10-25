@@ -1,17 +1,19 @@
 import type { Rate } from "./quote-engine";
-export function rateFromRow(r: any): Rate {
+import type { WaQuoteRateRow } from "@/integrations/supabase/types";
+
+export function rateFromRow(r: WaQuoteRateRow): Rate {
   return {
     id: r.id,
     batchId: r.batch_id,
     version: r.version,
-    origin: r.origin,
-    destination: r.destination,
-    equipment: r.equipment,
+    origin: r.origin as Rate["origin"],
+    destination: r.destination as Rate["destination"],
+    equipment: r.equipment as Rate["equipment"],
     minKg: r.min_kg,
     maxKg: r.max_kg,
     amountMinor: Number(r.amount_minor),
-    currency: r.currency,
-    vatTreatment: r.vat_treatment,
+    currency: r.currency as Rate["currency"],
+    vatTreatment: r.vat_treatment as Rate["vatTreatment"],
     vatBps: r.vat_bps,
     validFrom: new Date(r.valid_from).toISOString(),
     validTo: new Date(r.valid_to).toISOString(),

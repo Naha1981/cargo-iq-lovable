@@ -28,11 +28,14 @@ export const gapInput = z
     if (new Set(x.documentIds).size !== x.documentIds.length)
       c.addIssue({ code: "custom", path: ["documentIds"], message: "Duplicate evidence document" });
   });
-export function latestGaps(rows: any[]) {
-  const m = new Map<string, any>();
+export function latestGaps<
+  T extends { physical_reference: string; required_event: string; version: number },
+>(rows: T[]) {
+  const m = new Map<string, T>();
   for (const r of rows) {
     const k = JSON.stringify([r.physical_reference, r.required_event]);
-    if (!m.has(k) || m.get(k).version < r.version) m.set(k, r);
+    const cur = m.get(k);
+    if (!cur || cur.version < r.version) m.set(k, r);
   }
   return [...m.values()];
 }

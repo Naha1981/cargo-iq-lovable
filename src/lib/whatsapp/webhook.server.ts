@@ -53,6 +53,29 @@ async function boundedBody(request: Request): Promise<Uint8Array> {
   return all;
 }
 /** Deliberately no Graph API sender or access-token use. TEST only; default404. */
+type WaMessage = {
+  type?: unknown;
+  id?: unknown;
+  from?: unknown;
+  text?: { body?: unknown };
+  timestamp?: unknown;
+};
+
+type WaChannel = NonNullable<Awaited<ReturnType<WebhookDeps["findChannel"]>>>;
+
+type WaWebhookEvent = {
+  object?: unknown;
+  entry?: Array<{
+    changes?: Array<{
+      field?: unknown;
+      value?: {
+        messages?: WaMessage[];
+        metadata?: { phone_number_id?: unknown };
+      };
+    }>;
+  }>;
+};
+
 export async function handleWebhook(request: Request, d: WebhookDeps): Promise<Response> {
   if (!d.testIngestEnabled) return new Response("Not found", { status: 404 });
   if (request.method === "GET") {
@@ -78,7 +101,7 @@ export async function handleWebhook(request: Request, d: WebhookDeps): Promise<R
   }
   if (!verifySignature(raw, request.headers.get("x-hub-signature-256"), d.appSecret))
     return new Response("Forbidden", { status: 403 });
-  let event: any;
+  let event: WaWebhookEvent;
   try {
     event = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(raw));
   } catch {
@@ -92,7 +115,7 @@ export async function handleWebhook(request: Request, d: WebhookDeps): Promise<R
     event.entry.length > 20
   )
     return new Response("Invalid event", { status: 400 });
-  const pending: any[] = [];
+  const pending: { channel: WaChannel; id: string; from: string; body: string; ts: number }[] = [];
   for (const e of event.entry)
     for (const c of Array.isArray(e?.changes) ? e.changes : []) {
       if (!c || typeof c !== "object") return new Response("Invalid change", { status: 400 });
@@ -122,22 +145,22 @@ export async function handleWebhook(request: Request, d: WebhookDeps): Promise<R
           return new Response("Invalid text event", { status: 400 });
         const ts = Number(m.timestamp) * 1000;
         if (ts > d.now() + 300000 || ts < d.now() - 86400000) continue;
-        pending.push({ channel, m, ts });
+        pending.push({ channel, id: m.id, from: m.from, body: m.text.body, ts });
       }
     }
   if (pending.length > 50) return new Response("Too many messages", { status: 400 });
   try {
-    for (const { channel, m, ts } of pending) {
+    for (const { channel, id, from, body, ts } of pending) {
       const requestId = await d.receive(
         channel.id,
-        m.id,
-        m.from,
+        id,
+        from,
         new Date(ts).toISOString(),
-        m.text.body,
+        body,
         createHash("sha256").update(raw).digest("hex"),
       );
       const result = simulate(
-        m.text.body,
+        body,
         await d.rates(channel.tenantId),
         new Date(d.now()).toISOString(),
       );

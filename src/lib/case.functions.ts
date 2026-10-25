@@ -22,28 +22,116 @@ async function assertClockGate(db: any, caseId: string) {
 }
 
 
-export const listCases = createServerFn({ method: "GET" }).middleware([tenantMiddleware]).handler(async ({ context }) => {
-  const { data: cases, error } = await context.supabase.from("cases").select("*").order("created_at", { ascending: false });
-  if (error) throw error;
-  const ids = (cases ?? []).map((c: any) => c.id);
+// Audit item 10: prefer one batched RPC; while migration
+// 20261024214000_batched_clock_check.sql is not yet applied on an environment,
+// fall back to the original per-case checks so code and migration roll out in
+// either order (PGRST202 = RPC not found in PostgREST schema cache).
+async function unresolvedClockSet(supabase: any, ids: string[]): Promise<Set<string>> {
+  if (!ids.length) return new Set<string>();
+  const { data: blockedRows, error } = await supabase.rpc("cases_with_unresolved_operational_clocks", { _case_ids: ids });
+  if (!error) return new Set<string>((blockedRows ?? []).map((r: any) => (typeof r === "string" ? r : r.case_id ?? r)));
+  if (error.code !== "PGRST202" && error.code !== "42883") throw error;
+  const blocked = new Set<string>();
+  for (const id of ids) if (await clockBlocked(supabase, id)) blocked.add(id);
+  return blocked;
+}
+
+async function enrichCaseRows(supabase: any, cases: any[]) {
+  const ids = cases.map((c: any) => c.id);
   const { data: calcs } = ids.length
-    ? await context.supabase.from("financial_calculations").select("case_id,calculated_amount_minor,charged_amount_minor,currency,variance_minor").in("case_id", ids).order("created_at", { ascending: false })
+    ? await supabase.from("financial_calculations").select("case_id,calculated_amount_minor,charged_amount_minor,currency,variance_minor").in("case_id", ids).order("created_at", { ascending: false })
     : { data: [] as any[] };
   const { data: contradictions } = ids.length
-    ? await context.supabase.from("contradictions").select("case_id,status").in("case_id", ids)
+    ? await supabase.from("contradictions").select("case_id,status").in("case_id", ids)
     : { data: [] as any[] };
+  const blockedCaseIds = await unresolvedClockSet(supabase, ids);
 
   const latestCalc = new Map<string, any>();
   for (const row of calcs ?? []) if (!latestCalc.has(row.case_id)) latestCalc.set(row.case_id, row);
 
-  return Promise.all((cases ?? []).map(async (c: any) => {
+  return Promise.all(cases.map(async (c: any) => {
     const calc = latestCalc.get(c.id);
     const openContradictions = (contradictions ?? []).filter((x: any) => x.case_id === c.id && x.status === "FLAGGED").length;
-    const unresolvedClocks = await clockBlocked(context.supabase, c.id);
+    const unresolvedClocks = blockedCaseIds.has(c.id);
     const charged = calc?.charged_amount_minor ? Number(calc.charged_amount_minor) / 100 : 0;
     const calculated = calc?.calculated_amount_minor ? Number(calc.calculated_amount_minor) / 100 : 0;
     return { ...c, currency: calc?.currency ?? "ZAR", exposure: charged, recovery: caseRecovery(charged, calculated, openContradictions + (unresolvedClocks ? 1 : 0)), contradictions: openContradictions, clockConflicts: unresolvedClocks };
   }));
+}
+
+// --- Bounded dashboard (audit item 10) ------------------------------------------
+// listCases previously selected EVERY case with select("*") and ran one clock RPC
+// per case. Replaced by: (a) keyset-paged register with server-side search, and
+// (b) exact stats from LIGHT projections. No unbounded reads remain on this path.
+
+// Identical definitions to the dashboard's previous client-side derivation over
+// the full enriched set; computed here from light projections (no select("*"),
+// no per-case RPCs) so stats stay exact without loading every case row.
+export function computeDashboardStats(cases: any[], calcs: any[], contradictions: any[], blockedCaseIds: Set<string>) {
+  const latestCalc = new Map<string, any>();
+  for (const row of calcs ?? []) if (!latestCalc.has(row.case_id)) latestCalc.set(row.case_id, row);
+  let openCases = 0, contradictionCount = 0, exposureZar = 0, recoveryZar = 0, recoveryBlocked = false;
+  for (const c of cases ?? []) {
+    if (c.status !== "CLOSED") openCases++;
+    const calc = latestCalc.get(c.id);
+    const openContra = (contradictions ?? []).filter((x: any) => x.case_id === c.id && x.status === "FLAGGED").length;
+    const clockBlockedCase = blockedCaseIds.has(c.id);
+    contradictionCount += openContra;
+    const currency = calc?.currency ?? "ZAR";
+    if (currency !== "ZAR") continue;
+    const charged = calc?.charged_amount_minor ? Number(calc.charged_amount_minor) / 100 : 0;
+    const calculated = calc?.calculated_amount_minor ? Number(calc.calculated_amount_minor) / 100 : 0;
+    exposureZar += charged;
+    recoveryZar += caseRecovery(charged, calculated, openContra + (clockBlockedCase ? 1 : 0)) ?? 0;
+    if (openContra > 0 || clockBlockedCase) recoveryBlocked = true;
+  }
+  return { total: (cases ?? []).length, openCases, contradictions: contradictionCount, exposureZar, recoveryZar, recoveryBlocked };
+}
+
+export const getCaseDashboardStats = createServerFn({ method: "GET" }).middleware([tenantMiddleware]).handler(async ({ context }) => {
+  const { data: cases, error } = await context.supabase.from("cases").select("id,status");
+  if (error) throw error;
+  const ids = (cases ?? []).map((c: any) => c.id);
+  const { data: calcs } = ids.length
+    ? await context.supabase.from("financial_calculations").select("case_id,calculated_amount_minor,charged_amount_minor,currency").in("case_id", ids).order("created_at", { ascending: false })
+    : { data: [] as any[] };
+  const { data: contradictions } = ids.length
+    ? await context.supabase.from("contradictions").select("case_id,status").in("case_id", ids)
+    : { data: [] as any[] };
+  const blockedCaseIds = await unresolvedClockSet(context.supabase, ids);
+  return computeDashboardStats(cases ?? [], calcs ?? [], contradictions ?? [], blockedCaseIds);
+});
+
+// Register page: keyset cursor + optional server-side search over the same four
+// fields the client filter used (reference_no, vessel_name, container_no, port_code).
+const registerPageInput = z.object({
+  q: z.string().max(120).optional(),
+  limit: z.number().int().min(1).max(200).default(100),
+  cursor: z.object({ created_at: z.string(), id: z.string() }).optional(),
+}).optional();
+
+// PostgREST or-filter for the search term; characters that are syntax in an
+// or() expression are stripped so user input cannot break the filter.
+export function caseSearchOrFilter(q: string): string {
+  const t = q.replace(/[%,()\\.]/g, " ").trim().replace(/\s+/g, " ");
+  const p = `%${t}%`;
+  return `reference_no.ilike.${p},vessel_name.ilike.${p},container_no.ilike.${p},port_code.ilike.${p}`;
+}
+
+export const getCaseRegisterPage = createServerFn({ method: "GET" }).validator(registerPageInput).middleware([tenantMiddleware]).handler(async ({ data, context }) => {
+  const limit = data?.limit ?? 100;
+  let query = context.supabase.from("cases").select("*")
+    .order("created_at", { ascending: false }).order("id", { ascending: false })
+    .limit(limit + 1);
+  if (data?.q?.trim()) query = query.or(caseSearchOrFilter(data.q));
+  if (data?.cursor) query = query.or(`created_at.lt.${data.cursor.created_at},and(created_at.eq.${data.cursor.created_at},id.lt.${data.cursor.id})`);
+  const { data: rows, error } = await query;
+  if (error) throw error;
+  const page = (rows ?? []).slice(0, limit);
+  const nextCursor = (rows ?? []).length > limit && page.length
+    ? { created_at: page[page.length - 1].created_at, id: page[page.length - 1].id }
+    : null;
+  return { rows: await enrichCaseRows(context.supabase, page), nextCursor };
 });
 
 export const getCase = createServerFn({ method: "GET" }).validator(idInput).middleware([tenantMiddleware]).handler(async ({ data, context }) => {

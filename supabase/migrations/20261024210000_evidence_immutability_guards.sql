@@ -81,10 +81,17 @@ DECLARE t text;
 BEGIN
   FOREACH t IN ARRAY ARRAY['documents','extracted_claims','contradictions','timeline_events','external_observations','financial_calculations','audit_log'] LOOP
     IF to_regclass('public.'||t) IS NULL THEN RAISE EXCEPTION 'Core table % missing',t; END IF;
+    -- Verify-or-abort idempotency: an existing guard must be exactly ours
+    -- (function name + body hash), never silently trusted by name alone.
     IF EXISTS(SELECT 1 FROM pg_trigger WHERE tgrelid=('public.'||t)::regclass AND tgname='evidence_immutable_guard' AND NOT tgisinternal) THEN
-      RAISE EXCEPTION 'Guard already exists on %. Inspect before retry',t;
+      IF NOT EXISTS(SELECT 1 FROM pg_trigger tg JOIN pg_proc fp ON fp.oid=tg.tgfoid
+                    WHERE tg.tgrelid=('public.'||t)::regclass AND tg.tgname='evidence_immutable_guard' AND NOT tg.tgisinternal
+                      AND fp.proname='guard_evidence_immutable' AND md5(fp.prosrc)='6e0b8b78fd9f106475274938d228a7fe') THEN
+        RAISE EXCEPTION 'evidence_immutable_guard on % exists with an unexpected definition - inspect before continuing', t;
+      END IF;
+    ELSE
+      EXECUTE format('CREATE TRIGGER evidence_immutable_guard BEFORE UPDATE OR DELETE ON public.%I FOR EACH ROW EXECUTE FUNCTION public.guard_evidence_immutable()',t);
     END IF;
-    EXECUTE format('CREATE TRIGGER evidence_immutable_guard BEFORE UPDATE OR DELETE ON public.%I FOR EACH ROW EXECUTE FUNCTION public.guard_evidence_immutable()',t);
   END LOOP;
 END $guard$;
 
@@ -106,9 +113,14 @@ DECLARE t text;
 BEGIN
   FOREACH t IN ARRAY ARRAY['documents','extracted_claims','contradictions','timeline_events','external_observations','financial_calculations','evidence_packs','audit_log'] LOOP
     IF EXISTS(SELECT 1 FROM pg_trigger WHERE tgrelid=('public.'||t)::regclass AND tgname='case_tenant_match_guard' AND NOT tgisinternal) THEN
-      RAISE EXCEPTION 'Case-tenant guard already exists on %. Inspect before retry',t;
+      IF NOT EXISTS(SELECT 1 FROM pg_trigger tg JOIN pg_proc fp ON fp.oid=tg.tgfoid
+                    WHERE tg.tgrelid=('public.'||t)::regclass AND tg.tgname='case_tenant_match_guard' AND NOT tg.tgisinternal
+                      AND fp.proname='guard_case_tenant_match' AND md5(fp.prosrc)='e67b5a6614706515746504e8b1f8a551') THEN
+        RAISE EXCEPTION 'case_tenant_match_guard on % exists with an unexpected definition - inspect before continuing', t;
+      END IF;
+    ELSE
+      EXECUTE format('CREATE TRIGGER case_tenant_match_guard BEFORE INSERT OR UPDATE ON public.%I FOR EACH ROW EXECUTE FUNCTION public.guard_case_tenant_match()',t);
     END IF;
-    EXECUTE format('CREATE TRIGGER case_tenant_match_guard BEFORE INSERT OR UPDATE ON public.%I FOR EACH ROW EXECUTE FUNCTION public.guard_case_tenant_match()',t);
   END LOOP;
 END $casefk$;
 
@@ -128,9 +140,14 @@ BEGIN
     RAISE EXCEPTION 'cases/evidence_packs missing; inspect before apply';
   END IF;
   IF EXISTS(SELECT 1 FROM pg_trigger WHERE tgrelid='public.cases'::regclass AND tgname='case_pack_delete_guard' AND NOT tgisinternal) THEN
-    RAISE EXCEPTION 'Case guard already exists. Inspect before retry';
+    IF NOT EXISTS(SELECT 1 FROM pg_trigger tg JOIN pg_proc fp ON fp.oid=tg.tgfoid
+                  WHERE tg.tgrelid='public.cases'::regclass AND tg.tgname='case_pack_delete_guard' AND NOT tg.tgisinternal
+                    AND fp.proname='guard_case_delete_with_packs' AND md5(fp.prosrc)='d660757e0bd3990f13e3b551f62250bb') THEN
+      RAISE EXCEPTION 'case_pack_delete_guard exists with an unexpected definition - inspect before continuing';
+    END IF;
+  ELSE
+    CREATE TRIGGER case_pack_delete_guard BEFORE DELETE ON public.cases FOR EACH ROW EXECUTE FUNCTION public.guard_case_delete_with_packs();
   END IF;
-  CREATE TRIGGER case_pack_delete_guard BEFORE DELETE ON public.cases FOR EACH ROW EXECUTE FUNCTION public.guard_case_delete_with_packs();
 END $caseguard$;
 
 COMMIT;

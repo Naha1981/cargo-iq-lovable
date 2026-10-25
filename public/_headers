@@ -9,3 +9,13 @@
 
 /assets/*
   cache-control: public, max-age=31536000, immutable
+
+# Strict CSP scoped to /harbour-view (audit item 7/13). Verified zero-violation in
+# headless Chrome (24 Oct) against the real build: Cesium WASM/eval, jsDelivr
+# workers+textures, ArcGIS tiles, open-meteo, gods-eye REST+WS, github.io feeds,
+# restreamer webcams. 'unsafe-eval'+'wasm-unsafe-eval' are required BY CESIUM -
+# dropping them breaks the globe; that cost supports moving this surface off the
+# session origin later. SPA-wide CSP deferred: TanStack Start emits 4 per-build
+# inline bootstrap scripts needing a nonce/build-hash strategy first.
+/harbour-view/*
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://server.arcgisonline.com https://cdn.jsdelivr.net; connect-src 'self' https://yeaflwgwrjznigykplur.supabase.co wss://yeaflwgwrjznigykplur.supabase.co https://naha1981.github.io wss://cargoiq-gods-eye.onrender.com https://cargoiq-gods-eye.onrender.com https://api.open-meteo.com https://marine-api.open-meteo.com https://terrain.reearth.land https://cdn.jsdelivr.net https://server.arcgisonline.com; worker-src 'self' blob: https://cdn.jsdelivr.net; frame-src https://restreamer.cd.net.za; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'

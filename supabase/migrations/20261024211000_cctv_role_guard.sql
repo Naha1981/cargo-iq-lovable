@@ -12,12 +12,22 @@ BEGIN
     IF to_regclass('public.'||t) IS NULL THEN RAISE EXCEPTION 'CCTV table % missing',t; END IF;
     FOREACH cmd IN ARRAY ARRAY['INSERT','UPDATE','DELETE'] LOOP
       policy_name:='investigator_cctv_'||lower(cmd);
+      -- Verify-or-abort idempotency: an existing policy must be our RESTRICTIVE
+      -- admin/investigator guard structurally, never trusted by name alone.
       IF EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename=t AND policyname=policy_name) THEN
-        RAISE EXCEPTION 'CCTV guard already exists/partial deployment on %. Inspect before retry',t;
+        IF NOT EXISTS(SELECT 1 FROM pg_policy p JOIN pg_class c ON c.oid=p.polrelid JOIN pg_namespace n ON n.oid=c.relnamespace
+                      WHERE n.nspname='public' AND c.relname=t AND p.polname=policy_name
+                        AND NOT p.polpermissive
+                        AND p.polroles = ARRAY[(SELECT oid FROM pg_roles WHERE rolname='authenticated')]::oid[]
+                        AND position('user_roles' in coalesce(pg_get_expr(p.polqual,p.polrelid),'')||' '||coalesce(pg_get_expr(p.polwithcheck,p.polrelid),'')) > 0
+                        AND position('investigator' in coalesce(pg_get_expr(p.polqual,p.polrelid),'')||' '||coalesce(pg_get_expr(p.polwithcheck,p.polrelid),'')) > 0) THEN
+          RAISE EXCEPTION 'CCTV policy % on % exists with an unexpected definition - inspect before continuing', policy_name, t;
+        END IF;
+      ELSE
+        check_role:=format('EXISTS(SELECT 1 FROM public.user_roles r WHERE r.user_id=auth.uid() AND r.tenant_id=%I.tenant_id AND r.role IN (''admin'',''investigator''))',t);
+        EXECUTE format('CREATE POLICY %I ON public.%I AS RESTRICTIVE FOR %s TO authenticated %s',policy_name,t,cmd,
+          CASE cmd WHEN 'INSERT' THEN 'WITH CHECK ('||check_role||')' WHEN 'DELETE' THEN 'USING ('||check_role||')' ELSE 'USING ('||check_role||') WITH CHECK ('||check_role||')' END);
       END IF;
-      check_role:=format('EXISTS(SELECT 1 FROM public.user_roles r WHERE r.user_id=auth.uid() AND r.tenant_id=%I.tenant_id AND r.role IN (''admin'',''investigator''))',t);
-      EXECUTE format('CREATE POLICY %I ON public.%I AS RESTRICTIVE FOR %s TO authenticated %s',policy_name,t,cmd,
-        CASE cmd WHEN 'INSERT' THEN 'WITH CHECK ('||check_role||')' WHEN 'DELETE' THEN 'USING ('||check_role||')' ELSE 'USING ('||check_role||') WITH CHECK ('||check_role||')' END);
     END LOOP;
   END LOOP;
 END $guard$;

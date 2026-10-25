@@ -22,7 +22,7 @@ const mustThrow = async (name, sql, code) => {
 };
 const mustPass = async (name, sql) => { const r = await guarded(() => db.exec(sql)); r.ok ? ok(name) : bad(name, r.e.message); };
 
-await db.exec(`
+const SCHEMA = `
 create schema auth;
 create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('app.test_uid', true),'')::uuid $$;
 create table public.tenants(id uuid primary key, name text);
@@ -49,12 +49,35 @@ insert into public.user_roles values
  ('a0000000-0000-0000-0000-0000000000a3','11111111-1111-1111-1111-111111111111','viewer'),
  ('b0000000-0000-0000-0000-0000000000b1','22222222-2222-2222-2222-222222222222','investigator');
 insert into public.cases values ('c1111111-1111-1111-1111-111111111111','11111111-1111-1111-1111-111111111111','CaseA'),('c2222222-2222-2222-2222-222222222222','22222222-2222-2222-2222-222222222222','CaseB');
-`);
+`;
+await db.exec(SCHEMA);
 
-// Apply the two migrations verbatim
-for (const f of ["supabase/migrations/20261024210000_evidence_immutability_guards.sql","supabase/migrations/20261024211000_cctv_role_guard.sql"]) {
+// Apply the three migrations verbatim
+for (const f of ["supabase/migrations/20261024210000_evidence_immutability_guards.sql","supabase/migrations/20261024211000_cctv_role_guard.sql","supabase/migrations/20261024215000_audit_actor_guard.sql"]) {
   try { await db.exec(readFileSync(new URL("../"+f, import.meta.url), "utf8")); ok("apply "+f.split("/").pop()); }
   catch (e) { bad("apply "+f.split("/").pop(), e.message); }
+}
+
+// Re-apply both migrations verbatim: must no-op cleanly (post-manual-apply publish path)
+for (const f of ["supabase/migrations/20261024210000_evidence_immutability_guards.sql","supabase/migrations/20261024211000_cctv_role_guard.sql","supabase/migrations/20261024215000_audit_actor_guard.sql"]) {
+  try { await db.exec(readFileSync(new URL("../"+f, import.meta.url), "utf8")); ok("re-apply no-op "+f.split("/").pop()); }
+  catch (e) { bad("re-apply no-op "+f.split("/").pop(), e.message); }
+}
+
+// Wrong-definition decoy must abort loudly, never silently trusted
+{
+  const db2 = new PGlite();
+  await db2.query('create role authenticated nologin');
+  await db2.exec(SCHEMA);
+  await db2.exec(`create function public.guard_evil() returns trigger language plpgsql as $decoy$ BEGIN RETURN NEW; END $decoy$;
+    create trigger evidence_immutable_guard before update or delete on public.documents for each row execute function public.guard_evil();`);
+  try {
+    await db2.exec(readFileSync(new URL("../supabase/migrations/20261024210000_evidence_immutability_guards.sql", import.meta.url), "utf8"));
+    bad("decoy guard abort", "expected error, succeeded");
+  } catch (e) {
+    String(e.message).includes("unexpected definition") ? ok("decoy guard abort") : bad("decoy guard abort", e.message);
+  }
+  await db2.close();
 }
 
 await db.query('BEGIN');
@@ -101,6 +124,11 @@ await mustThrow("external obs update", `update public.external_observations set 
 await mustPass("audit insert", `insert into public.audit_log(tenant_id,case_id,actor_user_id,action) values ('${T}','${CA}','a0000000-0000-0000-0000-0000000000a2','TEST')`);
 await mustThrow("audit forged-actor update", `update public.audit_log set actor_user_id='b0000000-0000-0000-0000-0000000000b1' where case_id='${CA}'`, "AUDIT_LOG_APPEND_ONLY");
 await mustThrow("audit delete", `delete from public.audit_log where case_id='${CA}'`, "AUDIT_LOG_APPEND_ONLY");
+await db.query("SET app.test_uid = 'a0000000-0000-0000-0000-0000000000a2'");
+await mustThrow("audit forged-actor INSERT (authenticated as another user)", `insert into public.audit_log(tenant_id,case_id,actor_user_id,action,entity_type) values ('${T}','${CA}','a0000000-0000-0000-0000-0000000000a1','CASE_CREATED','case')`, "AUDIT_ACTOR_MISMATCH");
+await mustPass("audit INSERT with own actor (authenticated)", `insert into public.audit_log(tenant_id,case_id,actor_user_id,action,entity_type) values ('${T}','${CA}','a0000000-0000-0000-0000-0000000000a2','CASE_CREATED','case')`);
+await db.query("RESET app.test_uid");
+await mustPass("audit INSERT explicit actor via service role (auth.uid null)", `insert into public.audit_log(tenant_id,case_id,actor_user_id,action,entity_type) values ('${T}','${CA}','a0000000-0000-0000-0000-0000000000a1','CASE_CREATED','case')`);
 await mustThrow("audit cross-tenant case_id", `insert into public.audit_log(tenant_id,case_id,actor_user_id,action) values ('${T}','${CB}','a0000000-0000-0000-0000-0000000000a2','X')`, "CASE_TENANT_MISMATCH");
 
 // --- case delete guard ---

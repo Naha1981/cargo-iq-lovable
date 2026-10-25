@@ -11,6 +11,19 @@ export interface SatelliteScene {
   sourceUrl: string;
 }
 const STAC = "https://stac.dataspace.copernicus.eu/v1/search";
+
+interface StacAsset {
+  href?: unknown;
+}
+
+interface StacFeature {
+  id?: unknown;
+  collection?: string;
+  properties?: Record<string, unknown>;
+  assets?: Record<string, StacAsset>;
+  bbox?: unknown;
+  geometry?: unknown;
+}
 export async function querySentinelScenes(options: {
   bbox: [number, number, number, number];
   start: string;
@@ -31,7 +44,7 @@ export async function querySentinelScenes(options: {
     }),
   });
   if (!response.ok) throw new Error("COPERNICUS_STAC_" + response.status);
-  const json = (await response.json()) as { features?: any[] };
+  const json = (await response.json()) as { features?: StacFeature[] };
   return (json.features ?? []).map((item): SatelliteScene => {
     const sensor = String(item.collection ?? "").includes("sentinel-1")
       ? "SENTINEL-1"
@@ -39,11 +52,11 @@ export async function querySentinelScenes(options: {
     const props = item.properties ?? {};
     const assets: Record<string, string> = {};
     for (const [key, asset] of Object.entries(item.assets ?? {}))
-      if ((asset as any)?.href) assets[key] = String((asset as any).href);
+      if (asset?.href) assets[key] = String(asset.href);
     return {
       id: String(item.id),
       sensor,
-      acquiredAt: props.datetime ? new Date(props.datetime).toISOString() : null,
+      acquiredAt: props.datetime ? new Date(String(props.datetime)).toISOString() : null,
       cloudPercent: props["eo:cloud_cover"] != null ? Number(props["eo:cloud_cover"]) : null,
       bbox:
         Array.isArray(item.bbox) && item.bbox.length === 4

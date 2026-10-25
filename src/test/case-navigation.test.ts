@@ -52,19 +52,25 @@ it("reuses parent data across cached tab navigation and refetches on invalidatio
   });
   await router.load();
   expect(reads).toBe(1);
-  await (router.navigate as (options: any) => Promise<void>)({
+  await (
+    router.navigate as unknown as (options: { to: string; params: { id: string } }) => Promise<void>
+  )({
     to: "/case/$id/financials",
     params: { id: "demo" },
   });
   expect(reads).toBe(1);
   await router.invalidate();
   expect(reads).toBe(2);
-  await (router.navigate as (options: any) => Promise<void>)({
+  await (
+    router.navigate as unknown as (options: { to: string; params: { id: string } }) => Promise<void>
+  )({
     to: "/case/$id/map",
     params: { id: "demo" },
   });
   expect(reads).toBe(2);
-  await (router.navigate as (options: any) => Promise<void>)({
+  await (
+    router.navigate as unknown as (options: { to: string; params: { id: string } }) => Promise<void>
+  )({
     to: "/case/$id/map",
     params: { id: "other" },
   });

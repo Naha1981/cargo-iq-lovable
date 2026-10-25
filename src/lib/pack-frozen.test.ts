@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { sha256Hex, stableCanonical } from "@/lib/hash";
-import { buildEvidencePackPdf } from "@/lib/pack-pdf";
+import { buildEvidencePackPdf, type EvidencePackInput } from "@/lib/pack-pdf";
 
 // Representative frozen payload carrying every operational register and history.
-const payload: any = {
+const payload = {
   generatedAt: "2026-10-15T10:00:00.000Z",
   version: 3,
   case: { id: "case-1", reference_no: "CIQ-REG-01" },
@@ -117,8 +117,9 @@ const payload: any = {
 
 describe("frozen evidence pack hash", () => {
   it("is stable regardless of object key insertion order", async () => {
-    const shuffled: any = {};
-    for (const k of Object.keys(payload).reverse()) shuffled[k] = payload[k];
+    const shuffled: Record<string, unknown> = {};
+    for (const k of Object.keys(payload).reverse() as (keyof typeof payload)[])
+      shuffled[k] = payload[k];
     expect(await sha256Hex(stableCanonical(shuffled))).toBe(
       await sha256Hex(stableCanonical(payload)),
     );
@@ -140,7 +141,7 @@ describe("frozen evidence pack hash", () => {
 });
 
 describe("frozen pack pdf operational records", () => {
-  const pack: any = {
+  const pack: EvidencePackInput = {
     version: 3,
     status: "DRAFT",
     sha256_hash: "a".repeat(64),

@@ -14,14 +14,14 @@ const fakeCase = {
   container_no: "MSKU7748213",
 };
 
-let loaderData: any;
+let loaderData: unknown;
 
 vi.mock("@tanstack/react-router", async (importOriginal) => {
-  const actual = await importOriginal<any>();
+  const actual = await importOriginal<typeof import("@tanstack/react-router")>();
   return {
     ...actual,
     createFileRoute: () => () => ({ useParams: () => ({ caseId: "case-1" }), head: () => ({}) }),
-    Link: ({ children, ...rest }: any) => <a {...rest}>{children}</a>,
+    Link: ({ children, ...rest }: React.ComponentProps<"a">) => <a {...rest}>{children}</a>,
     useRouter: () => ({ invalidate: async () => {} }),
   };
 });
@@ -71,7 +71,7 @@ const fix2 = {
   payload: { sog: 8, cog: 95, mmsi: "111", vesselName: "MV Umhlanga Trader" },
 };
 
-function renderMap(data: any) {
+function renderMap(data: unknown) {
   loaderData = data;
   return render(<MapPage />);
 }

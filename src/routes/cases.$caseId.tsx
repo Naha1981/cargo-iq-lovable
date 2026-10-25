@@ -17,7 +17,8 @@ export const Route = createFileRoute("/cases/$caseId")({
       throw error;
     }
     if (!data.case) throw notFound();
-    return data;
+    // The notFound guard above establishes case as present for every consumer.
+    return { ...data, case: data.case };
   },
   pendingMs: 150,
   pendingMinMs: 0,

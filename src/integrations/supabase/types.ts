@@ -1,5 +1,29 @@
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
+export type WaQuoteRateRow = {
+  id: string;
+  tenant_id: string;
+  batch_id: string;
+  version: string;
+  origin: string;
+  destination: string;
+  equipment: string;
+  min_kg: number;
+  max_kg: number;
+  amount_minor: number;
+  currency: string;
+  vat_treatment: string;
+  vat_bps: number;
+  valid_from: string;
+  valid_to: string;
+  validity_hours: number;
+  terms: string;
+  exclusions: string;
+  source_reference: string;
+  disclosure_approved: boolean;
+  created_at: string;
+};
+
 export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
@@ -60,7 +84,7 @@ export type Database = {
           claim_target: string;
           claimant: string;
           created_at?: string;
-          created_by: string;
+          created_by?: string;
           id?: string;
           source_document_id: string;
           source_reference: string;
@@ -142,7 +166,7 @@ export type Database = {
           case_id: string;
           claim_target: string;
           created_at?: string;
-          created_by: string;
+          created_by?: string;
           end_at?: string | null;
           explanation: string;
           id?: string;
@@ -159,7 +183,7 @@ export type Database = {
           supersedes_id?: string | null;
           tenant_id: string;
           terms_reference: string;
-          version: number;
+          version?: number;
         };
         Update: {
           appointment_reference?: string;
@@ -418,18 +442,18 @@ export type Database = {
         };
         Insert: {
           case_id: string;
-          considered_clock_ids: string[];
+          considered_clock_ids?: string[];
           created_at?: string;
-          created_by: string;
+          created_by?: string;
           explanation: string;
           id?: string;
-          kind: string;
-          physical_reference: string;
+          kind?: string;
+          physical_reference?: string;
           selected_clock_id: string;
           source_document_id: string;
           source_reference: string;
           tenant_id: string;
-          version: number;
+          version?: number;
         };
         Update: {
           case_id?: string;
@@ -641,7 +665,7 @@ export type Database = {
           acceptance: string;
           case_id: string;
           created_at?: string;
-          created_by: string;
+          created_by?: string;
           id?: string;
           kpi_definition_id?: string | null;
           metric: string;
@@ -654,7 +678,7 @@ export type Database = {
           source_reference: string;
           supersedes_id?: string | null;
           tenant_id: string;
-          version: number;
+          version?: number;
         };
         Update: {
           acceptance?: string;
@@ -742,7 +766,7 @@ export type Database = {
           calculation: string;
           case_id: string;
           created_at?: string;
-          created_by: string;
+          created_by?: string;
           denominator: number;
           effective_from: string;
           effective_to?: string | null;
@@ -758,7 +782,7 @@ export type Database = {
           source_reference: string;
           supersedes_id?: string | null;
           tenant_id: string;
-          version: number;
+          version?: number;
         };
         Update: {
           acceptance?: string;
@@ -843,7 +867,7 @@ export type Database = {
           containers20?: number | null;
           containers40?: number | null;
           created_at?: string;
-          created_by: string;
+          created_by?: string;
           gate_kind: string;
           id?: string;
           import_id?: string | null;
@@ -857,7 +881,7 @@ export type Database = {
           source_reference: string;
           supersedes_id?: string | null;
           tenant_id: string;
-          version: number;
+          version?: number;
         };
         Update: {
           basis?: string;
@@ -936,7 +960,7 @@ export type Database = {
         Insert: {
           case_id: string;
           created_at?: string;
-          created_by: string;
+          created_by?: string;
           explanation: string;
           id?: string;
           match_id: string;
@@ -944,7 +968,7 @@ export type Database = {
           source_reference: string;
           status: string;
           tenant_id: string;
-          version: number;
+          version?: number;
         };
         Update: {
           case_id?: string;
@@ -1010,11 +1034,11 @@ export type Database = {
           claim_b_id: string;
           contradiction_id?: string | null;
           created_at?: string;
-          created_by: string;
+          created_by?: string;
           event_reference: string;
           id?: string;
           rationale: string;
-          result: string;
+          result?: string;
           tenant_id: string;
         };
         Update: {
@@ -1148,7 +1172,7 @@ export type Database = {
         Insert: {
           case_id: string;
           created_at?: string;
-          created_by: string;
+          created_by?: string;
           document_ids?: string[];
           evidence_reference: string;
           explanation: string;
@@ -1159,7 +1183,7 @@ export type Database = {
           status: string;
           supersedes_id?: string | null;
           tenant_id: string;
-          version: number;
+          version?: number;
         };
         Update: {
           case_id?: string;
@@ -1484,7 +1508,7 @@ export type Database = {
           benchmark_hours?: number | null;
           case_id: string;
           created_at?: string;
-          created_by: string;
+          created_by?: string;
           definition: string;
           end_kind: string;
           id?: string;
@@ -1496,7 +1520,7 @@ export type Database = {
           start_kind: string;
           supersedes_id?: string | null;
           tenant_id: string;
-          version: number;
+          version?: number;
         };
         Update: {
           acceptance?: string;
@@ -1577,7 +1601,7 @@ export type Database = {
           appointment_terms?: string | null;
           case_id: string;
           created_at?: string;
-          created_by: string;
+          created_by?: string;
           id?: string;
           kind: string;
           location_basis: string;
@@ -1660,7 +1684,7 @@ export type Database = {
           acceptance_basis: string;
           case_id: string;
           created_at?: string;
-          created_by: string;
+          created_by?: string;
           effective_from: string;
           effective_to?: string | null;
           id?: string;
@@ -1673,7 +1697,7 @@ export type Database = {
           supersedes_id?: string | null;
           tenant_id: string;
           unit: string;
-          version: number;
+          version?: number;
         };
         Update: {
           acceptance?: string;
@@ -1838,6 +1862,18 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      wa_current_rate_rows: {
+        Args: { p_tenant: string };
+        Returns: WaQuoteRateRow[];
+      };
+      wa_import_rates: {
+        Args: { p_tenant: string; p_sha256: string; p_rates: Json };
+        Returns: string;
+      };
+      wa_revoke_rate_batch: {
+        Args: { p_tenant: string; p_batch: string; p_reason: string };
+        Returns: string;
+      };
       approve_evidence_pack_atomic: {
         Args: { _case_id: string; _pack_id: string };
         Returns: {

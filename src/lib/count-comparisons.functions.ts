@@ -12,7 +12,7 @@ export const listCountComparisons = createServerFn({ method: "GET" })
       "kpi_definitions",
       "operational_clocks",
       "clock_reconciliations",
-    ];
+    ] as const;
     const res = await Promise.all(
       names.map((n) =>
         c.supabase

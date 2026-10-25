@@ -33,7 +33,7 @@ export const createInvitation = createServerFn({ method: "POST" })
   )
   .middleware([tenantMiddleware])
   .handler(async ({ data, context }) => {
-    const rpc = context.supabase.rpc as Rpc;
+    const rpc = context.supabase.rpc as unknown as Rpc;
     const { data: result, error } = await rpc("create_tenant_invitation", {
       p_tenant_id: context.tenantId,
       p_email: data.email,
@@ -49,7 +49,7 @@ export const createInvitation = createServerFn({ method: "POST" })
 export const listInvitations = createServerFn({ method: "GET" })
   .middleware([tenantMiddleware])
   .handler(async ({ context }) => {
-    const rpc = context.supabase.rpc as Rpc;
+    const rpc = context.supabase.rpc as unknown as Rpc;
     const { data, error } = await rpc("list_tenant_invitations", {
       p_tenant_id: context.tenantId,
     });
@@ -61,7 +61,7 @@ export const revokeInvitation = createServerFn({ method: "POST" })
   .inputValidator(z.object({ invitationId: z.string().uuid() }))
   .middleware([tenantMiddleware])
   .handler(async ({ data, context }) => {
-    const rpc = context.supabase.rpc as Rpc;
+    const rpc = context.supabase.rpc as unknown as Rpc;
     const { data: result, error } = await rpc("revoke_tenant_invitation", {
       p_invitation_id: data.invitationId,
     });

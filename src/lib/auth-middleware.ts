@@ -1,5 +1,7 @@
 import { createMiddleware } from "@tanstack/react-start";
 import { getAuthed } from "@/lib/supabase/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/integrations/supabase/types";
 
 export const tenantMiddleware = createMiddleware({ type: "function" }).server(async ({ next }) => {
   const { supabase, user } = await getAuthed();
@@ -29,7 +31,7 @@ export const tenantMiddleware = createMiddleware({ type: "function" }).server(as
 
   return next({
     context: {
-      supabase: supabase as any,
+      supabase: supabase as SupabaseClient<Database>,
       user,
       tenantId: membership.tenant_id as string,
       role: membership.role,

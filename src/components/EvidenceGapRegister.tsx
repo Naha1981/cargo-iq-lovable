@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
 import { gapStates, gapInput, latestGaps } from "@/lib/evidence-gaps";
 import { listEvidenceGaps, appendEvidenceGap } from "@/lib/evidence-gaps.functions";
+import type { Database } from "@/integrations/supabase/types";
+
+type DocRow = Database["public"]["Tables"]["documents"]["Row"];
+type GapRow = Database["public"]["Tables"]["evidence_gap_entries"]["Row"];
 const blank = {
   physicalReference: "",
   requiredEvent: "",
@@ -11,8 +15,14 @@ const blank = {
   evidenceReference: "",
   supersedesId: null as string | null,
 };
-export function EvidenceGapRegister({ caseId, documents }: { caseId: string; documents: any[] }) {
-  const [rows, setRows] = useState<any[]>([]),
+export function EvidenceGapRegister({
+  caseId,
+  documents,
+}: {
+  caseId: string;
+  documents: DocRow[];
+}) {
+  const [rows, setRows] = useState<GapRow[]>([]),
     [f, setF] = useState(blank),
     [err, setErr] = useState(""),
     [busy, setBusy] = useState(false),
@@ -30,7 +40,7 @@ export function EvidenceGapRegister({ caseId, documents }: { caseId: string; doc
       active = false;
     };
   }, [caseId]);
-  function edit(k: keyof typeof blank, v: any) {
+  function edit<K extends keyof typeof blank>(k: K, v: (typeof blank)[K]) {
     setF((x) => ({ ...x, [k]: v }));
   }
   async function save() {
@@ -46,7 +56,7 @@ export function EvidenceGapRegister({ caseId, documents }: { caseId: string; doc
       setBusy(false);
     }
   }
-  function revise(r: any) {
+  function revise(r: GapRow) {
     setF({
       physicalReference: r.physical_reference,
       requiredEvent: r.required_event,

@@ -5,6 +5,11 @@ import {
   addAppointmentAttribution,
 } from "@/lib/appointment-attribution.functions";
 import { listOperationalClocks } from "@/lib/operational-clocks.functions";
+import type { Database } from "@/integrations/supabase/types";
+
+type DocRow = Database["public"]["Tables"]["documents"]["Row"];
+type AttributionRow = Database["public"]["Tables"]["appointment_attributions"]["Row"];
+type ClockRow = Database["public"]["Tables"]["operational_clocks"]["Row"];
 const empty = {
   appointmentClockId: "",
   claimant: "",
@@ -19,10 +24,10 @@ export function AppointmentAttribution({
   documents,
 }: {
   caseId: string;
-  documents: any[];
+  documents: DocRow[];
 }) {
-  const [rows, setRows] = useState<any[]>([]),
-    [clocks, setClocks] = useState<any[]>([]),
+  const [rows, setRows] = useState<AttributionRow[]>([]),
+    [clocks, setClocks] = useState<ClockRow[]>([]),
     [f, setF] = useState(empty),
     [err, setErr] = useState(""),
     [busy, setBusy] = useState(false);
@@ -35,7 +40,7 @@ export function AppointmentAttribution({
       .then(([r, c]) => {
         if (active) {
           setRows(r);
-          setClocks(c.filter((x: any) => x.kind.startsWith("APPOINTMENT_")));
+          setClocks(c.filter((x) => x.kind.startsWith("APPOINTMENT_")));
         }
       })
       .catch((e) => {

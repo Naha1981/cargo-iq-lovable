@@ -90,7 +90,7 @@ function CctvPage() {
   const [openArtifactId, setOpenArtifactId] = useState<string | null>(null);
 
   const artifactByObservation = useMemo(
-    () => new Map(data.artifacts.map((artifact: any) => [artifact.observation_id, artifact])),
+    () => new Map(data.artifacts.map((artifact) => [artifact.observation_id, artifact])),
     [data.artifacts],
   );
   useEffect(() => {
@@ -237,7 +237,7 @@ function CctvPage() {
       <Panel title={"Camera registry · " + data.cameras.length}>
         <div className="grid gap-6 lg:grid-cols-[1fr_420px]">
           <div className="space-y-2">
-            {data.cameras.map((camera: any) => (
+            {data.cameras.map((camera) => (
               <div
                 key={camera.id}
                 className="grid gap-2 rounded-md border p-3 md:grid-cols-[1fr_auto]"
@@ -286,7 +286,7 @@ function CctvPage() {
               className="w-full rounded border bg-card px-3 py-2 text-sm"
             >
               <option value="">Select source</option>
-              {data.sources.map((source: any) => (
+              {data.sources.map((source) => (
                 <option key={source.id} value={source.id}>
                   {source.name}
                 </option>
@@ -316,7 +316,7 @@ function CctvPage() {
 
       <Panel title={"Observations ready to link · " + data.ready.length}>
         <div className="divide-y">
-          {data.ready.map((observation: any) => (
+          {data.ready.map((observation) => (
             <div
               key={observation.id}
               className="grid gap-3 py-4 lg:grid-cols-[150px_1fr_auto] lg:items-center"
@@ -360,7 +360,7 @@ function CctvPage() {
 
       <Panel title={"Linked observations · " + data.linked.length}>
         <div className="space-y-4">
-          {data.linked.map((observation: any) => {
+          {data.linked.map((observation) => {
             const artifact = artifactByObservation.get(observation.id);
             return (
               <article key={observation.id} className="rounded-lg border p-4">

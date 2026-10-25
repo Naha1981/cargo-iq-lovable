@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  aisTrack, clampZoom, interpolateTrack, mapCoverageLine, project,
+  aisTrack, basisDescription, basisLabel, clampZoom, interpolateTrack, mapCoverageLine, project,
   vesselIdentityLine, viewBoxString, zoomViewBox, MAP_CANVAS, ZOOM_MAX, ZOOM_MIN,
 } from "./harbour-map";
 
@@ -49,6 +49,43 @@ describe("interpolateTrack", () => {
     const centre = project(-29.8833, 31.05);
     expect(pos!.x).toBeCloseTo(centre.x);
     expect(pos!.y).toBeCloseTo(centre.y);
+  });
+});
+
+describe("interpolateTrack provenance", () => {
+  const a = pt(t0, -29.8, 31.0, 4);
+  const b = pt(t1, -29.9, 31.1, 8);
+  it("marks a position at a recorded fix as a fix", () => {
+    expect(interpolateTrack([a, b], Date.parse(t1))!.basis).toEqual({ kind: "fix", at: t1 });
+    expect(interpolateTrack([a], Date.parse(t0) + 3600e3)!.basis).toEqual({ kind: "fix", at: t0 });
+  });
+  it("marks a position between fixes as derived, with gap size", () => {
+    const basis = interpolateTrack([a, b], Date.parse(t0) + 3600e3)!.basis;
+    expect(basis).toEqual({ kind: "interpolated", from: t0, to: t1, gapHours: 2, longGap: false });
+  });
+  it("flags interpolation across a long gap as approximate", () => {
+    const far = pt("2026-09-02T16:00:00.000Z", -30.0, 31.2);
+    const basis = interpolateTrack([a, far], Date.parse(t0) + 4 * 3600e3)!.basis;
+    expect(basis.kind).toBe("interpolated");
+    expect((basis as any).longGap).toBe(true);
+    expect((basis as any).gapHours).toBe(8);
+  });
+  it("marks positions before the first fix and after the last fix instead of pretending currency", () => {
+    const early = interpolateTrack([a, b], Date.parse(t0) - 3600e3)!;
+    expect(early.basis).toEqual({ kind: "before-first", at: t0 });
+    expect(early.lat).toBeCloseTo(-29.8);
+    const late = interpolateTrack([a, b], Date.parse(t1) + 3600e3)!;
+    expect(late.basis).toEqual({ kind: "stale", at: t1 });
+    expect(late.lat).toBeCloseTo(-29.9);
+  });
+  it("labels each basis honestly", () => {
+    expect(basisLabel({ kind: "fix", at: t0 })).toContain("RECORDED AIS FIX");
+    expect(basisLabel({ kind: "interpolated", from: t0, to: t1, gapHours: 2, longGap: false })).toContain("DERIVED BETWEEN FIXES");
+    expect(basisLabel({ kind: "interpolated", from: t0, to: t1, gapHours: 8, longGap: true })).toContain("LONG GAP");
+    expect(basisLabel({ kind: "stale", at: t1 })).toContain("NO NEWER POSITIONS");
+    expect(basisLabel({ kind: "before-first", at: t0 })).toContain("NO EARLIER POSITIONS");
+    expect(basisDescription({ kind: "interpolated", from: t0, to: t1, gapHours: 8, longGap: true })).toContain("not a direct recording");
+    expect(basisDescription({ kind: "stale", at: t1 })).toContain("Last recorded position");
   });
 });
 

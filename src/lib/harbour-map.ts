@@ -51,13 +51,29 @@ export type InterpolatedPosition = {
   y: number;
 };
 
+/** Interpolations spanning more than this many hours are low confidence. */
+export const LONG_GAP_HOURS = 2;
+const FIX_TOLERANCE_MS = 60 * 1000;
+
 /**
- * Interpolated vessel position at a moment in time.
+ * Where a shown position comes from. Only "fix" is a recorded position;
+ * everything else is derived and must be labelled as such.
+ */
+export type PositionBasis =
+  | { kind: "fix"; at: string }
+  | { kind: "interpolated"; from: string; to: string; gapHours: number; longGap: boolean }
+  | { kind: "stale"; at: string }
+  | { kind: "before-first"; at: string };
+
+export type SourcedPosition = InterpolatedPosition & { basis: PositionBasis };
+
+/**
+ * Vessel position at a moment in time, with honest provenance.
  * Returns null when the case has NO recorded positions - callers must not
  * render a marker or coordinates in that state. There is deliberately no
  * fallback position: an invented location would fabricate evidence.
  */
-export function interpolateTrack(track: TrackPoint[], time: number): InterpolatedPosition | null {
+export function interpolateTrack(track: TrackPoint[], time: number): SourcedPosition | null {
   if (!track.length) return null;
   let a = track[0]!;
   let b = track[track.length - 1]!;
@@ -70,11 +86,59 @@ export function interpolateTrack(track: TrackPoint[], time: number): Interpolate
   }
   const ta = Date.parse(a.at);
   const tb = Date.parse(b.at);
-  const f = tb === ta ? 1 : Math.max(0, Math.min(1, (time - ta) / (tb - ta)));
-  const lat = a.lat + (b.lat - a.lat) * f;
-  const lon = a.lon + (b.lon - a.lon) * f;
+  const at = (p: TrackPoint) => p.at;
+  let basis: PositionBasis;
+  let lat: number;
+  let lon: number;
+  let sog: number;
+  let cog: number | null;
+  if (Math.abs(time - ta) <= FIX_TOLERANCE_MS || ta === tb) {
+    basis = { kind: "fix", at: at(a) };
+    lat = a.lat; lon = a.lon; sog = a.sog; cog = a.cog;
+  } else if (Math.abs(time - tb) <= FIX_TOLERANCE_MS) {
+    basis = { kind: "fix", at: at(b) };
+    lat = b.lat; lon = b.lon; sog = b.sog; cog = b.cog;
+  } else if (time < ta) {
+    basis = { kind: "before-first", at: at(a) };
+    lat = a.lat; lon = a.lon; sog = a.sog; cog = a.cog;
+  } else if (time > tb) {
+    basis = { kind: "stale", at: at(b) };
+    lat = b.lat; lon = b.lon; sog = b.sog; cog = b.cog;
+  } else {
+    const f = Math.max(0, Math.min(1, (time - ta) / (tb - ta)));
+    const gapHours = (tb - ta) / 3600000;
+    basis = { kind: "interpolated", from: at(a), to: at(b), gapHours, longGap: gapHours > LONG_GAP_HOURS };
+    lat = a.lat + (b.lat - a.lat) * f;
+    lon = a.lon + (b.lon - a.lon) * f;
+    sog = a.sog + (b.sog - a.sog) * f;
+    cog = a.cog ?? b.cog;
+  }
   const { x, y } = project(lat, lon);
-  return { lat, lon, sog: a.sog + (b.sog - a.sog) * f, cog: a.cog ?? b.cog, x, y };
+  return { lat, lon, sog, cog, x, y, basis };
+}
+
+/** Short canvas label for a position's provenance. */
+export function basisLabel(basis: PositionBasis): string {
+  const hm = (iso: string) => iso.slice(11, 16) + "Z";
+  switch (basis.kind) {
+    case "fix": return "RECORDED AIS FIX " + hm(basis.at);
+    case "interpolated": return "DERIVED BETWEEN FIXES " + hm(basis.from) + "-" + hm(basis.to) + (basis.longGap ? " · LONG GAP - APPROXIMATE" : "");
+    case "stale": return "LAST RECORDED " + hm(basis.at) + " - NO NEWER POSITIONS";
+    case "before-first": return "FIRST RECORDED " + hm(basis.at) + " - NO EARLIER POSITIONS";
+  }
+}
+
+/** Plain-language provenance for the preview card. */
+export function basisDescription(basis: PositionBasis): string {
+  const full = (iso: string) => iso.replace("T", " ").slice(0, 16) + "Z";
+  switch (basis.kind) {
+    case "fix": return "Recorded by AIS at " + full(basis.at);
+    case "interpolated":
+      return "Derived between recorded fixes " + full(basis.from) + " and " + full(basis.to) + " - not a direct recording"
+        + (basis.longGap ? "; spans a " + Math.round(basis.gapHours) + "-hour gap, treat as approximate" : "");
+    case "stale": return "Last recorded position (" + full(basis.at) + ") - no newer positions";
+    case "before-first": return "First recorded position (" + full(basis.at) + ") - no earlier positions";
+  }
 }
 
 export function clampZoom(zoom: number): number {

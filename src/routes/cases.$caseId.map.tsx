@@ -8,14 +8,14 @@ import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { disputedClaimIds, disputedWindow, isDisputeEvent } from "@/lib/dispute";
 
-import { aisTrack, clampZoom, interpolateTrack, mapCoverageLine, project, vesselIdentityLine, viewBoxString, zoomViewBox, type TrackPoint } from "@/lib/harbour-map";
+import { aisTrack, basisDescription, basisLabel, clampZoom, interpolateTrack, mapCoverageLine, project, vesselIdentityLine, viewBoxString, zoomViewBox, type TrackPoint } from "@/lib/harbour-map";
 
 export const Route = createFileRoute("/cases/$caseId/map")({
   head: () => ({ meta: [{ title: "Harbour Evidence Map | CargoIQ" }] }),
   component: MapPage,
 });
 
-function MapPage() {
+export function MapPage() {
   const { caseId } = Route.useParams();
   const data = CaseRoute.useLoaderData();
   const router = useRouter();
@@ -31,6 +31,7 @@ function MapPage() {
     ...data.timeline.map((x: any) => Date.parse(x.timestamp)),
   ].filter(Number.isFinite);
 
+  const hasTemporalEvidence = times.length > 0;
   const initialTime = times.length ? Math.min(...times) : Date.now();
   const maxTime = times.length ? Math.max(...times, initialTime + 3600000) : initialTime + 24 * 3600000;
 
@@ -101,6 +102,9 @@ function MapPage() {
     const svg = stageRef.current?.querySelector("svg");
     if (!svg) throw new Error("Map is not ready yet.");
     const clone = svg.cloneNode(true) as SVGSVGElement;
+    // Evidence snapshots always capture the full map: reset any interactive zoom
+    // so on-canvas identity and status labels are never cropped out of the pack.
+    clone.setAttribute("viewBox", "0 0 1000 640");
     const disputeColor = getComputedStyle(document.documentElement).getPropertyValue("--disputed").trim() || "oklch(0.68 0.2 25)";
     const serialized = new XMLSerializer().serializeToString(clone).replaceAll("var(--disputed)", disputeColor);
     const withSize = serialized.replace("<svg ", '<svg width="2000" height="1280" font-family="JetBrains Mono, monospace" ');
@@ -181,6 +185,7 @@ function MapPage() {
         ["Course", pos?.cog == null ? "Not recorded" : Math.round(pos.cog) + "°"],
         ["Destination", "Not recorded"],
         ["Last update", last ? fmt(Date.parse(last.at)) : "No positions recorded"],
+        ["Position basis", pos ? basisDescription(pos.basis) : "None - no recorded positions"],
       ];
       dispute = { on: inDisputedWindow, text: inDisputedWindow ? "Inside the disputed window" + (dWindow ? " (" + fmt(dWindow.start) + " – " + fmt(dWindow.end) + ")" : "") : "Outside the disputed window" };
     } else if (preview.kind === "position") {
@@ -406,8 +411,8 @@ function MapPage() {
                 <rect x="270" y="262" width="460" height="116" fill="#000000" fillOpacity=".72" stroke="#d2ff6b" strokeOpacity=".45" rx="6" />
                 <text x="500" y="296" textAnchor="middle" fill="#d2ff6b" fontFamily="JetBrains Mono" fontSize="13">{(data.case.vessel_name || "This vessel").toUpperCase()} - NO RECORDED POSITIONS</text>
                 <text x="500" y="322" textAnchor="middle" fill="#ffffff" fillOpacity=".8" fontFamily="JetBrains Mono" fontSize="11">Vessel positions appear here once AIS broadcasts are</text>
-                <text x="500" y="339" textAnchor="middle" fill="#ffffff" fillOpacity=".8" fontFamily="JetBrains Mono" fontSize="11">recorded for this case. Until then the map shows terminal</text>
-                <text x="500" y="356" textAnchor="middle" fill="#ffffff" fillOpacity=".8" fontFamily="JetBrains Mono" fontSize="11">zones, satellite coverage and case events only.</text>
+                <text x="500" y="339" textAnchor="middle" fill="#ffffff" fillOpacity=".8" fontFamily="JetBrains Mono" fontSize="11">recorded for this case. Until then the map shows only:</text>
+                <text x="500" y="356" textAnchor="middle" fill="#ffffff" fillOpacity=".8" fontFamily="JetBrains Mono" fontSize="11">{["schematic terminal zones", scenes.length ? "recorded satellite scene boxes" : null, data.timeline.length ? "case events" : null].filter(Boolean).join(" · ")}</text>
               </g>
             )}
 
@@ -415,6 +420,8 @@ function MapPage() {
             <g fill="#d2ff6b" fontFamily="JetBrains Mono" fontSize="10">
               <text x="18" y="40">{mapCoverageLine(isSample, track.length)} · ZOOM {zoom}×</text>
               <text x="18" y="58">{vesselIdentityLine(data.case)}</text>
+              {pos && <text x="18" y="76">{basisLabel(pos.basis)}</text>}
+              <text x="982" y="622" textAnchor="end" opacity=".7">SCHEMATIC HARBOUR BACKDROP - NOT CHARTED GEOGRAPHY</text>
               <text x="960" y="40">N ↑</text>
             </g>
           </svg>
@@ -444,7 +451,9 @@ function MapPage() {
 
           <div className="relative mx-3 my-3 md:absolute md:mx-0 md:my-0 md:inset-x-3 md:bottom-3 rounded border border-[#d2ff6b]/40 bg-black/75 px-3 py-2 backdrop-blur">
             <div className="flex flex-wrap items-center gap-2">
-              <Button className="py-1 text-xs" onClick={() => setPlaying((value) => !value)}>{playing ? "Pause" : "Play timeline"}</Button>
+              {hasTemporalEvidence
+                ? <Button className="py-1 text-xs" onClick={() => setPlaying((value) => !value)}>{playing ? "Pause" : "Play timeline"}</Button>
+                : <span className="px-2 py-1 text-xs text-white/50">Play timeline - no recorded positions, satellite passes or case events yet</span>}
               {track.length > 0 && <Button variant="ghost" className="py-1 text-xs" onClick={() => setLocked((value) => !value)}>{locked ? "Tracking vessel" : "Not tracking"}</Button>}
               <Button variant="ghost" className="py-1 text-xs" disabled={refreshing} onClick={refreshSensors}>{refreshing ? "Refreshing…" : "Refresh satellite & marine data"}</Button>
               <Button variant="ghost" className="py-1 text-xs" disabled={saving} onClick={saveSnapshot}>{saving ? "Sealing…" : "Add to evidence pack"}</Button>

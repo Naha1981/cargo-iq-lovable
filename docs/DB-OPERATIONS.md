@@ -123,3 +123,31 @@ Measured total for steps 2-6 on staging: ~125s.
 | Honest README/roadmap | OPEN (needs this ledger merged) | - |
 | tenant_invitations on LIVE DB | NOT APPLIED (needs owner approval); UI shows truthful pending state meanwhile | migration 20261025120000 |
 | Storage file-bytes backup | OPEN (§3 scope) | - |
+
+## Storage operations lessons (25 Oct 2026, staging)
+
+- Batch object DELETE (`DELETE /storage/v1/object/{bucket}` with a `prefixes`
+  JSON body) returned HTTP 200 while deleting nothing on this project. Do not
+  trust its status alone; verify object counts after any bulk delete.
+- Per-object DELETE as a tenant admin is denied by the storage server
+  (HTTP 400 wrapping a 403 AccessDenied body) even though the same DELETE is
+  admitted by RLS at SQL level (proven by the protect_delete trigger firing
+  under `set role authenticated` with the user's claims) and the stored
+  restrictive policy references public.user_roles correctly. Root cause inside
+  the storage server layer is unresolved. Not product-blocking: the app has no
+  user-facing storage delete flow (audit 25 Oct: only the CCTV ingest rollback
+  deletes objects, via the service client, which bypasses RLS).
+- Never delete storage.objects rows by SQL as a cleanup shortcut: the row goes,
+  the bytes in the storage backend orphan (protect_delete exists precisely to
+  prevent this). ~350 synthetic bench rows were owner-purged on staging with
+  `set session_replication_role = replica` on 25 Oct 2026; their ~35 MB of
+  synthetic bytes are orphaned on the free 1 GB tier as a result. Synthetic
+  staging only; never on live.
+- Free Nano capacity (supabase.com/docs/guides/platform/compute-and-disk):
+  60 DB max connections, 200 pooler max clients, 0.5 GB memory, 5 MB/s disk
+  baseline. Burst upload tests (10 workers x 10 x 100 KB) intermittently
+  saturate the DB connection ceiling: observed ~90% fail-closed
+  403 "new row violates row-level security policy" (RLS check cannot complete)
+  plus ~10% 429 too_many_connections, with no partial objects left. The same
+  burst succeeds when the instance is calm. Load findings live in
+  docs/LOAD-BASELINE.md; the reproducible probe is scripts/load-upload.mjs.

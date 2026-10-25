@@ -9,14 +9,20 @@ import {
 import { Route } from "./index";
 
 // Mock the server boundary; the component under test is the REAL Index.
+type RegisterRow = ReturnType<typeof row>;
+interface RegisterPage {
+  rows: RegisterRow[];
+  nextCursor: { created_at: string; id: string } | null;
+}
+
 const registerMock = vi.fn();
 vi.mock("@/lib/case.functions", () => ({
-  getCaseRegisterPage: (...a: any[]) => registerMock(...a),
+  getCaseRegisterPage: (...a: unknown[]) => registerMock(...a),
   getCaseDashboardStats: vi.fn(),
 }));
 vi.mock("@/lib/auth.functions", () => ({ getCurrentUser: vi.fn() }));
 
-function row(id: string, over: any = {}) {
+function row(id: string, over: Record<string, unknown> = {}) {
   return {
     id,
     reference_no: `DUR-2026-${id}`,
@@ -41,13 +47,16 @@ const stats = {
   recoveryBlocked: false,
 };
 
-async function renderIndex(page: any) {
+async function renderIndex(page: RegisterPage) {
   vi.spyOn(Route, "useLoaderData").mockReturnValue({
     session: { user: { id: "u1" } },
     stats,
     page,
-  } as any);
-  const rootRoute = createRootRoute({ component: (Route as any).options.component });
+  } as unknown as ReturnType<typeof Route.useLoaderData>);
+  const rootRoute = createRootRoute({
+    component: (Route as unknown as { options: { component: () => unknown } }).options
+      .component as never,
+  });
   const router = createRouter({
     routeTree: rootRoute,
     history: createMemoryHistory({ initialEntries: ["/"] }),
@@ -86,7 +95,7 @@ describe("dashboard search / load-more interaction (real component)", () => {
 
   it("a stale search response resolving after a newer one is discarded", async () => {
     await renderIndex({ rows: [row("a")], nextCursor: null });
-    let resolveFirst!: (v: any) => void;
+    let resolveFirst!: (v: RegisterPage) => void;
     registerMock
       .mockImplementationOnce(
         () =>
@@ -108,7 +117,7 @@ describe("dashboard search / load-more interaction (real component)", () => {
 
   it("an in-flight load-more is discarded when a new search starts", async () => {
     await renderIndex({ rows: [row("a")], nextCursor: { created_at: "t", id: "a" } });
-    let resolveMore!: (v: any) => void;
+    let resolveMore!: (v: RegisterPage) => void;
     registerMock
       .mockImplementationOnce(
         () =>

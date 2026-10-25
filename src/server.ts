@@ -67,16 +67,39 @@ const HARBOUR_VIEW_CSP =
   "worker-src 'self' blob: https://cdn.jsdelivr.net; frame-src https://restreamer.cd.net.za; " +
   "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'";
 
+// Report-only CSP for the app shell (audit item 8). Phase 1 of a staged rollout:
+// report-only can never block a resource, so it is safe to ship before every
+// client-side call is inventoried; violations are visible in devtools and the
+// staging preview must be exercised against this policy before any enforcing
+// CSP is considered. Kept deliberately permissive (inline scripts/styles from
+// the SSR bootstrap) and scoped to HTML page responses - JSON/server-function
+// responses and /harbour-view/* (which has its own enforced CSP) are untouched.
+const APP_CSP_REPORT_ONLY =
+  "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; " +
+  "img-src 'self' data: blob: https:; font-src 'self' data:; " +
+  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.open-meteo.com " +
+  "https://marine-api.open-meteo.com https://stac.dataspace.copernicus.eu; " +
+  "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'";
+
 export function withSecurityHeaders(request: Request, response: Response): Response {
   const out = new Response(response.body, response);
   for (const [name, value] of Object.entries(BASELINE_HEADERS)) {
     if (!out.headers.has(name)) out.headers.set(name, value);
   }
+  const path = new URL(request.url).pathname;
+  if (path.startsWith("/harbour-view/")) {
+    if (!out.headers.has("content-security-policy")) {
+      out.headers.set("content-security-policy", HARBOUR_VIEW_CSP);
+    }
+    return out;
+  }
+  const isHtml = (out.headers.get("content-type") ?? "").includes("text/html");
   if (
-    new URL(request.url).pathname.startsWith("/harbour-view/") &&
-    !out.headers.has("content-security-policy")
+    isHtml &&
+    !out.headers.has("content-security-policy") &&
+    !out.headers.has("content-security-policy-report-only")
   ) {
-    out.headers.set("content-security-policy", HARBOUR_VIEW_CSP);
+    out.headers.set("content-security-policy-report-only", APP_CSP_REPORT_ONLY);
   }
   return out;
 }

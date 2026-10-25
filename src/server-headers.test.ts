@@ -57,3 +57,44 @@ describe("worker security headers", () => {
     expect(other.headers.get("content-security-policy")).toBeNull();
   });
 });
+
+describe("app-shell report-only CSP (phase 1: never blocks)", () => {
+  const html = () =>
+    new Response("<html>app</html>", { status: 200, headers: { "content-type": "text/html" } });
+
+  it("adds a report-only CSP to SSR HTML pages", () => {
+    const out = withSecurityHeaders(req("/cases"), html());
+    const csp = out.headers.get("content-security-policy-report-only");
+    expect(csp).toContain("default-src 'self'");
+    expect(csp).toContain("https://*.supabase.co");
+    expect(out.headers.get("content-security-policy")).toBeNull();
+  });
+
+  it("leaves JSON/server-function responses without any CSP", () => {
+    const json = new Response("{}", {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+    const out = withSecurityHeaders(req("/cases"), json);
+    expect(out.headers.get("content-security-policy-report-only")).toBeNull();
+    expect(out.headers.get("content-security-policy")).toBeNull();
+  });
+
+  it("keeps the enforced harbour-view CSP and adds no report-only header there", () => {
+    const out = withSecurityHeaders(req("/harbour-view/map"), html());
+    expect(out.headers.get("content-security-policy")).toContain("default-src 'self'");
+    expect(out.headers.get("content-security-policy-report-only")).toBeNull();
+  });
+
+  it("never overwrites an upstream CSP or report-only header", () => {
+    const upstream = new Response("<html>app</html>", {
+      status: 200,
+      headers: {
+        "content-type": "text/html",
+        "content-security-policy-report-only": "default-src 'none'",
+      },
+    });
+    const out = withSecurityHeaders(req("/"), upstream);
+    expect(out.headers.get("content-security-policy-report-only")).toBe("default-src 'none'");
+  });
+});

@@ -308,7 +308,7 @@ export function buildEvidencePackPdf(pack: any): Uint8Array {
   }
   d.gap(4);
   const hasMapData = allObs.length > 0;
-  d.text((hasMapData ? "Limitations: AIS can contain gaps, spoofing or stale identity data. Satellite scene availability is not cargo-level proof. Weather provides context only. " : "Limitations: this pack contains document claims only. ") +
+  d.text((hasMapData ? "Limitations: AIS can contain gaps, spoofing or stale identity data. Satellite scene availability is not cargo-level proof. Weather provides context only. " : "Limitations: this pack contains document claims and raw imported source lines only. ") +
     "Claims marked PENDING have not been verified. Human review is required for disputed claims.", { size: 8, gray: 0.35 });
 
   return serialize(d.pages, pack);

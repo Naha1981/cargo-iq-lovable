@@ -119,7 +119,7 @@ describe("evidence pack layout and labels", () => {
   });
   it("real packs always say canonical (the database hashes the canonical payload at generation); test files say TEST HASH inside the file", () => {
     const real = Buffer.from(buildEvidencePackPdf(pack("DRAFT"))).toString("latin1");
-    expect(real).toContain("canonical pack payload"); expect(real).not.toContain("TEST HASH"); expect(real).not.toContain("AIS can contain"); expect(real).toContain("document claims only");
+    expect(real).toContain("canonical pack payload"); expect(real).not.toContain("TEST HASH"); expect(real).not.toContain("AIS can contain"); expect(real).toContain("document claims and raw imported source lines only");
     const t = Buffer.from(buildEvidencePackPdf({ ...pack("DRAFT"), test_hash: true })).toString("latin1");
     expect(t).toContain("TEST HASH - NOT A CARGOIQ HASH"); expect(t).toContain("TEST HASH \\(not a seal\\)"); expect(t).not.toContain("canonical pack payload:");
   });

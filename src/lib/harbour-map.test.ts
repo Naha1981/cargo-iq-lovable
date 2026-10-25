@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  aisTrack, basisDescription, basisLabel, clampZoom, interpolateTrack, mapCoverageLine, project,
-  vesselIdentityLine, viewBoxString, zoomViewBox, MAP_CANVAS, ZOOM_MAX, ZOOM_MIN,
+  aisTrack, basisDescription, basisLabel, clampZoom, interpolateTrack, mapCoverageLine, panBy, positionGap, project,
+  scaleBarPx, splitTrackSegments, vesselIdentityLine, viewBoxString, zoomViewBox, GEO_WINDOW, MAP_CANVAS, ZOOM_MAX, ZOOM_MIN,
 } from "./harbour-map";
 
 const t0 = "2026-09-02T08:00:00.000Z";
@@ -44,11 +44,36 @@ describe("interpolateTrack", () => {
     expect(pos!.lon).toBeCloseTo(31.05);
     expect(pos!.sog).toBeCloseTo(6);
   });
-  it("projects onto the canvas within bounds", () => {
-    const pos = interpolateTrack([pt(t0, -29.8833, 31.05)], Date.parse(t0));
-    const centre = project(-29.8833, 31.05);
-    expect(pos!.x).toBeCloseTo(centre.x);
-    expect(pos!.y).toBeCloseTo(centre.y);
+  it("projects real coordinates linearly over the geographic window", () => {
+    const cLat = (GEO_WINDOW.latMin + GEO_WINDOW.latMax) / 2;
+    const cLon = (GEO_WINDOW.lonMin + GEO_WINDOW.lonMax) / 2;
+    const c = project(cLat, cLon);
+    expect(c.x).toBeCloseTo(500, 6);
+    expect(c.y).toBeCloseTo(320, 6);
+    expect(project(GEO_WINDOW.latMax, GEO_WINDOW.lonMin).x).toBeCloseTo(0, 6);
+    expect(project(GEO_WINDOW.latMin, GEO_WINDOW.lonMax).y).toBeCloseTo(640, 6);
+    // no clamping: off-window points project outside the canvas for the viewBox to crop
+    expect(project(GEO_WINDOW.latMax + 0.1, cLon).y).toBeLessThan(0);
+  });
+
+  it("scale bar reflects real ground distance", () => {
+    const px = scaleBarPx(5000);
+    expect(px).toBeGreaterThan(80);
+    expect(px).toBeLessThan(140); // ~5 km of a ~47 km-wide window
+  });
+
+  it("splitTrackSegments breaks the track at unsupported gaps", () => {
+    const segs = splitTrackSegments([pt(t0, -29.8, 31.0), pt(t1, -29.9, 31.1), pt("2026-09-02T16:00:00.000Z", -30.0, 31.2)]);
+    expect(segs.length).toBe(2);
+    expect(segs[0]!.length).toBe(2);
+    expect(segs[1]!.length).toBe(1);
+    expect(splitTrackSegments([])).toEqual([]);
+  });
+
+  it("panBy clamps the viewBox inside the canvas", () => {
+    const vb = { x: 250, y: 160, width: 500, height: 320 };
+    expect(panBy(vb, 100, 50)).toEqual({ x: 350, y: 210, width: 500, height: 320 });
+    expect(panBy(vb, -999, 999)).toEqual({ x: 0, y: 320, width: 500, height: 320 });
   });
 });
 
@@ -63,12 +88,12 @@ describe("interpolateTrack provenance", () => {
     const basis = interpolateTrack([a, b], Date.parse(t0) + 3600e3)!.basis;
     expect(basis).toEqual({ kind: "interpolated", from: t0, to: t1, gapHours: 2, longGap: false });
   });
-  it("flags interpolation across a long gap as approximate", () => {
+  it("refuses to derive across a long gap and reports the gap instead", () => {
     const far = pt("2026-09-02T16:00:00.000Z", -30.0, 31.2);
-    const basis = interpolateTrack([a, far], Date.parse(t0) + 4 * 3600e3)!.basis;
-    expect(basis.kind).toBe("interpolated");
-    expect((basis as any).longGap).toBe(true);
-    expect((basis as any).gapHours).toBe(8);
+    expect(interpolateTrack([a, far], Date.parse(t0) + 4 * 3600e3)).toBeNull(); // no implied route
+    expect(positionGap([a, far], Date.parse(t0) + 4 * 3600e3)).toEqual({ from: t0, to: "2026-09-02T16:00:00.000Z" });
+    expect(positionGap([a, b], Date.parse(t0) + 30 * 60e3)).toBeNull(); // inside the supported 2h segment
+    expect(positionGap([a, b], Date.parse(t1))).toBeNull(); // exactly on a fix, not between
   });
   it("marks positions before the first fix and after the last fix instead of pretending currency", () => {
     const early = interpolateTrack([a, b], Date.parse(t0) - 3600e3)!;

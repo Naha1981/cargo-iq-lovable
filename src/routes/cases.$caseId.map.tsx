@@ -8,7 +8,8 @@ import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { disputedClaimIds, disputedWindow, isDisputeEvent } from "@/lib/dispute";
 
-import { aisTrack, basisDescription, basisLabel, clampZoom, interpolateTrack, mapCoverageLine, project, vesselIdentityLine, viewBoxString, zoomViewBox, type TrackPoint } from "@/lib/harbour-map";
+import { aisTrack, basisDescription, basisLabel, clampZoom, interpolateTrack, mapCoverageLine, panBy, positionGap, project, scaleBarPx, splitTrackSegments, vesselIdentityLine, viewBoxString, zoomViewBox, type TrackPoint, type ViewBox } from "@/lib/harbour-map";
+import { DURBAN_COASTLINE } from "@/lib/durban-coastline";
 
 export const Route = createFileRoute("/cases/$caseId/map")({
   head: () => ({ meta: [{ title: "Harbour Evidence Map | CargoIQ" }] }),
@@ -38,10 +39,13 @@ export function MapPage() {
   const [time, setTime] = useState(initialTime);
   const [playing, setPlaying] = useState(false);
   const [locked, setLocked] = useState(true);
-  const [layers, setLayers] = useState({ ais: true, sar: true, optical: true, weather: false, infrastructure: true });
+  const [layers, setLayers] = useState({ ais: true, infrastructure: true });
   const [refreshing, setRefreshing] = useState(false);
   const [large, setLarge] = useState(false);
   const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const dragRef = useRef<{ px: number; py: number; panX: number; panY: number } | null>(null);
+  const svgRef = useRef<SVGSVGElement | null>(null);
   const [saving, setSaving] = useState(false);
   const [snapshotNotice, setSnapshotNotice] = useState("");
   const [snapshotError, setSnapshotError] = useState("");
@@ -70,7 +74,44 @@ export function MapPage() {
 
   // null when the case has no recorded positions: never render an invented location.
   const pos = useMemo(() => interpolateTrack(track, time), [track, time]);
-  const vb = viewBoxString(zoomViewBox(zoom, pos && locked ? { x: pos.x, y: pos.y } : null));
+  const gap = useMemo(() => positionGap(track, time), [track, time]);
+  const segments = useMemo(() => splitTrackSegments(track), [track]);
+  const focus = pos && locked ? { x: pos.x, y: pos.y } : null;
+  const vbObj = panBy(zoomViewBox(zoom, focus), pan.x, pan.y);
+  const vb = viewBoxString(vbObj);
+  const coast = useMemo(() => DURBAN_COASTLINE.map((chain) => chain.map(([lon, lat]) => project(lat, lon))), []);
+  const landPath = useMemo(() => coast.map((chain) => {
+    const first = chain[0]!;
+    const last = chain[chain.length - 1]!;
+    // close along the west (landward) edge of the canvas
+    return "M" + first.x + " " + first.y + " " + chain.map((p) => "L" + p.x + " " + p.y).join(" ") + " L-2000 " + last.y + " L-2000 " + first.y + " Z";
+  }).join(" "), [coast]);
+  const graticule = useMemo(() => {
+    const lines: { x1: number; y1: number; x2: number; y2: number }[] = [];
+    for (let lon = 30.85; lon <= 31.30; lon += 0.05) { const a = project(-29.99, lon); const b = project(-29.72, lon); lines.push({ x1: a.x, y1: a.y, x2: b.x, y2: b.y }); }
+    for (let lat = -29.98; lat <= -29.73; lat += 0.05) { const a = project(lat, 30.82); const b = project(lat, 31.306); lines.push({ x1: a.x, y1: a.y, x2: b.x, y2: b.y }); }
+    return lines;
+  }, []);
+  const statusLine = mapCoverageLine(isSample, track.length) + " · ZOOM " + zoom + "×";
+  const identityLine = vesselIdentityLine(data.case);
+  const hm = (iso: string) => iso.slice(11, 16) + "Z";
+  const gapLine = gap ? "POSITION GAP " + hm(gap.from) + "-" + hm(gap.to) + " · NO RECORDED POSITIONS IN THIS WINDOW" : null;
+  const basisLine = gapLine ?? (pos ? basisLabel(pos.basis) : null);
+  const attributionLine = "COASTLINE © OPENSTREETMAP CONTRIBUTORS · TERMINAL AREAS APPROXIMATE";
+
+  function onMapPointerDown(e: React.PointerEvent<SVGSVGElement>) {
+    if (zoom === 1) return;
+    dragRef.current = { px: e.clientX, py: e.clientY, panX: pan.x, panY: pan.y };
+  }
+  function onMapPointerMove(e: React.PointerEvent<SVGSVGElement>) {
+    const d = dragRef.current;
+    const rect = svgRef.current?.getBoundingClientRect();
+    if (!d || !rect || rect.width === 0) return;
+    const scale = vbObj.width / rect.width;
+    setPan({ x: d.panX - (e.clientX - d.px) * scale, y: d.panY - (e.clientY - d.py) * scale });
+  }
+  function onMapPointerUp() { dragRef.current = null; }
+  function resetView() { setZoom(1); setPan({ x: 0, y: 0 }); }
 
   const nearby = data.timeline.filter((e: any) => Math.abs(Date.parse(e.timestamp) - time) <= 24 * 3600000).slice(0, 10);
   const flagged = data.contradictions.filter((x: any) => x.status === "FLAGGED").slice(0, 6);
@@ -89,7 +130,7 @@ export function MapPage() {
   }
   function guideBerth() {
     setLayers((v) => ({ ...v, infrastructure: true }));
-    tapPreview({ kind: "terminal", name: "North quay terminal zone", covers: "Berth and container stack area inside the dashed outline" });
+    tapPreview({ kind: "terminal", name: "Container terminal area", covers: "Approximate area - berths and container stacks on the Point" });
   }
   function guideDispute() {
     if (dWindow) setTime(dWindow.start);
@@ -120,9 +161,19 @@ export function MapPage() {
       canvas.width = 2000; canvas.height = 1280;
       const ctx = canvas.getContext("2d");
       if (!ctx) throw new Error("Could not render the map image.");
-      ctx.fillStyle = "#08151a";
+      ctx.fillStyle = "#0a1b22";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      // Fixed overlays live outside the zoomable svg; draw them onto the export
+      // so identity, data status, position basis and attribution are always in the pack.
+      ctx.fillStyle = "#d2ff6b";
+      ctx.font = "20px 'JetBrains Mono', monospace";
+      ctx.textAlign = "left";
+      ctx.fillText(statusLine, 36, 80);
+      ctx.fillText(identityLine, 36, 116);
+      if (basisLine) ctx.fillText(basisLine, 36, 152);
+      ctx.textAlign = "right";
+      ctx.fillText(attributionLine, 1964, 1244);
       return await new Promise<Blob>((resolve, reject) => canvas.toBlob((b) => b ? resolve(b) : reject(new Error("Could not encode the map image.")), "image/png"));
     } finally {
       URL.revokeObjectURL(url);
@@ -202,7 +253,7 @@ export function MapPage() {
     } else if (preview.kind === "terminal") {
       title = preview.name;
       rows = [
-        ["Location", "Durban harbour (schematic overlay)"],
+        ["Location", "Durban harbour (approximate area overlay)"],
         ["Covers", preview.covers],
         ["Last refresh", "Fixed overlay — not live data"],
       ];
@@ -281,7 +332,7 @@ export function MapPage() {
         {[
           ["DATA STATUS", inDisputedWindow ? "DISPUTED WINDOW" : isSample ? "SAMPLE DATA" : "RECORDED OBSERVATIONS · CORROBORATION"],
           ["TIME (UTC)", new Date(time).toISOString().replace("T", " ").slice(0, 19) + "Z"],
-          ["VESSEL POSITION", pos ? (locked ? pos.lat.toFixed(5) + " / " + pos.lon.toFixed(5) : "NOT TRACKING") : "NO RECORDED POSITIONS"],
+          ["VESSEL POSITION", pos ? (locked ? pos.lat.toFixed(5) + " / " + pos.lon.toFixed(5) : "NOT TRACKING") : gap ? "GAP - NO RECORDED DATA" : "NO RECORDED POSITIONS"],
           ["VESSEL COURSE", pos?.cog == null ? "—" : Math.round(pos.cog) + "°"],
           ["MAP ZOOM", zoom + "×"],
         ].map(([label, value]) => (
@@ -312,56 +363,78 @@ export function MapPage() {
           </div>
         )}
         <div className="relative">
-          <svg viewBox={vb} className={large ? "block h-[calc(100vh-150px)] min-h-[320px] w-full" : "block h-auto aspect-[1000/640] md:aspect-auto w-full md:h-[calc(100vh-380px)] md:min-h-[340px]"} role="img" aria-label="CargoIQ harbour evidence map">
+          <svg
+            ref={svgRef}
+            viewBox={vb}
+            className={large ? "block h-[calc(100vh-150px)] min-h-[320px] w-full" : "block h-auto aspect-[1000/640] md:aspect-auto w-full md:h-[calc(100vh-380px)] md:min-h-[340px]"}
+            role="img"
+            aria-label="CargoIQ harbour evidence map"
+            style={{ cursor: zoom > 1 ? (dragRef.current ? "grabbing" : "grab") : "default", touchAction: "none" }}
+            onPointerDown={onMapPointerDown}
+            onPointerMove={onMapPointerMove}
+            onPointerUp={onMapPointerUp}
+            onPointerLeave={onMapPointerUp}
+          >
             <defs>
-              <pattern id="hud-grid" width="40" height="40" patternUnits="userSpaceOnUse">
-                <path d="M40 0H0V40" fill="none" stroke="#d2ff6b" strokeOpacity="0.09" />
-              </pattern>
-              <radialGradient id="hud-vignette">
-                <stop offset="55%" stopColor="transparent" />
-                <stop offset="100%" stopColor="#000000" stopOpacity="0.82" />
-              </radialGradient>
               <filter id="hud-glow"><feGaussianBlur stdDeviation="2.5" result="blur" /><feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
             </defs>
 
-            <rect width="1000" height="640" fill="#08151a" onClick={clearPreview} />
-            <rect width="1000" height="640" fill="url(#hud-grid)" />
+            <rect width="1000" height="640" fill="#0a1b22" onClick={clearPreview} />
 
-            <path d="M0 0H1000V175C860 200 760 145 690 190C560 235 450 215 320 235C200 255 110 230 0 260Z" fill="#1f2a26" />
-            <path d="M0 640V415C150 390 235 455 310 425C360 410 380 475 325 530C265 595 150 615 0 640Z" fill="#1f2a26" />
+            {/* lat/lon graticule: real geographic reference, 0.05 degree spacing */}
+            <g stroke="#d2ff6b" strokeOpacity="0.07">
+              {graticule.map((l, i) => <line key={i} x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2} />)}
+            </g>
 
+            {/* real coastline (OpenStreetMap data) with land fill */}
+            <path d={landPath} fill="#1c2a24" stroke="none" />
+            {coast.map((chain, i) => (
+              <polyline key={i} points={chain.map((pt) => pt.x + "," + pt.y).join(" ")} fill="none" stroke="#d2ff6b" strokeOpacity=".55" strokeWidth="1.5" />
+            ))}
+
+            {/* terminal areas: approximate, geo-anchored, always labelled approximate */}
             {layers.infrastructure && (
               <g fill="none" stroke="#d2ff6b" strokeDasharray="5 4" opacity=".78">
                 {([
-                  { name: "North quay terminal zone", covers: "Berth and container stack area inside the dashed outline", el: <rect key="t1" x="330" y="225" width="210" height="70" /> },
-                  { name: "South quay terminal zone", covers: "Berth and container stack area inside the dashed outline", el: <rect key="t2" x="345" y="302" width="190" height="92" /> },
-                  { name: "Anchorage ring", covers: "Waiting area for vessels outside the harbour entrance", el: <circle key="t3" cx="900" cy="515" r="64" /> },
-                ]).map((t) => (
-                  <g key={t.name} style={{ cursor: "pointer" }} onClick={() => tapPreview({ kind: "terminal", name: t.name, covers: t.covers })} onMouseEnter={() => showPreview({ kind: "terminal", name: t.name, covers: t.covers })} onMouseLeave={hoverOut}>
-                    {t.el}
-                  </g>
-                ))}
+                  { name: "Container terminal area", covers: "Approximate area - berths and container stacks on the Point", lonMin: 31.02, lonMax: 31.06, latMin: -29.885, latMax: -29.855 },
+                  { name: "Maydon Wharf area", covers: "Approximate area - south and west quays", lonMin: 30.995, lonMax: 31.03, latMin: -29.915, latMax: -29.885 },
+                ]).map((t) => {
+                  const a = project(t.latMax, t.lonMin);
+                  const b = project(t.latMin, t.lonMax);
+                  return (
+                    <g key={t.name} style={{ cursor: "pointer" }} onClick={() => tapPreview({ kind: "terminal", name: t.name, covers: t.covers })} onMouseEnter={() => showPreview({ kind: "terminal", name: t.name, covers: t.covers })} onMouseLeave={hoverOut}>
+                      <rect x={a.x} y={a.y} width={b.x - a.x} height={b.y - a.y} />
+                      <text x={a.x + 5} y={a.y + 13} fill="#d2ff6b" stroke="none" fontSize="9" opacity=".85" pointerEvents="none">{t.name.toUpperCase()} (APPROX)</text>
+                    </g>
+                  );
+                })}
+                {(() => {
+                  const c = project(-29.82, 31.14);
+                  const r = scaleBarPx(3500);
+                  const name = "Anchorage";
+                  const covers = "Approximate waiting area for vessels outside the harbour entrance";
+                  return (
+                    <g style={{ cursor: "pointer" }} onClick={() => tapPreview({ kind: "terminal", name, covers })} onMouseEnter={() => showPreview({ kind: "terminal", name, covers })} onMouseLeave={hoverOut}>
+                      <circle cx={c.x} cy={c.y} r={r} />
+                      <text x={c.x - r + 5} y={c.y - r + 14} fill="#d2ff6b" stroke="none" fontSize="9" opacity=".85" pointerEvents="none">ANCHORAGE (APPROX)</text>
+                    </g>
+                  );
+                })()}
               </g>
             )}
 
+            {/* recorded vessel track: broken at unsupported gaps so no line implies a route across one */}
             {layers.ais && (
               <g filter="url(#hud-glow)">
-                <polyline
-                  points={track.map((p) => {
-                    const pos = project(p.lat, p.lon);
-                    return pos.x + "," + pos.y;
-                  }).join(" ")}
-                  fill="none"
-                  stroke="#d2ff6b"
-                  strokeWidth="2"
-                  opacity=".85"
-                />
-                {track.map((p, i) => {
-                  const pos = project(p.lat, p.lon);
+                {segments.map((seg, si) => (
+                  <polyline key={si} points={seg.map((pt) => { const c = project(pt.lat, pt.lon); return c.x + "," + c.y; }).join(" ")} fill="none" stroke="#d2ff6b" strokeWidth="2" opacity=".85" />
+                ))}
+                {track.map((pt, i) => {
+                  const c = project(pt.lat, pt.lon);
                   return (
-                    <g key={i} style={{ cursor: "pointer" }} onClick={() => tapPreview({ kind: "position", p })} onMouseEnter={() => showPreview({ kind: "position", p })} onMouseLeave={hoverOut}>
-                      <circle cx={pos.x} cy={pos.y} r="14" fill="transparent" />
-                      <circle cx={pos.x} cy={pos.y} r={Math.max(2, Math.min(6, 2 + p.sog / 4))} fill="#d2ff6b" fillOpacity={Math.min(1, 0.2 + p.sog / 12)} />
+                    <g key={i} style={{ cursor: "pointer" }} onClick={() => tapPreview({ kind: "position", p: pt })} onMouseEnter={() => showPreview({ kind: "position", p: pt })} onMouseLeave={hoverOut}>
+                      <circle cx={c.x} cy={c.y} r="14" fill="transparent" />
+                      <circle cx={c.x} cy={c.y} r={Math.max(2, Math.min(6, 2 + pt.sog / 4))} fill="#d2ff6b" fillOpacity={Math.min(1, 0.2 + pt.sog / 12)} />
                     </g>
                   );
                 })}
@@ -372,34 +445,14 @@ export function MapPage() {
                     <animate attributeName="r" values="12;28;12" dur="1.8s" repeatCount="indefinite" />
                   </circle>
                   <path d="M0 -10 L6 8 L0 4 L-6 8Z" fill={markerColor} />
+                  <text x="16" y="-16" fill={markerColor} fontSize="11" fontFamily="JetBrains Mono" stroke="none">{(data.case.vessel_name || "Case vessel").toUpperCase()}</text>
                 </g>
                 )}
               </g>
             )}
 
-            {layers.sar && scenes.filter((s: any) => s.observation_type === "SENTINEL_1_SCENE").map((scene: any, i: number) => (
-              <g key={scene.id}>
-                <rect x={680 + i * 50} y={70 + i * 45} width="165" height="110" fill="#5ffbf1" fillOpacity=".04" stroke="#5ffbf1" strokeOpacity=".75" style={{ cursor: "pointer" }} onClick={() => tapPreview({ kind: "sar", scene })} onMouseEnter={() => showPreview({ kind: "sar", scene })} onMouseLeave={hoverOut} />
-                <text x={687 + i * 50} y={88 + i * 45} fill="#5ffbf1" fontSize="10" pointerEvents="none">SATELLITE RADAR · ORBIT {scene.payload?.relativeOrbit ?? "—"}</text>
-              </g>
-            ))}
-
-            {layers.optical && scenes.filter((s: any) => s.observation_type === "SENTINEL_2_SCENE").map((scene: any, i: number) => (
-              <g key={scene.id}>
-                <rect x={80 + i * 55} y={395 + i * 35} width="165" height="90" fill="#7dd3fc" fillOpacity=".04" stroke="#7dd3fc" strokeOpacity=".72" style={{ cursor: "pointer" }} onClick={() => tapPreview({ kind: "optical", scene })} onMouseEnter={() => showPreview({ kind: "optical", scene })} onMouseLeave={hoverOut} />
-                <text x={87 + i * 55} y={413 + i * 35} fill="#7dd3fc" fontSize="10" pointerEvents="none">SATELLITE OPTICAL · CLOUD {Math.round(Number(scene.payload?.cloudPercent ?? 0))}%</text>
-              </g>
-            ))}
-
-            {layers.weather && marine.slice(-8).map((w: any, i: number) => (
-              <g key={i} style={{ cursor: "pointer" }} onClick={() => tapPreview({ kind: "weather", w })} onMouseEnter={() => showPreview({ kind: "weather", w })} onMouseLeave={hoverOut}>
-                <circle cx={760 + i * 22} cy={565} r="16" fill="transparent" />
-                <circle cx={760 + i * 22} cy={565} r={Math.max(4, Number(w.payload?.waveHeight ?? 1) * 3)} fill="#7dd3fc" fillOpacity=".26" />
-              </g>
-            ))}
-
             {pos && (
-            <g stroke={markerColor} opacity=".82">
+            <g stroke={markerColor} opacity=".82" pointerEvents="none">
               <path d={"M" + (pos.x - 30) + " " + pos.y + "H" + (pos.x + 30) + "M" + pos.x + " " + (pos.y - 30) + "V" + (pos.y + 30)} />
               <circle cx={pos.x} cy={pos.y} r="32" fill="none" />
               <circle cx={pos.x} cy={pos.y} r="45" fill="none" strokeDasharray="2 8" />
@@ -407,24 +460,33 @@ export function MapPage() {
             )}
 
             {!track.length && (
-              <g>
+              <g pointerEvents="none">
                 <rect x="270" y="262" width="460" height="116" fill="#000000" fillOpacity=".72" stroke="#d2ff6b" strokeOpacity=".45" rx="6" />
                 <text x="500" y="296" textAnchor="middle" fill="#d2ff6b" fontFamily="JetBrains Mono" fontSize="13">{(data.case.vessel_name || "This vessel").toUpperCase()} - NO RECORDED POSITIONS</text>
                 <text x="500" y="322" textAnchor="middle" fill="#ffffff" fillOpacity=".8" fontFamily="JetBrains Mono" fontSize="11">Vessel positions appear here once AIS broadcasts are</text>
                 <text x="500" y="339" textAnchor="middle" fill="#ffffff" fillOpacity=".8" fontFamily="JetBrains Mono" fontSize="11">recorded for this case. Until then the map shows only:</text>
-                <text x="500" y="356" textAnchor="middle" fill="#ffffff" fillOpacity=".8" fontFamily="JetBrains Mono" fontSize="11">{["schematic terminal zones", scenes.length ? "recorded satellite scene boxes" : null, data.timeline.length ? "case events" : null].filter(Boolean).join(" · ")}</text>
+                <text x="500" y="356" textAnchor="middle" fill="#ffffff" fillOpacity=".8" fontFamily="JetBrains Mono" fontSize="11">{["real coastline", "approximate terminal areas", data.timeline.length ? "case events" : null].filter(Boolean).join(" · ")}</text>
               </g>
             )}
 
-            <rect x="3" y="3" width="994" height="634" fill="url(#hud-vignette)" />
-            <g fill="#d2ff6b" fontFamily="JetBrains Mono" fontSize="10">
-              <text x="18" y="40">{mapCoverageLine(isSample, track.length)} · ZOOM {zoom}×</text>
-              <text x="18" y="58">{vesselIdentityLine(data.case)}</text>
-              {pos && <text x="18" y="76">{basisLabel(pos.basis)}</text>}
-              <text x="982" y="622" textAnchor="end" opacity=".7">SCHEMATIC HARBOUR BACKDROP - NOT CHARTED GEOGRAPHY</text>
-              <text x="960" y="40">N ↑</text>
+            {/* scale bar: real ground distance, zooms with the map */}
+            <g pointerEvents="none">
+              <line x1="30" y1="606" x2={30 + scaleBarPx(5000)} y2="606" stroke="#d2ff6b" strokeWidth="2" />
+              <line x1="30" y1="600" x2="30" y2="612" stroke="#d2ff6b" strokeWidth="2" />
+              <line x1={30 + scaleBarPx(5000)} y1="600" x2={30 + scaleBarPx(5000)} y2="612" stroke="#d2ff6b" strokeWidth="2" />
+              <text x={34 + scaleBarPx(5000)} y="610" fill="#d2ff6b" fontSize="11" fontFamily="JetBrains Mono">5 KM</text>
             </g>
           </svg>
+
+          {/* fixed overlays: readable at every zoom, drawn into evidence exports separately */}
+          <div className="pointer-events-none absolute left-3 top-2 font-mono text-[10px] leading-relaxed text-[#d2ff6b]" style={{ textShadow: "0 1px 3px #000" }}>
+            <div>{statusLine}</div>
+            <div>{identityLine}</div>
+            {basisLine && <div>{basisLine}</div>}
+          </div>
+          <div className="pointer-events-none absolute right-3 top-2 font-mono text-[10px] text-[#d2ff6b]" style={{ textShadow: "0 1px 3px #000" }}>N ↑</div>
+          <div className="pointer-events-none absolute bottom-2 right-3 font-mono text-[9px] text-[#d2ff6b]/80" style={{ textShadow: "0 1px 3px #000" }}>{attributionLine}</div>
+          {zoom > 1 && <div className="pointer-events-none absolute bottom-2 left-3 font-mono text-[9px] text-[#d2ff6b]/80" style={{ textShadow: "0 1px 3px #000" }}>DRAG TO PAN</div>}
 
           {renderPreview()}
 
@@ -466,14 +528,14 @@ export function MapPage() {
           <div className="relative mx-3 mb-3 flex flex-wrap gap-1 md:absolute md:mx-0 md:mb-0 md:right-4 md:top-8 md:max-w-[60%] md:justify-end">
             <button aria-label="Zoom in" onClick={() => setZoom((z) => clampZoom(z * 1.5))} className="rounded border border-[#d2ff6b]/35 bg-black/65 px-2 py-1 font-mono text-[10px] uppercase text-[#d2ff6b]">+ Zoom in</button>
             <button aria-label="Zoom out" onClick={() => setZoom((z) => clampZoom(z / 1.5))} className="rounded border border-[#d2ff6b]/35 bg-black/65 px-2 py-1 font-mono text-[10px] uppercase text-[#d2ff6b]">- Zoom out</button>
-            {zoom !== 1 && <button aria-label="Reset zoom" onClick={() => setZoom(1)} className="rounded border border-[#d2ff6b]/35 bg-black/65 px-2 py-1 font-mono text-[10px] uppercase text-[#d2ff6b]">Reset view</button>}
+            {zoom !== 1 && <button aria-label="Reset zoom" onClick={resetView} className="rounded border border-[#d2ff6b]/35 bg-black/65 px-2 py-1 font-mono text-[10px] uppercase text-[#d2ff6b]">Reset view</button>}
             {Object.entries(layers).map(([key, enabled]) => (
               <button
                 key={key}
                 onClick={() => setLayers((value) => ({ ...value, [key]: !enabled }))}
                 className={cn("rounded border border-[#d2ff6b]/35 bg-black/65 px-2 py-1 font-mono text-[10px] uppercase text-[#d2ff6b]", !enabled && "opacity-30")}
               >
-                {({ ais: "Vessel track", sar: "Radar", optical: "Optical", weather: "Sea state", infrastructure: "Terminals" } as Record<string, string>)[key] ?? key}
+                {({ ais: "Vessel track", infrastructure: "Terminal areas" } as Record<string, string>)[key] ?? key}
               </button>
             ))}
           </div>

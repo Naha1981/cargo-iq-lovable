@@ -2,7 +2,13 @@
 // source-bound display labels. No DOM, no React - unit-tested in harbour-map.test.ts.
 
 export const MAP_CANVAS = { width: 1000, height: 640 } as const;
-export const DURBAN = { lat: -29.8833, lon: 31.05 } as const;
+/**
+ * Geographic window shown at zoom 1: Durban harbour plus offshore anchorage.
+ * Sized so one canvas unit is square on the ground (equirectangular at ~29.86S),
+ * which keeps the scale bar honest.
+ */
+export const GEO_WINDOW = { lonMin: 30.82, lonMax: 31.306, latMin: -29.99, latMax: -29.72 } as const;
+const WINDOW_WIDTH_KM = (GEO_WINDOW.lonMax - GEO_WINDOW.lonMin) * 111.32 * Math.cos(-29.855 * Math.PI / 180);
 export const ZOOM_MIN = 1;
 export const ZOOM_MAX = 8;
 
@@ -18,11 +24,17 @@ export type TrackPoint = {
 
 export type CanvasPoint = { x: number; y: number };
 
-/** Fixed schematic projection used by the harbour evidence map canvas. */
+/** Real geographic projection (equirectangular) over GEO_WINDOW. No clamping:
+ *  the svg viewBox crops naturally, and positions must never snap to fake points. */
 export function project(lat: number, lon: number): CanvasPoint {
-  const x = Math.max(20, Math.min(980, 500 + (lon - DURBAN.lon) * 1600));
-  const y = Math.max(20, Math.min(620, 320 - (lat - DURBAN.lat) * 1600));
+  const x = ((lon - GEO_WINDOW.lonMin) / (GEO_WINDOW.lonMax - GEO_WINDOW.lonMin)) * MAP_CANVAS.width;
+  const y = ((GEO_WINDOW.latMax - lat) / (GEO_WINDOW.latMax - GEO_WINDOW.latMin)) * MAP_CANVAS.height;
   return { x, y };
+}
+
+/** Pixel width of a ground-distance scale bar at the map's latitude. */
+export function scaleBarPx(meters: number): number {
+  return (meters / 1000 / WINDOW_WIDTH_KM) * MAP_CANVAS.width;
 }
 
 /** Parse AIS_POSITION observations into an ordered vessel track. */
@@ -105,9 +117,10 @@ export function interpolateTrack(track: TrackPoint[], time: number): SourcedPosi
     basis = { kind: "stale", at: at(b) };
     lat = b.lat; lon = b.lon; sog = b.sog; cog = b.cog;
   } else {
-    const f = Math.max(0, Math.min(1, (time - ta) / (tb - ta)));
     const gapHours = (tb - ta) / 3600000;
-    basis = { kind: "interpolated", from: at(a), to: at(b), gapHours, longGap: gapHours > LONG_GAP_HOURS };
+    if (gapHours > LONG_GAP_HOURS) return null; // unsupported window: no marker, no derived position
+    const f = Math.max(0, Math.min(1, (time - ta) / (tb - ta)));
+    basis = { kind: "interpolated", from: at(a), to: at(b), gapHours, longGap: false };
     lat = a.lat + (b.lat - a.lat) * f;
     lon = a.lon + (b.lon - a.lon) * f;
     sog = a.sog + (b.sog - a.sog) * f;
@@ -115,6 +128,43 @@ export function interpolateTrack(track: TrackPoint[], time: number): SourcedPosi
   }
   const { x, y } = project(lat, lon);
   return { lat, lon, sog, cog, x, y, basis };
+}
+
+/** The unsupported window containing time, when fixes are too far apart to derive across. */
+export function positionGap(track: TrackPoint[], time: number): { from: string; to: string } | null {
+  for (let i = 1; i < track.length; i++) {
+    const ta = Date.parse(track[i - 1]!.at);
+    const tb = Date.parse(track[i]!.at);
+    if (time > ta && time < tb && (tb - ta) / 3600000 > LONG_GAP_HOURS) {
+      return { from: track[i - 1]!.at, to: track[i]!.at };
+    }
+  }
+  return null;
+}
+
+/** Track broken at unsupported gaps so no line implies a traversed route across one. */
+export function splitTrackSegments(track: TrackPoint[]): TrackPoint[][] {
+  const segments: TrackPoint[][] = [];
+  let current: TrackPoint[] = [];
+  for (const p of track) {
+    const prev = current[current.length - 1];
+    if (prev && (Date.parse(p.at) - Date.parse(prev.at)) / 3600000 > LONG_GAP_HOURS) {
+      segments.push(current);
+      current = [];
+    }
+    current.push(p);
+  }
+  if (current.length) segments.push(current);
+  return segments;
+}
+
+/** Pan a viewBox by canvas units, clamped inside the canvas. */
+export function panBy(vb: ViewBox, dx: number, dy: number): ViewBox {
+  return {
+    ...vb,
+    x: Math.min(Math.max(vb.x + dx, 0), MAP_CANVAS.width - vb.width),
+    y: Math.min(Math.max(vb.y + dy, 0), MAP_CANVAS.height - vb.height),
+  };
 }
 
 /** Short canvas label for a position's provenance. */

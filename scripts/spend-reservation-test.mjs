@@ -73,5 +73,25 @@ r.rows[0].status === "completed" ? ok("completion without reservation inserts fr
 await db.query(`SET app.test_uid = 'b0000000-0000-0000-0000-0000000000b1'`);
 try { await db.query("select public.reserve_extraction_cost($1, gen_random_uuid(), 0.01)", [T]); bad("non-member", "succeeded"); }
 catch (e) { String(e.message).includes("FORBIDDEN") ? ok("non-member forbidden") : bad("non-member", e.message); }
+// Grants + RLS inspection on extraction_usage and the reservation RPCs
+const rlsU = await db.query(`select c.relrowsecurity as on, (select count(*) from pg_policy where polrelid='public.extraction_usage'::regclass) as pols from pg_class c where c.relname='extraction_usage'`);
+(rlsU.rows[0].on === true && rlsU.rows[0].pols == 2) ? ok("extraction_usage: RLS on, exactly 2 tenant policies") : bad("extraction_usage RLS", JSON.stringify(rlsU.rows));
+const sfns = ["reserve_extraction_cost(uuid,uuid,numeric)", "complete_extraction_cost(uuid,uuid,uuid,uuid,text,text,integer,integer,numeric)", "void_extraction_reservation(uuid,uuid)", "reconcile_extraction_reservations()"];
+for (const fn of sfns) {
+  const a = await db.query(`select has_function_privilege('anon','public.${fn}','EXECUTE') as p`);
+  const u = await db.query(`select has_function_privilege('authenticated','public.${fn}','EXECUTE') as p`);
+  (a.rows[0].p === false && u.rows[0].p === true) ? ok(`grants ${fn.split("(")[0]}: anon denied, authenticated granted`) : bad(`grants ${fn}`, `anon=${a.rows[0].p} auth=${u.rows[0].p}`);
+}
+const tu = await db.query(`select has_table_privilege('authenticated','public.extraction_usage','UPDATE') as p, has_table_privilege('authenticated','public.extraction_usage','DELETE') as q, has_table_privilege('anon','public.extraction_usage','SELECT') as r`);
+(tu.rows[0].p === false && tu.rows[0].q === false && tu.rows[0].r === false) ? ok("extraction_usage: no UPDATE/DELETE for authenticated, nothing for anon") : bad("extraction_usage table grants", JSON.stringify(tu.rows));
+// RLS execution: tenant member reads own rows, non-member reads none
+await db.query(`SET app.test_uid = 'a0000000-0000-0000-0000-0000000000a1'`);
+await db.query("SET ROLE authenticated");
+const mem = await db.query(`select count(*)::int as n from public.extraction_usage where tenant_id='${T}'`);
+await db.query(`SET app.test_uid = 'b0000000-0000-0000-0000-0000000000b1'`);
+const non = await db.query(`select count(*)::int as n from public.extraction_usage where tenant_id='${T}'`);
+await db.query("RESET ROLE");
+(mem.rows[0].n >= 1 && non.rows[0].n === 0) ? ok(`RLS execution: member sees ${mem.rows[0].n} rows, non-member sees 0`) : bad("RLS execution", `member=${mem.rows[0].n} nonmember=${non.rows[0].n}`);
+
 console.log(fail === 0 ? `ALL ${pass} PASSED` : `${fail} FAILED, ${pass} passed`);
 process.exit(fail === 0 ? 0 : 1);

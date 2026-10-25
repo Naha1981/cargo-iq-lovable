@@ -30,5 +30,11 @@ BEGIN
     CREATE POLICY "Tenant insert extraction usage" ON public.extraction_usage FOR INSERT TO authenticated WITH CHECK(public.is_tenant_member(tenant_id));
   END IF;
 END $pol$;
+-- Explicit table grants: do not depend on ambient default privileges. The tenant
+-- policies above are dead unless authenticated holds SELECT/INSERT, and UPDATE/DELETE
+-- stay denied even if a permissive default-privilege rule exists on the project.
+GRANT SELECT, INSERT ON TABLE public.extraction_usage TO authenticated;
+REVOKE UPDATE, DELETE, TRUNCATE ON TABLE public.extraction_usage FROM authenticated, anon;
+REVOKE ALL ON TABLE public.extraction_usage FROM anon;
 COMMIT;
 SELECT 'extraction_usage_applied' AS result;

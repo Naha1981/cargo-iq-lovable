@@ -117,5 +117,15 @@ try {
 finally { await db.query("RESET ROLE").catch(() => {}); }
 rlsExec === "denied" ? ok("RLS execution: authenticated role reads zero allowlist rows") : bad("RLS execution", rlsExec);
 
+// Grants inspection: EXECUTE privileges on every admin RPC + no direct table access
+const fns = ["is_platform_admin()", "admin_list_tenants(integer,timestamptz)", "admin_list_users(integer,timestamptz)", "admin_list_cases(integer,timestamptz)", "admin_list_disputes(integer,timestamptz)", "admin_get_dispute(uuid)"];
+for (const fn of fns) {
+  const a = await db.query(`select has_function_privilege('anon','public.${fn}','EXECUTE') as p`);
+  const u = await db.query(`select has_function_privilege('authenticated','public.${fn}','EXECUTE') as p`);
+  (a.rows[0].p === false && u.rows[0].p === true) ? ok(`grants ${fn}: anon denied, authenticated granted`) : bad(`grants ${fn}`, `anon=${a.rows[0].p} auth=${u.rows[0].p}`);
+}
+const tp = await db.query(`select has_table_privilege('authenticated','public.platform_admins','SELECT') as p, has_table_privilege('anon','public.platform_admins','SELECT') as q`);
+(tp.rows[0].p === false && tp.rows[0].q === false) ? ok("platform_admins: no direct table SELECT for authenticated/anon") : bad("platform_admins table grant", JSON.stringify(tp.rows));
+
 console.log(fail === 0 ? `ALL ${pass} PASSED` : `${fail} FAILED, ${pass} passed`);
 process.exit(fail === 0 ? 0 : 1);

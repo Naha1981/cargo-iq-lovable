@@ -1,19 +1,25 @@
 import { CargoIqOffer } from "@/components/CargoIqOffer";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AppHeader, Stat } from "@/components/ui-kit";
 import { getCurrentUser } from "@/lib/auth.functions";
-import { listCases } from "@/lib/case.functions";
+import { getCaseDashboardStats, getCaseRegisterPage } from "@/lib/case.functions";
 import { fmtMoney } from "@/lib/case-data";
 import { cn } from "@/lib/utils";
 import { SiteFooter } from "@/components/SiteFooter";
+
+const PAGE_SIZE = 100;
 
 export const Route = createFileRoute("/")({
   ssr: false,
   loader: async () => {
     const session = await getCurrentUser();
-    if (!session.user) return { session, cases: [] };
-    return { session, cases: await listCases() };
+    if (!session.user) return { session, stats: null as any, page: null as any };
+    const [stats, page] = await Promise.all([
+      getCaseDashboardStats(),
+      getCaseRegisterPage({ data: { limit: PAGE_SIZE } }),
+    ]);
+    return { session, stats, page };
   },
   head: () => ({
     meta: [
@@ -33,21 +39,51 @@ const statusCls: Record<string, string> = {
 };
 
 function Index() {
-  const { session, cases } = Route.useLoaderData();
+  const { session, stats, page } = Route.useLoaderData();
   const [q, setQ] = useState("");
-  const rows = useMemo(
-    () => cases.filter((c: any) =>
-      (c.reference_no + (c.vessel_name ?? "") + (c.container_no ?? "") + (c.port_code ?? ""))
-        .toLowerCase()
-        .includes(q.toLowerCase())
-    ),
-    [cases, q],
-  );
+  const [rows, setRows] = useState<any[]>(page?.rows ?? []);
+  const [cursor, setCursor] = useState<{ created_at: string; id: string } | null>(page?.nextCursor ?? null);
+  const [loading, setLoading] = useState(false);
+  const firstLoad = useRef(true);
+  // Monotonic request sequence: any response that is not the latest request
+  // (stale search or a load-more superseded by a new search) is discarded.
+  const reqSeq = useRef(0);
 
-  const zar = cases.filter((c: any) => c.currency === "ZAR");
-  const charged = zar.reduce((sum: number, c: any) => sum + c.exposure, 0);
-  const recoveryBlocked = zar.some((c: any) => (c.contradictions > 0 || c.clockConflicts));
-  const recovery = zar.reduce((sum: number, c: any) => sum + (c.recovery ?? 0), 0);
+  // Server-side search over the same four fields as the old client filter,
+  // debounced; resets paging to the first page of the filtered result.
+  useEffect(() => {
+    if (firstLoad.current) { firstLoad.current = false; return; }
+    const seq = ++reqSeq.current;
+    const t = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const p = await getCaseRegisterPage({ data: { q, limit: PAGE_SIZE } });
+        if (seq !== reqSeq.current) return; // a newer search superseded this one
+        setRows(p.rows);
+        setCursor(p.nextCursor);
+      } finally {
+        if (seq === reqSeq.current) setLoading(false);
+      }
+    }, 300);
+    return () => clearTimeout(t);
+  }, [q]);
+
+  const loadMore = async () => {
+    if (!cursor || loading) return;
+    const seq = reqSeq.current;
+    setLoading(true);
+    try {
+      const p = await getCaseRegisterPage({ data: { q, cursor, limit: PAGE_SIZE } });
+      if (seq !== reqSeq.current) return; // search changed while paging; discard
+      setRows((prev) => {
+        const seen = new Set(prev.map((r: any) => r.id));
+        return [...prev, ...p.rows.filter((r: any) => !seen.has(r.id))];
+      });
+      setCursor(p.nextCursor);
+    } finally {
+      if (seq === reqSeq.current) setLoading(false);
+    }
+  };
 
   if (!session.user) {
     return (
@@ -58,15 +94,17 @@ function Index() {
     );
   }
 
+  const noCases = (stats?.total ?? 0) === 0;
+
   return (
     <div className="min-h-screen">
       <AppHeader />
-      {cases.length === 0 && <CargoIqOffer firstRun />}
+      {noCases && <CargoIqOffer firstRun />}
       <main className="mx-auto max-w-[1400px] px-6 py-10">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="font-mono text-xs uppercase tracking-[0.2em] text-primary">Investigations</p>
-            {cases.length === 0
+            {noCases
               ? <h2 className="mt-2 max-w-3xl text-3xl font-semibold tracking-tight md:text-4xl">What actually happened — and what can be defensibly proven.</h2>
               : <h1 className="mt-2 max-w-3xl text-3xl font-semibold tracking-tight md:text-4xl">What actually happened — and what can be defensibly proven.</h1>}
           </div>
@@ -75,10 +113,10 @@ function Index() {
 
         <a href="/demo/cuf" className="mt-6 inline-flex rounded-md border px-4 py-2 text-sm font-semibold">Explore a worked example</a>
         <div className="mt-8 grid grid-cols-2 gap-3 md:grid-cols-4">
-          <Stat label="Open cases" value={cases.filter((c: any) => c.status !== "CLOSED").length} />
-          <Stat label="Contradictions" value={cases.reduce((a: number, c: any) => a + c.contradictions, 0)} tone="disputed" />
-          <Stat label="Exposure (ZAR)" value={fmtMoney(charged, "ZAR")} />
-          <Stat label="Recoverable (ZAR)" value={recoveryBlocked ? "BLOCKED" : fmtMoney(recovery, "ZAR")} tone={recoveryBlocked ? "disputed" : "observed"} />
+          <Stat label="Open cases" value={stats?.openCases ?? 0} />
+          <Stat label="Contradictions" value={stats?.contradictions ?? 0} tone="disputed" />
+          <Stat label="Exposure (ZAR)" value={fmtMoney(stats?.exposureZar ?? 0, "ZAR")} className="col-span-2 md:col-span-1" />
+          <Stat label="Recoverable (ZAR)" value={stats?.recoveryBlocked ? "BLOCKED" : fmtMoney(stats?.recoveryZar ?? 0, "ZAR")} tone={stats?.recoveryBlocked ? "disputed" : "observed"} className="col-span-2 md:col-span-1" />
         </div>
 
         <div className="mt-10 flex flex-wrap items-center justify-between gap-4">
@@ -119,9 +157,15 @@ function Index() {
             </tbody>
           </table>
         </div>
+        {cursor && (
+          <div className="mt-4 text-center">
+            <button onClick={loadMore} disabled={loading} className="rounded-md border px-4 py-2 text-sm font-semibold disabled:opacity-50">
+              {loading ? "Loading…" : "Load more investigations"}
+            </button>
+          </div>
+        )}
       </main>
       <SiteFooter />
     </div>
   );
 }
-

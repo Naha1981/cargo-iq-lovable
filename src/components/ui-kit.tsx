@@ -56,11 +56,11 @@ export function Panel({ title, action, children, className }: { title?: string; 
   );
 }
 
-export function Stat({ label, value, tone }: { label: string; value: ReactNode; tone?: "primary" | "observed" | "disputed" }) {
+export function Stat({ label, value, tone, className }: { label: string; value: ReactNode; tone?: "primary" | "observed" | "disputed"; className?: string }) {
   return (
-    <div className="rounded-lg border bg-card px-4 py-3">
+    <div className={cn("rounded-lg border bg-card px-4 py-3", className)}>
       <div className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">{label}</div>
-      <div className={cn("mt-1 font-mono text-2xl font-medium", tone === "primary" && "text-primary", tone === "observed" && "text-observed", tone === "disputed" && "text-disputed")}>{value}</div>
+      <div className={cn("mt-1 font-mono text-base sm:text-2xl font-medium [overflow-wrap:break-word]", tone === "primary" && "text-primary", tone === "observed" && "text-observed", tone === "disputed" && "text-disputed")}>{value}</div>
     </div>
   );
 }

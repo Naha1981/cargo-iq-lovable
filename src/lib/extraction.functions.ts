@@ -133,8 +133,8 @@ export function dayAnchored(claimText: string, iso: string): boolean {
 
 function parseJsonModel(text: string): ClaimDraft[] {
   const cleaned = text
-    .replace(/^\`\`\`json\s*/i, "")
-    .replace(/^\`\`\`\s*$/i, "")
+    .replace(/^```json\s*/i, "")
+    .replace(/^```\s*$/i, "")
     .trim();
   const parsed = JSON.parse(cleaned);
   const rows = Array.isArray(parsed) ? parsed : parsed.claims;

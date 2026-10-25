@@ -49,15 +49,15 @@ export const cctvIngestSchema = z
       })
       .optional(),
     processing_version: z.string().max(160).optional(),
-    roi: z.record(z.unknown()).optional(),
-    payload: z.record(z.unknown()).optional(),
+    roi: z.record(z.string(), z.unknown()).optional(),
+    payload: z.record(z.string(), z.unknown()).optional(),
     evidence: z
       .object({
         media_type: z.string().min(1).max(120),
         file_name: z.string().min(1).max(255),
         captured_at: z.string().datetime({ offset: true }).optional(),
         base64: z.string().min(1).max(8_000_000),
-        metadata: z.record(z.unknown()).optional(),
+        metadata: z.record(z.string(), z.unknown()).optional(),
       })
       .optional(),
   })

@@ -151,3 +151,21 @@ Measured total for steps 2-6 on staging: ~125s.
   plus ~10% 429 too_many_connections, with no partial objects left. The same
   burst succeeds when the instance is calm. Load findings live in
   docs/LOAD-BASELINE.md; the reproducible probe is scripts/load-upload.mjs.
+
+## Verified supported paths (25 Oct 2026, staging)
+
+- Synthetic auth users: the supported route works end to end. The staging
+  service_role secret is stored as a vault agent entry ("Supabase CargoIQ
+  staging service_role secret (nahalabs org, synthetic testing only)");
+  POST /auth/v1/admin/users with email_confirm:true created a user that
+  signed in via the password grant, and DELETE /auth/v1/admin/users/{id}
+  removed it cleanly (verified 0 residue). No more raw SQL auth mutation.
+- Storage deletes: the service-role API path works (upload + DELETE returned
+  200 "Successfully deleted", row and bytes gone). This is the path the CCTV
+  ingest rollback uses, so failed-ingest cleanup leaves no orphaned bytes.
+  Tenant-user JWT deletes remain denied at the storage-server layer despite
+  RLS admitting them at SQL level (unresolved; no user-facing flow needs it).
+- Never SQL-delete storage.objects rows: bytes orphan. Supported cleanup is
+  the service-role API delete above. The ~35 MB orphaned by the 25 Oct
+  metadata-only purges has no supported removal path (rows already gone);
+  recorded here so the mistake is not repeated.

@@ -160,7 +160,7 @@ describe("bounded extraction recovery", () => {
     // Default mock returns PGRST202 for reserve_free_extraction_attempt when unstubbed below.
     mock.supabase.rpc = async (fn: string) => fn === "reserve_free_extraction_attempt" ? { data: null, error: { code: "PGRST202", message: "missing" } } : { data: [], error: null };
     const result = await extractDocumentClaimsForPath({ ...base, supabase: mock.supabase, freeDataClass: "public_synthetic" });
-    expect(fetch).toHaveBeenCalledTimes(1); // the failed paid call only; no free request went out
+    expect(fetch).not.toHaveBeenCalled(); // fail-closed safety: LOVABLE_API_KEY presence alone is not consent - no gateway call at all, and no free request went out
     expect(result.providerUsed).toBe("none"); expect(result.mode).toBe("text-fallback");
     expect((result as any).fallbackErrors?.some((e: string) => e.includes("daily-attempt cap update is applied"))).toBe(true);
   });
@@ -171,7 +171,7 @@ describe("bounded extraction recovery", () => {
     const realRpc = mock.supabase.rpc;
     mock.supabase.rpc = async (fn: string, args: any) => fn === "reserve_free_extraction_attempt" ? { data: "over_cap", error: null } : realRpc(fn, args);
     const result = await extractDocumentClaimsForPath({ ...base, supabase: mock.supabase, freeDataClass: "public_synthetic" });
-    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(fetch).not.toHaveBeenCalled(); // fail-closed safety: no gateway call; over-cap also blocks the free request
     expect(result.providerUsed).toBe("none"); expect(result.mode).toBe("text-fallback");
     expect((result as any).fallbackErrors?.some((e: string) => e.includes("attempts for today are used up") && e.includes("text import still works"))).toBe(true);
   });
@@ -182,7 +182,7 @@ describe("bounded extraction recovery", () => {
     const realRpc = mock.supabase.rpc;
     mock.supabase.rpc = async (fn: string, args: any) => { if (fn === "reserve_free_extraction_attempt") throw new Error("connection reset"); return realRpc(fn, args); };
     const result = await extractDocumentClaimsForPath({ ...base, supabase: mock.supabase, freeDataClass: "public_synthetic" });
-    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(fetch).not.toHaveBeenCalled(); // fail-closed safety: no gateway call; transient cap failure also blocks the free request
     expect(result.providerUsed).toBe("none"); expect(result.mode).toBe("text-fallback");
     expect((result as any).fallbackErrors?.some((e: string) => e.includes("could not verify the free daily attempt limit"))).toBe(true);
   });

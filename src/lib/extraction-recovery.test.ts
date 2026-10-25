@@ -36,32 +36,32 @@ describe("bounded extraction recovery", () => {
     expect(fetch).not.toHaveBeenCalled(); expect(result.mode).toBe("text"); expect(result.count).toBe(2);
     expect(mock.inserted.every(row => row.nature === "REPORTED" && row.timestamp_claimed == null)).toBe(true);
   });
-  it("402 imports real PDF text with page provenance and no invented timestamps", async () => {
-    clear(); process.env.LOVABLE_API_KEY = "synthetic-key";
+  it("imports real PDF text with page provenance and no invented timestamps when no AI is configured", async () => {
+    clear(); process.env.LOVABLE_API_KEY = "synthetic-key"; // injected key alone must not select the billed gateway
     const fetch = vi.fn(async () => new Response("quota", { status: 402 })); vi.stubGlobal("fetch", fetch);
     const mock = db(new Blob([fs.readFileSync("tests/fixtures/synthetic-recovery.pdf")]), "test.pdf", "application/pdf");
     const result = await extractDocumentClaimsForPath({ ...base, supabase: mock.supabase });
-    expect(fetch).toHaveBeenCalledTimes(1); expect(result.mode).toBe("pdf-text-fallback"); expect(result.providerUsed).toBe("none");
+    expect(fetch).not.toHaveBeenCalled(); expect(result.mode).toBe("pdf-text-fallback"); expect(result.providerUsed).toBe("none");
     expect(result.count).toBe(4); expect(mock.inserted.every(row => row.page_number === 1 && row.nature === "REPORTED" && row.timestamp_claimed == null)).toBe(true);
   });
   it("Gemini test fallback receives native PDF only with all explicit gates", async () => {
     clear(); process.env.LOVABLE_API_KEY = "synthetic-primary"; process.env.GEMINI_API_KEY = "synthetic-test-key";
     process.env.CLAIM_GEMINI_TEST_FALLBACK_ENABLED = "true"; process.env.CLAIM_GEMINI_FREE_TIER_CONFIRMED = "true";
-    const fetch = vi.fn().mockResolvedValueOnce(new Response("quota", { status: 402 })).mockResolvedValueOnce(new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify({ claims: [{ page_number: 1, claim_text: "Synthetic fallback claim", nature: "REPORTED", confidence: 0.6 }] }) }] } }] }), { status: 200 }));
+    const fetch = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify({ claims: [{ page_number: 1, claim_text: "Synthetic fallback claim", nature: "REPORTED", confidence: 0.6 }] }) }] } }] }), { status: 200 }));
     vi.stubGlobal("fetch", fetch); const mock = db(new Blob([fs.readFileSync("tests/fixtures/synthetic-recovery.pdf")]), "test.pdf", "application/pdf");
     const result = await extractDocumentClaimsForPath({ ...base, supabase: mock.supabase, freeDataClass: "public_synthetic" as const });
-    expect(result.providerUsed).toBe("gemini-test"); expect(result.mode).toBe("ai"); expect(fetch).toHaveBeenCalledTimes(2);
-    const [url, init] = fetch.mock.calls[1]; expect(url).toContain("gemini-flash-lite-latest:generateContent");
+    expect(result.providerUsed).toBe("gemini-test"); expect(result.mode).toBe("ai"); expect(fetch).toHaveBeenCalledTimes(1);
+    const [url, init] = fetch.mock.calls[0]; expect(url).toContain("gemini-flash-lite-latest:generateContent");
     // PDFs with a text layer are sent as page-tagged text so page provenance survives and long files are chunked.
     expect(JSON.parse(init.body).contents[0].parts[1].text).toContain("[page 1]");
   });
   it("OpenRouter cannot select a paid model or weaken privacy", async () => {
     clear(); process.env.LOVABLE_API_KEY = "synthetic-primary"; process.env.OPENROUTER_API_KEY = "synthetic-router"; process.env.CLAIM_OPENROUTER_FREE_FALLBACK_ENABLED = "true";
-    const fetch = vi.fn().mockResolvedValueOnce(new Response("quota", { status: 402 })).mockResolvedValueOnce(new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ claims: [{ claim_text: "Synthetic free route", nature: "REPORTED" }] }) } }] }), { status: 200 }));
+    const fetch = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ claims: [{ claim_text: "Synthetic free route", nature: "REPORTED" }] }) } }] }), { status: 200 }));
     vi.stubGlobal("fetch", fetch); const mock = db(new Blob(["Synthetic line"]), "test.txt", "text/plain");
     // Synthetic fixture data, explicitly classified - the only state in which a free provider may be called.
     const result = await extractDocumentClaimsForPath({ ...base, supabase: mock.supabase, freeDataClass: "public_synthetic" }); expect(result.providerUsed).toBe("openrouter");
-    const body = JSON.parse(fetch.mock.calls[1][1].body); expect(body.model).toBe("openrouter/free"); expect(body.provider).toEqual({ data_collection: "deny", zdr: true }); expect(body.plugins).toBeUndefined();
+    const body = JSON.parse(fetch.mock.calls[0][1].body); expect(body.model).toBe("openrouter/free"); expect(body.provider).toEqual({ data_collection: "deny", zdr: true }); expect(body.plugins).toBeUndefined();
   });
   it("without the explicit classification, an enabled free provider is never called (paid-disabled must not leak confidential docs)", async () => {
     clear(); process.env.LOVABLE_API_KEY = "synthetic-primary"; process.env.OPENROUTER_API_KEY = "synthetic-router"; process.env.CLAIM_OPENROUTER_FREE_FALLBACK_ENABLED = "true";
@@ -69,7 +69,7 @@ describe("bounded extraction recovery", () => {
     vi.stubGlobal("fetch", fetch); const mock = db(new Blob(["Confidential line"]), "test.txt", "text/plain");
     const result = await extractDocumentClaimsForPath({ ...base, supabase: mock.supabase });
     expect(result.providerUsed).toBe("none"); expect(result.mode).toBe("text-fallback");
-    expect(fetch).toHaveBeenCalledTimes(1); // the failed paid call only; OpenRouter never contacted
+    expect(fetch).not.toHaveBeenCalled(); // no billed primary and no free call: OpenRouter never contacted
   });
   it("AI re-extraction without the atomic RPC refuses loudly and deletes nothing", async () => {
     // Migration 20261024217000 absent: replacing PENDING evidence via separate
@@ -81,6 +81,67 @@ describe("bounded extraction recovery", () => {
     await expect(extractDocumentClaimsForPath({ ...base, supabase: noRpc as any }))
       .rejects.toThrow("REEXTRACTION_UNAVAILABLE");
     expect(mock.inserted.length).toBe(0);
+  });
+  it("explicit gateway without a verified rate is refused before any provider call (credits are spend)", async () => {
+    clear(); process.env.CLAIM_AI_PROVIDER = "gateway"; process.env.LOVABLE_API_KEY = "synthetic-key";
+    const fetch = vi.fn(); vi.stubGlobal("fetch", fetch);
+    const mock = db(new Blob(["line"]), "test.txt", "text/plain");
+    // The gateway model has no verified price in the book: the reservation refuses
+    // closed rather than spending workspace AI credits blind.
+    await expect(extractDocumentClaimsForPath({ ...base, supabase: mock.supabase })).rejects.toThrow("UNKNOWN_MODEL_RATE");
+    expect(fetch).not.toHaveBeenCalled();
+  });
+  it("refused billed attempts are audit-logged as refusals, never as usage rows", async () => {
+    // no-cap refusal on an own-key provider (rate exists, no cap configured): the denial
+    // lands in app_errors with the EXTRACTION_SPEND_REFUSED marker and no provider call
+    // and no extraction_usage write happen.
+    clear(); process.env.CLAIM_AI_PROVIDER = "openai"; process.env.OPENAI_API_KEY = "synthetic-key";
+    const fetch = vi.fn(); vi.stubGlobal("fetch", fetch);
+    const mock = db(new Blob(["line"]), "test.txt", "text/plain");
+    const audited: any[] = [];
+    const baseFrom = mock.supabase.from.bind(mock.supabase);
+    mock.supabase.from = (table: string) => {
+      if (table === "app_errors") return { insert: (row: any) => { audited.push(row); return { then: (cb: any) => { cb?.({}); return Promise.resolve({}); } }; } };
+      return baseFrom(table);
+    };
+    const noCap = { ...mock.supabase, rpc: async (fn: string) => fn === "reserve_extraction_cost" ? { data: "no_cap", error: null } : { data: null, error: { code: "PGRST202" } } };
+    noCap.from = mock.supabase.from;
+    await expect(extractDocumentClaimsForPath({ ...base, supabase: noCap as any })).rejects.toThrow("PAID_NOT_ENABLED");
+    expect(fetch).not.toHaveBeenCalled();
+    expect(audited.length).toBe(1);
+    expect(audited[0].message).toContain("EXTRACTION_SPEND_REFUSED");
+    expect(audited[0].message).toContain("provider=openai");
+    expect(audited[0].source).toBe("server");
+  });
+  it("attempted paid failure completes with the reserved bound held - never voided as if free", async () => {
+    clear(); process.env.CLAIM_AI_PROVIDER = "openai"; process.env.OPENAI_API_KEY = "synthetic-key";
+    const fetch = vi.fn(async () => { throw new Error("network down mid-call"); }); vi.stubGlobal("fetch", fetch);
+    const mock = db(new Blob(["line one"]), "test.txt", "text/plain");
+    const rpcCalls: { fn: string; args: any }[] = [];
+    const spy = { ...mock.supabase, rpc: async (fn: string, args: any) => {
+      rpcCalls.push({ fn, args });
+      if (fn === "reserve_extraction_cost") return { data: "reserved", error: null };
+      if (fn === "replace_pending_claims") { const rows = (args._claims as any[]).map((c: any, i: number) => ({ id: "c" + i, ...c })); return { data: rows.map(r => ({ id: r.id, claim_text: r.claim_text })), error: null }; }
+      return { data: null, error: null };
+    } };
+    const result = await extractDocumentClaimsForPath({ ...base, supabase: spy as any });
+    expect(result.mode).toBe("text-fallback"); // local import still recovered
+    const completed = rpcCalls.find(c => c.fn === "complete_extraction_cost");
+    expect(completed).toBeTruthy();
+    expect(completed!.args.p_provider).toBe("openai");
+    expect(completed!.args.p_input_tokens).toBeNull(); // consumption unknown
+    expect(completed!.args.p_cost_usd).toBeGreaterThan(0); // reserved bound held, not zero
+    expect(rpcCalls.find(c => c.fn === "void_extraction_reservation")).toBeUndefined(); // never voided as if free
+  });
+  it("reservation without an attempted call is still voided safely", async () => {
+    clear(); process.env.CLAIM_AI_PROVIDER = "openai"; process.env.OPENAI_API_KEY = "synthetic-key";
+    // Multi-section paid refusal happens BEFORE any outbound request: void is correct.
+    const { assertPaidChunkingSupported } = await import("./extraction.functions");
+    expect(() => assertPaidChunkingSupported(3, "openai")).toThrow("PAID_MULTICHUNK_UNSUPPORTED");
+    expect(() => assertPaidChunkingSupported(3, "gateway")).toThrow("PAID_MULTICHUNK_UNSUPPORTED");
+    expect(() => assertPaidChunkingSupported(1, "openai")).not.toThrow();
+    expect(() => assertPaidChunkingSupported(3, "none")).not.toThrow(); // free/local chunking unaffected
+    expect(() => assertPaidChunkingSupported(3, "free")).not.toThrow();
   });
   it("CLAIM_AI_PROVIDER=free never calls any paid provider even when paid keys exist", async () => {
     clear(); process.env.CLAIM_AI_PROVIDER = "free";

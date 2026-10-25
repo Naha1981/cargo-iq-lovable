@@ -7,9 +7,11 @@ afterEach(() => { for (const k of keys) { if (saved[k] === undefined) delete pro
 const clear = () => { for (const k of keys) delete process.env[k]; };
 
 describe("claim AI provider selection", () => {
-  it("falls back to the gateway when no own key is set", () => {
+  it("never selects the billed gateway from the mere presence of LOVABLE_API_KEY", () => {
+    // Lovable Cloud injects LOVABLE_API_KEY automatically; credits are money, so only an
+    // explicit CLAIM_AI_PROVIDER=gateway may select it.
     clear(); process.env["LOVABLE_API_KEY"] = "x";
-    expect(resolveClaimAiProvider().kind).toBe("gateway");
+    expect(resolveClaimAiProvider().kind).toBe("none");
   });
   it("reports none when nothing is configured", () => {
     clear();

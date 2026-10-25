@@ -123,12 +123,17 @@ export function resolveClaimAiProvider(): ClaimAiProvider {
   if (wanted === "openai" && openai) return { kind: "openai", label: "Using your own OpenAI key" };
   if (!wanted && openai) return { kind: "openai", label: "Using your own OpenAI key" };
   if (!wanted && anthropic) return { kind: "anthropic", label: "Using your own Anthropic key" };
-  if (process.env["LOVABLE_API_KEY"]) return { kind: "gateway", label: "Using Lovable gateway" };
+  // No silent billed route: the gateway spends workspace AI credits, and credits are
+  // money. It is selected only by an explicit CLAIM_AI_PROVIDER=gateway, and even then
+  // the extraction call must pass the same reservation gate as own-key providers.
+  // Lovable Cloud injects LOVABLE_API_KEY automatically; the key's mere presence must
+  // never route a document to a billed provider.
   return { kind: "none", label: "No AI key configured" };
 }
 
 function paidModelForKind(kind: string): string {
   if (kind === "anthropic") return process.env["CLAIM_AI_MODEL"] || "claude-3-5-sonnet-latest";
+  if (kind === "gateway") return GATEWAY_MODEL;
   return process.env["CLAIM_AI_MODEL"] || "gpt-4o-mini";
 }
 
@@ -144,6 +149,10 @@ async function readError(res: Response, name: string) {
   return new Error("AI_" + res.status + " " + msg.slice(0, 200));
 }
 
+// Set when a billed provider call is ABOUT TO START. Distinguishes "reservation made,
+// no outbound request" (void is safe) from "outbound request attempted, consumption
+// unknown" (never void: complete with the bound held, pending reconciliation).
+let paidCallAttempted: { provider: string; model: string } | null = null;
 // Set by the paid provider calls after a successful response; read by the orchestration
 // to record usage accounting. Module state mirrors the error-capture pattern in this repo.
 export let lastPaidUsage: { provider: string; model: string; inputTokens: number | null; outputTokens: number | null } | null = null;
@@ -157,6 +166,7 @@ async function extractViaOpenAi(bytes: ArrayBuffer, mimeType: string, filename: 
   if (isText) content.push({ type: "input_text", text: "DOCUMENT (page 1):\n" + new TextDecoder().decode(bytes).slice(0, 200000) });
   else if (isImage) content.push({ type: "input_image", image_url: `data:${mimeType};base64,${b64}` });
   else content.push({ type: "input_file", filename, file_data: `data:${mimeType || "application/pdf"};base64,${b64}` });
+  paidCallAttempted = { provider: "openai", model: process.env["CLAIM_AI_MODEL"] || "gpt-4o-mini" };
   const res = await fetch("https://api.openai.com/v1/responses", {
     method: "POST", signal: AbortSignal.timeout(45000),
     headers: { "content-type": "application/json", Authorization: "Bearer " + key },
@@ -183,6 +193,7 @@ async function extractViaAnthropic(bytes: ArrayBuffer, mimeType: string, filenam
   else if (isImage) content.push({ type: "image", source: { type: "base64", media_type: mimeType, data: b64 } });
   else content.push({ type: "document", source: { type: "base64", media_type: "application/pdf", data: b64 } });
   content.push({ type: "text", text: claimPrompt(filename) + "\nReturn ONLY a JSON object of the form {\"claims\": [...]} where each claim has: page_number, claim_text, claim_type, value, evidence_class, nature, confidence, timestamp_claimed. No prose." });
+  paidCallAttempted = { provider: "anthropic", model: process.env["CLAIM_AI_MODEL"] || "claude-3-5-sonnet-latest" };
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST", signal: AbortSignal.timeout(45000),
     headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
@@ -224,6 +235,7 @@ export function estimateCostUsd(model: string, inputTokens: number | null, outpu
 // by reconcile_extraction_reservations(). FAIL CLOSED: when accounting is unavailable,
 // paid extraction is refused - we cannot prove no cap exists, so we do not spend blind.
 // When the cap check returns "no_cap", behavior is unchanged from before caps existed.
+const GATEWAY_MODEL = "openai/gpt-6-astra";
 const PAID_MAX_OUTPUT_TOKENS = 8000; // matches max_tokens on the own-key provider calls
 const PAID_OUTPUT_TOKENS_GEMINI_STYLE = 8192;
 function conservativeReservedCostUsd(model: string, estimatedInputTokens: number): number | null {
@@ -258,6 +270,18 @@ export async function completePaidExtraction(supabase: any, input: { tenantId: s
   });
   return error ? "usage completion failed (row remains reconcilable): " + String(error.message ?? "error").slice(0, 100) : null;
 }
+// Audit for REFUSED billed attempts. An actual outbound request always leaves an
+// extraction_usage row (RESERVED or completed); a refusal must be visible too, and
+// distinguishable from a real request: app_errors row with the EXTRACTION_SPEND_REFUSED
+// marker, never an extraction_usage row. Best-effort, insert-only table, never blocks
+// or alters the refusal itself.
+async function logSpendRefusal(supabase: any, userId: string, provider: string, error: unknown): Promise<void> {
+  try {
+    const reason = error instanceof Error ? error.message : String(error);
+    const message = ("EXTRACTION_SPEND_REFUSED provider=" + provider + " reason=" + reason).slice(0, 1900);
+    await supabase.from("app_errors").insert({ user_id: userId, route: "server:extract-claims", source: "server", message });
+  } catch { /* best-effort audit only */ }
+}
 export async function voidPaidExtraction(supabase: any, tenantId: string, requestId: string): Promise<void> {
   await supabase.rpc("void_extraction_reservation", { p_tenant_id: tenantId, p_request_id: requestId }).catch(() => {});
 }
@@ -290,11 +314,22 @@ export async function extractChunked(call: (b: ArrayBuffer, mime: string, name: 
 }
 
 /** Name kept for history: this runs the configured production provider route (openai, anthropic or gateway), chunked for long PDFs. */
+// A chunked document is N outbound calls, each with its own retry - one whole-doc
+// reservation cannot bound that. Paid multi-section reading is refused until per-section
+// reservation lands; free/local routes still apply. Exported for direct testing.
+export function assertPaidChunkingSupported(chunkCount: number, kind: string): void {
+  if (chunkCount > 1 && (kind === "openai" || kind === "anthropic" || kind === "gateway"))
+    throw new Error("PAID_MULTICHUNK_UNSUPPORTED: this PDF needs " + chunkCount + " sections; paid AI reading of multi-section documents is off until each section is reserved separately. Free/local routes still work.");
+}
+
 export async function extractWithGemini(bytes: ArrayBuffer, mimeType: string, filename: string, warnings: string[] = []) {
   const isPdf = mimeType === "application/pdf" || /\.pdf$/i.test(filename);
   if (isPdf) {
     const pages = await readPdfPages(bytes).catch(() => [] as string[]);
-    if (pages.length && chunkPages(pages).length > 1) return extractChunked(extractWholeDocument, pages, filename, warnings);
+    if (pages.length && chunkPages(pages).length > 1) {
+      assertPaidChunkingSupported(chunkPages(pages).length, resolveClaimAiProvider().kind);
+      return extractChunked(extractWholeDocument, pages, filename, warnings);
+    }
   }
   return extractWholeDocument(bytes, mimeType, filename);
 }
@@ -311,11 +346,12 @@ async function extractViaGateway(bytes: ArrayBuffer, mimeType: string, filename:
   else if (isImage) content.push({ type: "input_image", image_url: `data:${mimeType};base64,${b64}` });
   else content.push({ type: "input_file", filename, file_data: `data:${mimeType || "application/pdf"};base64,${b64}` });
 
+  paidCallAttempted = { provider: "gateway", model: GATEWAY_MODEL };
   const res = await fetch("https://ai.gateway.lovable.dev/v1/responses", {
     method: "POST", signal: AbortSignal.timeout(45000),
     headers: { "content-type": "application/json", "Lovable-API-Key": key, Authorization: `Bearer ${key}`, "X-Lovable-AIG-SDK": "fetch" },
     body: JSON.stringify({
-      model: "openai/gpt-6-astra", stream: true, store: false,
+      model: GATEWAY_MODEL, stream: true, store: false,
       reasoning: { effort: "low" },
       input: [{ role: "user", content }],
       text: { format: { type: "json_schema", name: "claims", strict: true, schema: claimSchema } },
@@ -347,6 +383,7 @@ async function extractViaGateway(bytes: ArrayBuffer, mimeType: string, filename:
       } catch (e) { if (e instanceof Error && e.message.startsWith("AI_FAILED")) throw e; }
     }
   }
+  lastPaidUsage = { provider: "gateway", model: GATEWAY_MODEL, inputTokens: null, outputTokens: null };
   return parseJsonModel(out).map((c) => ({ ...c, timestamp_claimed: c.timestamp_claimed || undefined }));
 }
 
@@ -642,15 +679,44 @@ export async function extractDocumentClaimsForPath(input: {
   let reservationId: string | null = null;
   if (input.noAi) claims = await importLines();
   else {
-    // App-side spend reservation before any customer-billed call (own OpenAI/Anthropic key).
-    // Gateway calls bill Lovable credits, not his provider account - no cap check there.
+    // App-side spend reservation before any billed call: own OpenAI/Anthropic keys AND
+    // the Lovable gateway. Gateway calls bill workspace AI credits - credits are money,
+    // so the same cap/reservation gate applies. The gateway model has no verified rate
+    // in the price book, so the reservation refuses (UNKNOWN_MODEL_RATE) until the owner
+    // adds a verified rate and sets a cap: no guessed prices, no blind credit spend.
     const resolvedProvider = resolveClaimAiProvider().kind;
-    if (resolvedProvider === "openai" || resolvedProvider === "anthropic")
-      // Conservative input bound: 1 token per byte (chars/4 UNDERESTIMATES dense text).
-      reservationId = await reservePaidExtraction(input.supabase, input.tenantId, paidModelForKind(resolvedProvider), bytes.byteLength);
+    if (resolvedProvider === "openai" || resolvedProvider === "anthropic" || resolvedProvider === "gateway")
+      try {
+        // Conservative input bound: 1 token per byte (chars/4 UNDERESTIMATES dense text).
+        reservationId = await reservePaidExtraction(input.supabase, input.tenantId, paidModelForKind(resolvedProvider), bytes.byteLength);
+      } catch (error) {
+        await logSpendRefusal(input.supabase, input.userId, resolvedProvider, error);
+        throw error;
+      }
+    paidCallAttempted = null;
     try { claims = await extractWithGemini(bytes, doc.file_type, doc.name, coverageWarnings); }
     catch (error) {
-      if (reservationId) { await voidPaidExtraction(input.supabase, input.tenantId, reservationId); reservationId = null; }
+      if (reservationId) {
+        // Provider functions set this inside their own scope; an explicit type read keeps
+        // TS from narrowing the module variable to null at the reset above.
+        const attempted = paidCallAttempted as { provider: string; model: string } | null;
+        if (attempted) {
+          // An outbound billed request STARTED. Consumption is unknown - possibly partial.
+          // Never void (that would release budget as if proved free): complete the row with
+          // the reserved bound held as cost and tokens NULL, meaning "consumption unknown,
+          // pending reconciliation". Distinct from a clean completion (tokens present) and
+          // from a voided row (request never attempted).
+          lastPaidUsage = { provider: attempted.provider, model: attempted.model, inputTokens: null, outputTokens: null };
+          const bound = conservativeReservedCostUsd(paidModelForKind(resolvedProvider), bytes.byteLength);
+          const note = await completePaidExtraction(input.supabase, input, reservationId, bound ?? undefined);
+          if (note) fallbackErrors.push(note);
+        } else {
+          // Reservation made but no outbound request was attempted: voiding is safe.
+          await voidPaidExtraction(input.supabase, input.tenantId, reservationId);
+        }
+        paidCallAttempted = null;
+        reservationId = null;
+      }
       let recovered = false;
       for (const provider of enabledFreeFallbacks(input.freeDataClass)) {
         try { claims = await extractFreeFallback(provider, bytes, doc.file_type, doc.name, coverageWarnings); if (claims.length) { providerUsed = provider; recovered = true; break; } }
@@ -837,6 +903,6 @@ export const extractionHealth = createServerFn({ method: "GET" }).handler(async 
     configured: provider.kind !== "none",
     provider: provider.kind,
     label: provider.label,
-    model: provider.kind === "gateway" ? "openai/gpt-6-astra" : process.env["CLAIM_AI_MODEL"] || (provider.kind === "anthropic" ? "claude-3-5-sonnet-latest" : "gpt-4o-mini"),
+    model: provider.kind === "gateway" ? GATEWAY_MODEL : process.env["CLAIM_AI_MODEL"] || (provider.kind === "anthropic" ? "claude-3-5-sonnet-latest" : "gpt-4o-mini"),
   };
 });

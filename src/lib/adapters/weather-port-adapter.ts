@@ -27,7 +27,17 @@ export async function fetchPortConditions(options: {
     "&hourly=wave_height,wave_direction,wave_period,ocean_current_velocity,ocean_current_direction&timezone=UTC";
   const response = await fetch(marineUrl, { cache: "no-store" });
   if (!response.ok) throw new Error("OPEN_METEO_MARINE_" + response.status);
-  const body = (await response.json()) as any;
+  type MarineResponse = {
+    hourly?: {
+      time?: string[];
+      wave_height?: (number | null)[];
+      wave_direction?: (number | null)[];
+      wave_period?: (number | null)[];
+      ocean_current_velocity?: (number | null)[];
+      ocean_current_direction?: (number | null)[];
+    };
+  };
+  const body = (await response.json()) as MarineResponse;
   const weatherUrl =
     "https://api.open-meteo.com/v1/forecast?latitude=" +
     latitude +
@@ -35,7 +45,14 @@ export async function fetchPortConditions(options: {
     longitude +
     "&hourly=wind_speed_10m,wind_direction_10m,rain&timezone=UTC";
   const weatherResponse = await fetch(weatherUrl, { cache: "no-store" });
-  const weather = weatherResponse.ok ? ((await weatherResponse.json()) as any) : null;
+  type ForecastResponse = {
+    hourly?: {
+      wind_speed_10m?: (number | null)[];
+      wind_direction_10m?: (number | null)[];
+      rain?: (number | null)[];
+    };
+  };
+  const weather = weatherResponse.ok ? ((await weatherResponse.json()) as ForecastResponse) : null;
   const times = body?.hourly?.time ?? [];
   return times
     .map((time: string, i: number): PortWeather => ({

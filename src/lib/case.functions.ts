@@ -2,6 +2,8 @@ import { assertDocumentSize } from "./extraction-policy";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { tenantMiddleware } from "@/lib/auth-middleware";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database, Json } from "@/integrations/supabase/types";
 import { sha256Hex, stableCanonical } from "@/lib/hash";
 import { resolvePortCenter } from "@/lib/port-centers";
 import { caseRecovery } from "@/lib/recovery-gate";
@@ -12,12 +14,12 @@ import { fetchPortConditions } from "@/lib/adapters/weather-port-adapter";
 import { extractDocumentClaimsForPath } from "@/lib/extraction.functions";
 
 const idInput = z.object({ caseId: z.string().uuid() });
-async function clockBlocked(db: any, caseId: string): Promise<boolean> {
+async function clockBlocked(db: SupabaseClient<Database>, caseId: string): Promise<boolean> {
   const { data, error } = await db.rpc("has_unresolved_operational_clocks", { _case_id: caseId });
   if (error) throw error;
   return Boolean(data);
 }
-async function assertClockGate(db: any, caseId: string) {
+async function assertClockGate(db: SupabaseClient<Database>, caseId: string) {
   if (await clockBlocked(db, caseId))
     throw new Error("BLOCKED: reconcile conflicting operational clock evidence first.");
 }
@@ -26,44 +28,53 @@ async function assertClockGate(db: any, caseId: string) {
 // 20261024214000_batched_clock_check.sql is not yet applied on an environment,
 // fall back to the original per-case checks so code and migration roll out in
 // either order (PGRST202 = RPC not found in PostgREST schema cache).
-async function unresolvedClockSet(supabase: any, ids: string[]): Promise<Set<string>> {
+async function unresolvedClockSet(
+  supabase: SupabaseClient<Database>,
+  ids: string[],
+): Promise<Set<string>> {
   if (!ids.length) return new Set<string>();
   const { data: blockedRows, error } = await supabase.rpc(
     "cases_with_unresolved_operational_clocks",
     { _case_ids: ids },
   );
-  if (!error)
-    return new Set<string>(
-      (blockedRows ?? []).map((r: any) => (typeof r === "string" ? r : (r.case_id ?? r))),
-    );
+  if (!error) return new Set<string>((blockedRows ?? []).map((r) => r));
   if (error.code !== "PGRST202" && error.code !== "42883") throw error;
   const blocked = new Set<string>();
   for (const id of ids) if (await clockBlocked(supabase, id)) blocked.add(id);
   return blocked;
 }
 
-async function enrichCaseRows(supabase: any, cases: any[]) {
-  const ids = cases.map((c: any) => c.id);
+type CaseListRow = Database["public"]["Tables"]["cases"]["Row"];
+type CalcLite = {
+  case_id: string;
+  calculated_amount_minor: number | null;
+  charged_amount_minor: number | null;
+  currency: string | null;
+};
+type ContraLite = { case_id: string; status: string };
+
+async function enrichCaseRows(supabase: SupabaseClient<Database>, cases: CaseListRow[]) {
+  const ids = cases.map((c) => c.id);
   const { data: calcs } = ids.length
     ? await supabase
         .from("financial_calculations")
         .select("case_id,calculated_amount_minor,charged_amount_minor,currency,variance_minor")
         .in("case_id", ids)
         .order("created_at", { ascending: false })
-    : { data: [] as any[] };
+    : { data: [] as never[] };
   const { data: contradictions } = ids.length
     ? await supabase.from("contradictions").select("case_id,status").in("case_id", ids)
-    : { data: [] as any[] };
+    : { data: [] as never[] };
   const blockedCaseIds = await unresolvedClockSet(supabase, ids);
 
-  const latestCalc = new Map<string, any>();
+  const latestCalc = new Map<string, CalcLite>();
   for (const row of calcs ?? []) if (!latestCalc.has(row.case_id)) latestCalc.set(row.case_id, row);
 
   return Promise.all(
-    cases.map(async (c: any) => {
+    cases.map(async (c) => {
       const calc = latestCalc.get(c.id);
       const openContradictions = (contradictions ?? []).filter(
-        (x: any) => x.case_id === c.id && x.status === "FLAGGED",
+        (x) => x.case_id === c.id && x.status === "FLAGGED",
       ).length;
       const unresolvedClocks = blockedCaseIds.has(c.id);
       const charged = calc?.charged_amount_minor ? Number(calc.charged_amount_minor) / 100 : 0;
@@ -95,12 +106,12 @@ async function enrichCaseRows(supabase: any, cases: any[]) {
 // the full enriched set; computed here from light projections (no select("*"),
 // no per-case RPCs) so stats stay exact without loading every case row.
 export function computeDashboardStats(
-  cases: any[],
-  calcs: any[],
-  contradictions: any[],
+  cases: { id: string; status: string }[],
+  calcs: CalcLite[],
+  contradictions: ContraLite[],
   blockedCaseIds: Set<string>,
 ) {
-  const latestCalc = new Map<string, any>();
+  const latestCalc = new Map<string, CalcLite>();
   for (const row of calcs ?? []) if (!latestCalc.has(row.case_id)) latestCalc.set(row.case_id, row);
   let openCases = 0,
     contradictionCount = 0,
@@ -111,7 +122,7 @@ export function computeDashboardStats(
     if (c.status !== "CLOSED") openCases++;
     const calc = latestCalc.get(c.id);
     const openContra = (contradictions ?? []).filter(
-      (x: any) => x.case_id === c.id && x.status === "FLAGGED",
+      (x) => x.case_id === c.id && x.status === "FLAGGED",
     ).length;
     const clockBlockedCase = blockedCaseIds.has(c.id);
     contradictionCount += openContra;
@@ -140,17 +151,17 @@ export const getCaseDashboardStats = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { data: cases, error } = await context.supabase.from("cases").select("id,status");
     if (error) throw error;
-    const ids = (cases ?? []).map((c: any) => c.id);
+    const ids = (cases ?? []).map((c) => c.id);
     const { data: calcs } = ids.length
       ? await context.supabase
           .from("financial_calculations")
           .select("case_id,calculated_amount_minor,charged_amount_minor,currency")
           .in("case_id", ids)
           .order("created_at", { ascending: false })
-      : { data: [] as any[] };
+      : { data: [] as never[] };
     const { data: contradictions } = ids.length
       ? await context.supabase.from("contradictions").select("case_id,status").in("case_id", ids)
-      : { data: [] as any[] };
+      : { data: [] as never[] };
     const blockedCaseIds = await unresolvedClockSet(context.supabase, ids);
     return computeDashboardStats(cases ?? [], calcs ?? [], contradictions ?? [], blockedCaseIds);
   });
@@ -522,29 +533,33 @@ export const corroborateCase = createServerFn({ method: "POST" })
         observed_at: x.observedAt,
         latitude: x.latitude,
         longitude: x.longitude,
-        payload: x,
+        payload: x as unknown as Json,
         confidence: 0.8,
         limitation:
           "AIS corroborates reported vessel position; it does not prove contractual liability.",
       })),
-      ...scenes.map((x) => ({
-        source: "Copernicus Sentinel Data Space",
-        observation_type: x.sensor === "SENTINEL-1" ? "SENTINEL_1_SCENE" : "SENTINEL_2_SCENE",
-        observed_at: x.acquiredAt,
-        latitude: x.bbox ? (x.bbox[1] + x.bbox[3]) / 2 : null,
-        longitude: x.bbox ? (x.bbox[0] + x.bbox[2]) / 2 : null,
-        payload: x,
-        confidence: 0.7,
-        limitation:
-          "Scene metadata corroborates spatial/temporal coverage; imagery requires human inspection before shipment-specific conclusions.",
-      })),
-      ...weather.slice(0, 48).map((x: any) => ({
+      // Scenes without an acquisition time cannot anchor the NOT NULL observed_at
+      // column, so they are excluded rather than failing the insert at runtime.
+      ...scenes
+        .filter((x): x is typeof x & { acquiredAt: string } => x.acquiredAt !== null)
+        .map((x) => ({
+          source: "Copernicus Sentinel Data Space",
+          observation_type: x.sensor === "SENTINEL-1" ? "SENTINEL_1_SCENE" : "SENTINEL_2_SCENE",
+          observed_at: x.acquiredAt,
+          latitude: x.bbox ? (x.bbox[1] + x.bbox[3]) / 2 : null,
+          longitude: x.bbox ? (x.bbox[0] + x.bbox[2]) / 2 : null,
+          payload: x as unknown as Json,
+          confidence: 0.7,
+          limitation:
+            "Scene metadata corroborates spatial/temporal coverage; imagery requires human inspection before shipment-specific conclusions.",
+        })),
+      ...weather.slice(0, 48).map((x) => ({
         source: x.source,
         observation_type: "MARINE_WEATHER",
         observed_at: x.time,
         latitude: center[0],
         longitude: center[1],
-        payload: x,
+        payload: x as unknown as Json,
         confidence: 0.6,
         limitation:
           "Weather is contextual evidence and does not establish delay responsibility by itself.",
@@ -823,9 +838,7 @@ export const generateEvidencePack = createServerFn({ method: "POST" })
     ])
       if (x.error) throw x.error;
 
-    const unresolved = (contradictions.data ?? []).filter(
-      (x: any) => x.status === "FLAGGED",
-    ).length;
+    const unresolved = (contradictions.data ?? []).filter((x) => x.status === "FLAGGED").length;
     if (unresolved > 0)
       throw new Error("Resolve the flagged contradictions before generating an evidence pack.");
     await assertClockGate(db, data.caseId);
@@ -850,7 +863,7 @@ export const generateEvidencePack = createServerFn({ method: "POST" })
       appointmentLifecycle: appointmentLifecycle.data ?? [],
       authorisedImports: authorisedImports.data ?? [],
       countEngineVersion: "1",
-      verifiedClaims: (claims.data ?? []).filter((x: any) => x.status === "VERIFIED"),
+      verifiedClaims: (claims.data ?? []).filter((x) => x.status === "VERIFIED"),
       claims: claims.data ?? [],
       contradictions: contradictions.data ?? [],
       timeline: timeline.data ?? [],
@@ -880,12 +893,12 @@ export const generateEvidencePack = createServerFn({ method: "POST" })
       "",
       "## Timeline",
       ...(timeline.data ?? []).map(
-        (e: any) => "- " + e.timestamp + " — " + e.title + " [" + e.nature + "] — " + e.source,
+        (e) => "- " + e.timestamp + " — " + e.title + " [" + e.nature + "] — " + e.source,
       ),
       "",
       "## Count source records and executable mappings (engine v1)",
       ...(countSources.data ?? []).map(
-        (x: any) =>
+        (x) =>
           "- " +
           x.party +
           " / " +
@@ -902,7 +915,7 @@ export const generateEvidencePack = createServerFn({ method: "POST" })
           x.source_reference,
       ),
       ...(countRules.data ?? []).map(
-        (x: any) =>
+        (x) =>
           "- Rule " +
           x.name +
           " v" +
@@ -922,7 +935,7 @@ export const generateEvidencePack = createServerFn({ method: "POST" })
           "]",
       ),
       ...(countComparisons.data ?? []).map(
-        (x: any) =>
+        (x) =>
           "- Common scope " +
           x.name +
           " v" +
@@ -940,7 +953,7 @@ export const generateEvidencePack = createServerFn({ method: "POST" })
       "",
       "## Appointment lifecycle and human causal review",
       ...(appointmentLifecycle.data ?? []).map(
-        (x: any) =>
+        (x) =>
           "- " +
           x.appointment_reference +
           " / " +
@@ -961,7 +974,7 @@ export const generateEvidencePack = createServerFn({ method: "POST" })
       "",
       "## Authorised export provenance (permission is an operator assertion)",
       ...(authorisedImports.data ?? []).map(
-        (x: any) =>
+        (x) =>
           "- " +
           x.dataset +
           " / " +
@@ -976,7 +989,7 @@ export const generateEvidencePack = createServerFn({ method: "POST" })
       "",
       "## Operational definitions",
       ...(definitions.data ?? []).map(
-        (x: any) =>
+        (x) =>
           "- " +
           x.party +
           " / " +
@@ -998,7 +1011,7 @@ export const generateEvidencePack = createServerFn({ method: "POST" })
       "",
       "## Clock evidence and appointment attribution",
       ...(clocks.data ?? []).map(
-        (x: any) =>
+        (x) =>
           "- " +
           x.physical_reference +
           " " +
@@ -1015,7 +1028,7 @@ export const generateEvidencePack = createServerFn({ method: "POST" })
           x.source_reference,
       ),
       ...(attributions.data ?? []).map(
-        (x: any) =>
+        (x) =>
           "- Appointment source " +
           x.appointment_clock_id +
           ": claimant " +
@@ -1032,7 +1045,7 @@ export const generateEvidencePack = createServerFn({ method: "POST" })
       "",
       "## KPI definitions and benchmarks",
       ...(kpis.data ?? []).map(
-        (x: any) =>
+        (x) =>
           "- " +
           x.party +
           " / " +
@@ -1055,7 +1068,7 @@ export const generateEvidencePack = createServerFn({ method: "POST" })
       "",
       "## Cross-party physical-event matches",
       ...(matches.data ?? []).map(
-        (x: any) =>
+        (x) =>
           "- " +
           x.event_reference +
           ": " +
@@ -1070,7 +1083,7 @@ export const generateEvidencePack = createServerFn({ method: "POST" })
       "",
       "## Match review history (retractions and reaffirmations)",
       ...(identityReviews.data ?? []).map(
-        (x: any) =>
+        (x) =>
           "- match " +
           x.match_id +
           " v" +
@@ -1088,7 +1101,7 @@ export const generateEvidencePack = createServerFn({ method: "POST" })
       "",
       "## Evidenced clock reconciliation decisions",
       ...(clockDecisions.data ?? []).map(
-        (x: any) =>
+        (x) =>
           "- " +
           x.physical_reference +
           " / " +
@@ -1110,7 +1123,7 @@ export const generateEvidencePack = createServerFn({ method: "POST" })
       "",
       "## Required evidence and gaps (history, not proof of non-occurrence)",
       ...(gaps.data ?? []).map(
-        (x: any) =>
+        (x) =>
           "- " +
           x.physical_reference +
           " / " +
@@ -1125,11 +1138,11 @@ export const generateEvidencePack = createServerFn({ method: "POST" })
       "",
 
       "## Contradictions",
-      ...(contradictions.data ?? []).map((x: any) => "- " + x.title + ": " + x.description),
+      ...(contradictions.data ?? []).map((x) => "- " + x.title + ": " + x.description),
       "",
       "## Financial calculations",
       ...(calculations.data ?? []).map(
-        (x: any) =>
+        (x) =>
           "- " +
           x.calculation_type +
           " " +

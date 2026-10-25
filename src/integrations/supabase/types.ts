@@ -1862,6 +1862,10 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      cases_with_unresolved_operational_clocks: {
+        Args: { _case_ids: string[] };
+        Returns: string[];
+      };
       wa_current_rate_rows: {
         Args: { p_tenant: string };
         Returns: WaQuoteRateRow[];

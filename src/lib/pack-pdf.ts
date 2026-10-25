@@ -153,7 +153,6 @@ function stamp(s: unknown) {
     : iso.replace("T", " ").slice(0, 16) + "Z";
 }
 
-
 // pack_payload row shapes as read from the frozen JSON export. Everything is
 // optional: the payload is data, and a missing field renders as "n/a", never a crash.
 interface PackDocument {
@@ -972,7 +971,8 @@ export function buildEvidencePackPdf(pack: EvidencePackInput): Uint8Array {
     ],
   ];
   for (const [key, title, describe] of operationalSections) {
-    const records = ((p as Record<string, unknown>)[key] as PackOperationalRecord[] | undefined) ?? [];
+    const records =
+      ((p as Record<string, unknown>)[key] as PackOperationalRecord[] | undefined) ?? [];
     if (!records.length) continue;
     d.heading(title + " (" + records.length + ")");
     for (const x of records) {

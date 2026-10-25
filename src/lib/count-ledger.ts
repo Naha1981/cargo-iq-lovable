@@ -1,3 +1,4 @@
+import type { Database } from "@/integrations/supabase/types";
 import { z } from "zod";
 export const countMetrics = [
   "HATCH_COVER",
@@ -229,40 +230,49 @@ export function countProductivity(total: number | null, hours: number | null) {
     : null;
 }
 
-export function recordFromDb(r: any): CountRecord {
+type CountSourceRecordDb = Omit<
+  Database["public"]["Tables"]["count_source_records"]["Row"],
+  "created_at" | "created_by" | "tenant_id" | "import_id"
+>;
+type CountRuleDb = Omit<
+  Database["public"]["Tables"]["count_rule_versions"]["Row"],
+  "created_at" | "created_by" | "tenant_id"
+>;
+
+export function recordFromDb(r: CountSourceRecordDb): CountRecord {
   return {
     id: r.id,
     version: r.version,
     caseId: r.case_id,
     physicalReference: r.physical_reference,
     party: r.party,
-    metric: r.metric,
-    basis: r.basis,
+    metric: r.metric as CountRecord["metric"],
+    basis: r.basis as CountRecord["basis"],
     quantity: Number(r.quantity),
     occurredAt: r.occurred_at,
     containers20: r.containers20,
     containers40: r.containers40,
-    gateKind: r.gate_kind,
+    gateKind: r.gate_kind as CountRecord["gateKind"],
     sourceDocumentId: r.source_document_id,
     sourceReference: r.source_reference,
     limitations: r.limitations,
     supersedesId: r.supersedes_id,
   };
 }
-export function ruleFromDb(r: any): CountRule {
+export function ruleFromDb(r: CountRuleDb): CountRule {
   return {
     id: r.id,
     version: r.version,
     caseId: r.case_id,
     name: r.name,
-    metric: r.metric,
-    inputBasis: r.input_basis,
+    metric: r.metric as CountRule["metric"],
+    inputBasis: r.input_basis as CountRule["inputBasis"],
     outputUnit: r.output_unit,
-    calculation: r.calculation,
+    calculation: r.calculation as CountRule["calculation"],
     numerator: r.numerator,
     denominator: r.denominator,
-    gateKinds: r.gate_kinds,
-    acceptance: r.acceptance,
+    gateKinds: r.gate_kinds as CountRule["gateKinds"],
+    acceptance: r.acceptance as CountRule["acceptance"],
     effectiveFrom: r.effective_from,
     effectiveTo: r.effective_to,
     sourceDocumentId: r.source_document_id,

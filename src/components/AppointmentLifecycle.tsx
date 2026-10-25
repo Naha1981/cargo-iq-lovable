@@ -9,9 +9,37 @@ import {
   appendAppointmentLifecycle,
   listAppointmentLifecycle,
 } from "@/lib/appointment-lifecycle.functions";
+import type { Database } from "@/integrations/supabase/types";
+
+type DocRow = Database["public"]["Tables"]["documents"]["Row"];
+
+type FormState = {
+  caseId: string;
+  appointmentReference: string;
+  physicalReference: string;
+  recordType: string;
+  issuer: string;
+  party: string;
+  startAt: string | null;
+  endAt: string | null;
+  occurredAt: string;
+  claimTarget: string;
+  outcome: string;
+  explanation: string;
+  termsReference: string;
+  sourceDocumentId: string;
+  sourceReference: string;
+  supersedesId: string | null;
+};
 const cl = "mt-1 w-full min-w-0 rounded border bg-background p-2 text-sm";
-export function AppointmentLifecycle({ caseId, documents }: { caseId: string; documents: any[] }) {
-  const blank = {
+export function AppointmentLifecycle({
+  caseId,
+  documents,
+}: {
+  caseId: string;
+  documents: DocRow[];
+}) {
+  const blank: FormState = {
     caseId,
     appointmentReference: "",
     physicalReference: "",
@@ -29,7 +57,7 @@ export function AppointmentLifecycle({ caseId, documents }: { caseId: string; do
     sourceReference: "",
     supersedesId: null,
   };
-  const [form, setForm] = useState<any>(blank),
+  const [form, setForm] = useState<FormState>(blank),
     [rows, setRows] = useState<Row[]>([]),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
@@ -57,13 +85,13 @@ export function AppointmentLifecycle({ caseId, documents }: { caseId: string; do
       setBusy(false);
     }
   }
-  function field(key: string, label: string) {
+  function field(key: keyof FormState & string, label: string) {
     return (
       <label className="min-w-0 text-sm" key={key}>
         {label}
         <input
           className={cl}
-          value={form[key] ?? ""}
+          value={String(form[key] ?? "")}
           onChange={(e) =>
             setForm({
               ...form,

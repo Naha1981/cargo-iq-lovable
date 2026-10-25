@@ -1,3 +1,4 @@
+import type { Database } from "@/integrations/supabase/types";
 import { z } from "zod";
 const zoned = z.string().datetime({ offset: true });
 export const appointmentLifecycleInput = z
@@ -108,21 +109,26 @@ export function evaluateAppointment(rows: AppointmentLifecycle[]) {
   });
 }
 
-export function lifecycleFromDb(r: any): AppointmentLifecycle {
+type AppointmentLifecycleDb = Omit<
+  Database["public"]["Tables"]["appointment_lifecycle"]["Row"],
+  "created_at" | "created_by" | "tenant_id"
+>;
+
+export function lifecycleFromDb(r: AppointmentLifecycleDb): AppointmentLifecycle {
   return {
     id: r.id,
     version: r.version,
     caseId: r.case_id,
     appointmentReference: r.appointment_reference,
     physicalReference: r.physical_reference,
-    recordType: r.record_type,
+    recordType: r.record_type as AppointmentLifecycle["recordType"],
     issuer: r.issuer,
     party: r.party,
     startAt: r.start_at,
     endAt: r.end_at,
     occurredAt: r.occurred_at,
     claimTarget: r.claim_target,
-    outcome: r.outcome,
+    outcome: r.outcome as AppointmentLifecycle["outcome"],
     explanation: r.explanation,
     termsReference: r.terms_reference,
     sourceDocumentId: r.source_document_id,

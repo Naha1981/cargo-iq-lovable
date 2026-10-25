@@ -13,25 +13,33 @@ const num = (value: unknown) => {
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
 };
-export function normalizeAisMessage(payload: any): NormalizedAis | null {
-  const metadata = payload?.MetaData ?? payload?.metadata ?? payload;
-  const message = payload?.Message ?? payload?.message ?? {};
-  const position =
-    message?.PositionReport ?? message?.positionReport ?? message?.Position ?? metadata;
-  const lat = num(position?.Latitude ?? position?.latitude ?? metadata?.Latitude);
-  const lon = num(position?.Longitude ?? position?.longitude ?? metadata?.Longitude);
-  const mmsi = String(metadata?.MMSI ?? metadata?.mmsi ?? message?.MMSI ?? "").trim();
+const rec = (value: unknown): Record<string, unknown> =>
+  value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+
+export function normalizeAisMessage(payload: Record<string, unknown>): NormalizedAis | null {
+  const metadata = rec(payload.MetaData ?? payload.metadata ?? payload);
+  const message = rec(payload.Message ?? payload.message);
+  const position = rec(
+    message.PositionReport ?? message.positionReport ?? message.Position ?? metadata,
+  );
+  const lat = num(position.Latitude ?? position.latitude ?? metadata.Latitude);
+  const lon = num(position.Longitude ?? position.longitude ?? metadata.Longitude);
+  const mmsi = String(metadata.MMSI ?? metadata.mmsi ?? message.MMSI ?? "").trim();
   if (!mmsi || lat == null || lon == null) return null;
   return {
     mmsi,
-    vesselName: metadata?.ShipName ? String(metadata.ShipName).trim() : null,
+    vesselName: metadata.ShipName ? String(metadata.ShipName).trim() : null,
     latitude: lat,
     longitude: lon,
-    sog: num(position?.Sog ?? position?.SOG ?? position?.sog),
-    cog: num(position?.Cog ?? position?.COG ?? position?.cog),
+    sog: num(position.Sog ?? position.SOG ?? position.sog),
+    cog: num(position.Cog ?? position.COG ?? position.cog),
     navigationalStatus:
-      position?.NavigationalStatus != null ? String(position.NavigationalStatus) : null,
-    observedAt: new Date(payload?.timestamp ?? Date.now()).toISOString(),
+      position.NavigationalStatus != null ? String(position.NavigationalStatus) : null,
+    observedAt: new Date(
+      typeof payload.timestamp === "string" || typeof payload.timestamp === "number"
+        ? payload.timestamp
+        : Date.now(),
+    ).toISOString(),
     source: "AISStream",
   };
 }

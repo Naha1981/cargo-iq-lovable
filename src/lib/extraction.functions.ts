@@ -15,7 +15,7 @@ import { createServerFn } from "@tanstack/react-start";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Json } from "@/integrations/supabase/types";
 
-type ClaimDraft = {
+export type ClaimDraft = {
   page_number?: number;
   claim_text: string;
   claim_type?: string;

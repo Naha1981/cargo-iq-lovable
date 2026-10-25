@@ -1,3 +1,4 @@
+import type { Database } from "@/integrations/supabase/types";
 import { z } from "zod";
 import {
   countMetrics,
@@ -153,18 +154,23 @@ export function evaluateCountComparison(
   };
 }
 
-export function comparisonFromDb(r: any): CountComparison {
+type CountComparisonDb = Omit<
+  Database["public"]["Tables"]["count_comparison_definitions"]["Row"],
+  "created_at" | "created_by" | "tenant_id"
+>;
+
+export function comparisonFromDb(r: CountComparisonDb): CountComparison {
   return {
     id: r.id,
     version: r.version,
     caseId: r.case_id,
     name: r.name,
-    metric: r.metric,
+    metric: r.metric as CountComparison["metric"],
     outputUnit: r.output_unit,
     ruleIds: r.rule_ids,
     physicalReferences: r.physical_references,
     kpiDefinitionId: r.kpi_definition_id,
-    acceptance: r.acceptance,
+    acceptance: r.acceptance as CountComparison["acceptance"],
     rationale: r.rationale,
     sourceDocumentId: r.source_document_id,
     sourceReference: r.source_reference,

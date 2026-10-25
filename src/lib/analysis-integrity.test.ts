@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractChunked } from "./extraction.functions";
+import { extractChunked, type ClaimDraft } from "./extraction.functions";
 import {
   analysisStatus,
   candidateDateMismatches,
@@ -84,14 +84,13 @@ describe("extractChunked (provider-neutral)", () => {
     { length: 6 },
     (_, i) => ("page " + (i + 1) + " ").repeat(1) + "x".repeat(7000),
   );
-  const claim = (t: string) =>
-    ({
-      page_number: 1,
-      claim_text: t,
-      nature: "REPORTED",
-      evidence_class: "DOCUMENT",
-      confidence: 0.9,
-    }) as any;
+  const claim = (t: string): ClaimDraft => ({
+    page_number: 1,
+    claim_text: t,
+    nature: "REPORTED",
+    evidence_class: "DOCUMENT",
+    confidence: 0.9,
+  });
   it("keeps good sections, retries once, and reports the failed pages instead of dropping them silently", async () => {
     const seen: string[] = [];
     let calls = 0;

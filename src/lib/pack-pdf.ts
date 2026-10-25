@@ -1,5 +1,5 @@
 import { parseExtractionStatus } from "./analysis-integrity";
-import { frozenOperationalResults } from "./count-pack";
+import { frozenOperationalResults, type FrozenOpsPayload } from "./count-pack";
 // Dependency-free, deterministic PDF writer for the Evidence Pack.
 // Runs entirely in the browser: no network, no external service. Same pack in = same bytes out.
 
@@ -990,7 +990,7 @@ export function buildEvidencePackPdf(pack: EvidencePackInput): Uint8Array {
   }
   // Keep approval lines and limitations together instead of orphaning the caveat.
   d.reserve(245);
-  const frozen = frozenOperationalResults(p);
+  const frozen = frozenOperationalResults(p as FrozenOpsPayload);
   if (frozen.counts.length || frozen.appointments.length) {
     d.heading("Frozen operational calculations (engine v1)");
     d.text(

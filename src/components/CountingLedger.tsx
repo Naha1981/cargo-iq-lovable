@@ -11,8 +11,30 @@ import {
   type CountRecord,
   type CountRule,
 } from "@/lib/count-ledger";
+import type { Database } from "@/integrations/supabase/types";
+
+type DocumentRow = Database["public"]["Tables"]["documents"]["Row"];
+type FormShape = Record<string, unknown>;
+
+type RecordForm = Omit<CountRecord, "id" | "version"> &
+  Partial<Pick<CountRecord, "id" | "version">>;
+type RuleForm = Omit<CountRule, "id" | "version"> & Partial<Pick<CountRule, "id" | "version">>;
+type GateKind = CountRule["gateKinds"][number];
+const GATE_KINDS: readonly GateKind[] = [
+  "PHYSICAL_IN",
+  "PHYSICAL_OUT",
+  "VIRTUAL_IN",
+  "VIRTUAL_OUT",
+];
+
 const cl = "mt-1 w-full min-w-0 rounded border bg-background p-2 text-sm";
-export function CountingLedger({ caseId, documents }: { caseId: string; documents: any[] }) {
+export function CountingLedger({
+  caseId,
+  documents,
+}: {
+  caseId: string;
+  documents: DocumentRow[];
+}) {
   const [data, setData] = useState<{ records: CountRecord[]; rules: CountRule[] }>({
     records: [],
     rules: [],
@@ -54,8 +76,8 @@ export function CountingLedger({ caseId, documents }: { caseId: string; document
     rationale: "",
     supersedesId: null as string | null,
   };
-  const [record, setRecord] = useState<any>(blankRecord);
-  const [rule, setRule] = useState<any>(blankRule);
+  const [record, setRecord] = useState<RecordForm>(blankRecord);
+  const [rule, setRule] = useState<RuleForm>(blankRule);
   const load = useCallback(async () => {
     try {
       setData(await listCountLedger({ data: { caseId } }));
@@ -84,14 +106,20 @@ export function CountingLedger({ caseId, documents }: { caseId: string; document
       setBusy(false);
     }
   }
-  function field(form: any, set: (v: any) => void, key: string, label: string, type = "text") {
+  function field<T extends FormShape>(
+    form: T,
+    set: (v: T) => void,
+    key: keyof T & string,
+    label: string,
+    type = "text",
+  ) {
     return (
       <label className="min-w-0 text-sm" key={key}>
         {label}
         <input
           type={type}
           className={cl}
-          value={form[key] ?? ""}
+          value={String(form[key] ?? "")}
           onChange={(e) =>
             set({
               ...form,
@@ -101,16 +129,16 @@ export function CountingLedger({ caseId, documents }: { caseId: string; document
                     ? null
                     : Number(e.target.value)
                   : e.target.value,
-            })
+            } as T)
           }
         />
       </label>
     );
   }
-  function select(
-    form: any,
-    set: (v: any) => void,
-    key: string,
+  function select<T extends FormShape>(
+    form: T,
+    set: (v: T) => void,
+    key: keyof T & string,
     label: string,
     values: readonly string[],
   ) {
@@ -119,8 +147,8 @@ export function CountingLedger({ caseId, documents }: { caseId: string; document
         {label}
         <select
           className={cl}
-          value={form[key]}
-          onChange={(e) => set({ ...form, [key]: e.target.value })}
+          value={String(form[key] ?? "")}
+          onChange={(e) => set({ ...form, [key]: e.target.value } as T)}
         >
           {values.map((v) => (
             <option key={v}>{v}</option>
@@ -129,14 +157,15 @@ export function CountingLedger({ caseId, documents }: { caseId: string; document
       </label>
     );
   }
-  function evidence(form: any, set: (v: any) => void) {
+  function evidence<T extends FormShape>(form: T, set: (v: T) => void) {
+    const docKey = "sourceDocumentId" as keyof T & string;
     return (
       <>
         <label className="text-sm">
           Case source document
           <select
             className={cl}
-            value={form.sourceDocumentId}
+            value={String(form[docKey] ?? "")}
             onChange={(e) =>
               set({
                 ...form,
@@ -144,7 +173,7 @@ export function CountingLedger({ caseId, documents }: { caseId: string; document
                 ...("party" in form
                   ? { party: documents.find((d) => d.id === e.target.value)?.source_party || "" }
                   : {}),
-              })
+              } as T)
             }
           >
             <option value="">Choose evidence</option>
@@ -155,7 +184,7 @@ export function CountingLedger({ caseId, documents }: { caseId: string; document
             ))}
           </select>
         </label>
-        {field(form, set, "sourceReference", "Page / row / source reference")}
+        {field(form, set, "sourceReference" as keyof T & string, "Page / row / source reference")}
       </>
     );
   }
@@ -345,7 +374,7 @@ export function CountingLedger({ caseId, documents }: { caseId: string; document
           {field(rule, setRule, "rationale", "Why this formula applies / agreement basis")}
           <fieldset className="text-sm">
             <legend>Eligible gates (explicit selection)</legend>
-            {["PHYSICAL_IN", "PHYSICAL_OUT", "VIRTUAL_IN", "VIRTUAL_OUT"].map((g) => (
+            {GATE_KINDS.map((g) => (
               <label className="mt-2 flex gap-2" key={g}>
                 <input
                   type="checkbox"
@@ -355,7 +384,7 @@ export function CountingLedger({ caseId, documents }: { caseId: string; document
                       ...rule,
                       gateKinds: e.target.checked
                         ? [...rule.gateKinds, g]
-                        : rule.gateKinds.filter((x: string) => x !== g),
+                        : rule.gateKinds.filter((x) => x !== g),
                     })
                   }
                 />

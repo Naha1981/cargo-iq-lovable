@@ -11,6 +11,7 @@ import {
 } from "@/lib/case.functions";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
+import { type Nature } from "@/lib/case-data";
 import { disputedClaimIds, isDisputedClaim } from "@/lib/dispute";
 
 export const Route = createFileRoute("/cases/$caseId/documents")({
@@ -225,7 +226,7 @@ function DocsPage() {
           </span>
         </label>
         <ul className="divide-y">
-          {data.documents.map((d: any) => (
+          {data.documents.map((d) => (
             <li key={d.id} className="flex items-start gap-3 px-2 py-3">
               <div className="grid h-10 w-8 shrink-0 place-items-center rounded-sm border bg-panel font-mono text-[9px] text-muted-foreground">
                 {d.file_type.split("/").pop()?.slice(0, 6).toUpperCase()}
@@ -272,7 +273,7 @@ function DocsPage() {
       <div className="min-w-0 space-y-6">
         <Panel title={"Extracted claims · " + data.claims.length}>
           <ul className="divide-y">
-            {data.claims.map((c: any) => {
+            {data.claims.map((c) => {
               const status: string = decisions[c.id] ?? c.status;
               return (
                 <li
@@ -285,7 +286,7 @@ function DocsPage() {
                   <div>
                     <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                       <span className="font-mono">p.{c.page_number ?? "?"}</span>
-                      <NatureBadge n={String(c.nature).toLowerCase() as any} />
+                      <NatureBadge n={String(c.nature).toLowerCase() as Nature} />
                       <ClassTag c={c.evidence_class} />
                       <span className="font-mono">
                         conf {Math.round(Number(c.confidence ?? 0) * 100)}%
@@ -350,12 +351,12 @@ function DocsPage() {
         <Panel
           title={
             "Contradictions · " +
-            data.contradictions.filter((c: any) => c.status === "FLAGGED").length +
+            data.contradictions.filter((c) => c.status === "FLAGGED").length +
             " flagged"
           }
         >
           <div className="space-y-3">
-            {data.contradictions.map((c: any) => (
+            {data.contradictions.map((c) => (
               <div
                 key={c.id}
                 className={cn(
@@ -382,8 +383,8 @@ function DocsPage() {
                 <p className="mt-2 text-sm text-muted-foreground">{c.description}</p>
                 {[c.claim_a_id, c.claim_b_id].filter(Boolean).length > 0 && (
                   <ul className="mt-3 space-y-1.5">
-                    {[c.claim_a_id, c.claim_b_id].filter(Boolean).map((id: any) => {
-                      const linked = data.claims.find((cl: any) => String(cl.id) === String(id));
+                    {[c.claim_a_id, c.claim_b_id].filter(Boolean).map((id) => {
+                      const linked = data.claims.find((cl) => String(cl.id) === String(id));
                       return (
                         <li
                           key={String(id)}
@@ -419,7 +420,7 @@ function DocsPage() {
                         className="mt-1 w-full rounded border bg-background p-2"
                       >
                         <option value="">Select source evidence</option>
-                        {data.documents.map((d: any) => (
+                        {data.documents.map((d) => (
                           <option key={d.id} value={d.id}>
                             {d.name} ({d.source_party || "source not recorded"})
                           </option>
@@ -456,7 +457,7 @@ function DocsPage() {
                     <p>{c.resolution_note || "Legacy resolution: no explanation captured."}</p>
                     <p className="mt-1 text-xs text-muted-foreground">
                       Evidence:{" "}
-                      {data.documents.find((d: any) => d.id === c.resolution_document_id)?.name ||
+                      {data.documents.find((d) => d.id === c.resolution_document_id)?.name ||
                         c.resolution_document_id ||
                         "Not recorded"}{" "}
                       · {c.resolution_evidence_reference || "No reference recorded"}

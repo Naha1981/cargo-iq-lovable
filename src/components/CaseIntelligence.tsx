@@ -8,7 +8,7 @@ import {
   updateAlertStatus,
   verifyRiskAlert,
 } from "@/lib/risk-events.functions";
-import { COST_CATEGORIES, VERIFICATION_DECISIONS } from "@/lib/risk-events";
+import { COST_CATEGORIES, VERIFICATION_DECISIONS, caseScopedVerificationStatus } from "@/lib/risk-events";
 import type { Database } from "@/integrations/supabase/types";
 
 type RiskEventRow = Database["public"]["Tables"]["risk_events"]["Row"];
@@ -78,6 +78,13 @@ export function CaseIntelligence({
   const timeline = links
     .map((l) => ({ link: l, event: l.risk_events ?? null }))
     .filter((x) => x.event)
+    .map((x) => ({
+      ...x,
+      scopedStatus: caseScopedVerificationStatus(
+        x.event!.verification_status as Parameters<typeof caseScopedVerificationStatus>[0],
+        alerts.filter((a) => a.event_id === x.event!.id),
+      ),
+    }))
     .sort((a, b) => (a.event!.observed_at < b.event!.observed_at ? 1 : -1));
 
   return (

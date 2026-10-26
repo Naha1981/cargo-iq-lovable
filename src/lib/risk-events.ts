@@ -342,6 +342,64 @@ export function verificationStatusForDecision(decision: VerificationDecision): V
   return "suspected";
 }
 
+export interface WeatherAssessment {
+  kind: "current" | "forecast";
+  validTime: string;
+  severity: AlertSeverity;
+  reasons: string[];
+}
+
+/** Split a weather time series into an honest current assessment and an
+ * optional forecast exceedance. A forecast hour is NEVER presented as an
+ * observation: current must be valid at or before `now`; forecast entries
+ * are labeled and capped at 48 h ahead. */
+export function selectWeatherAssessment(
+  series: { time: string; windSpeed: number | null; waveHeight: number | null }[],
+  now: Date,
+  thresholds: WeatherThresholds = DEFAULT_WEATHER_THRESHOLDS,
+  forecastHorizonHours = 48,
+): { current: WeatherAssessment | null; forecast: WeatherAssessment | null } {
+  const entries = series
+    .map((e) => ({ ...e, t: new Date(e.time).getTime() }))
+    .filter((e) => Number.isFinite(e.t))
+    .sort((a, b) => a.t - b.t);
+  const nowMs = now.getTime();
+  const horizon = nowMs + forecastHorizonHours * 3600 * 1000;
+  const past = entries.filter((e) => e.t <= nowMs);
+  const currentEntry = past[past.length - 1] ?? null;
+  let current: WeatherAssessment | null = null;
+  if (currentEntry) {
+    const a = assessPortConditions(currentEntry, thresholds);
+    if (a.notable)
+      current = { kind: "current", validTime: currentEntry.time, severity: a.severity, reasons: a.reasons };
+  }
+  let forecast: WeatherAssessment | null = null;
+  for (const e of entries) {
+    if (e.t <= nowMs || e.t > horizon) continue;
+    const a = assessPortConditions(e, thresholds);
+    if (a.notable) {
+      forecast = { kind: "forecast", validTime: e.time, severity: a.severity, reasons: a.reasons };
+      break;
+    }
+  }
+  return { current, forecast };
+}
+
+/** Case-scoped verification truth for a timeline row: the latest verification
+ * decision on THIS case's alerts for the event wins; without any case alert,
+ * fall back to the event's own status. One case's verdict never changes what
+ * another case sees. */
+export function caseScopedVerificationStatus(
+  eventVerificationStatus: VerificationStatus,
+  alertsForEvent: { verification_status: string; updated_at: string }[],
+): VerificationStatus {
+  if (alertsForEvent.length === 0) return eventVerificationStatus;
+  const latest = [...alertsForEvent].sort((a, b) => (a.updated_at < b.updated_at ? 1 : -1))[0];
+  return (VERIFICATION_STATUSES as readonly string[]).includes(latest.verification_status)
+    ? (latest.verification_status as VerificationStatus)
+    : eventVerificationStatus;
+}
+
 /** Timeline window filter: keep events whose observed time falls within
  * +/- windowHours of the reference instant (default: last 24 h). */
 export function withinWindow(observedAt: string, reference: Date, windowHours: number): boolean {

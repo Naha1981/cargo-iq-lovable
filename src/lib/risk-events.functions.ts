@@ -15,6 +15,7 @@ import {
   costRecoveryInput,
   manualLinkInput,
   riskEventInput,
+  selectWeatherAssessment,
   sourceConfigInput,
   verificationStatusForDecision,
   verifyAlertInput,
@@ -208,16 +209,23 @@ export const capturePortWeather = createServerFn({ method: "POST" })
       waveHeightWarnM:
         Number(settings.waveHeightWarnM) || DEFAULT_WEATHER_THRESHOLDS.waveHeightWarnM,
     };
-    const assessed = assessPortConditions(
-      { windSpeed: latest.windSpeed, waveHeight: latest.waveHeight },
-      thresholds,
-    );
-    if (!assessed.notable)
-      return { captured: false as const, reason: "CONDITIONS_BELOW_THRESHOLD", conditions: latest };
+    const selection = selectWeatherAssessment(series, new Date(), thresholds);
+    const chosen = selection.current ?? selection.forecast;
+    if (!chosen)
+      return {
+        captured: false as const,
+        reason: "CONDITIONS_BELOW_THRESHOLD",
+        conditions: latest,
+        forecastChecked: selection.forecast !== null,
+      };
 
     const portCode = data.portCode.trim().toUpperCase();
-    const title = `Adverse weather near ${portCode}: ${assessed.reasons.join(" ")}`;
-    const observedAt = latest.time;
+    const title =
+      chosen.kind === "forecast"
+        ? `Forecast adverse weather near ${portCode} (valid ${chosen.validTime}): ${chosen.reasons.join(" ")}`
+        : `Adverse weather near ${portCode}: ${chosen.reasons.join(" ")}`;
+    // observed_at is the signal's VALID time; retrieval time is ingested_at.
+    const observedAt = chosen.validTime;
     const dedupe = computeDedupeKey({
       source: "open_meteo",
       kind: "weather",
@@ -232,7 +240,9 @@ export const capturePortWeather = createServerFn({ method: "POST" })
         source: "open_meteo",
         kind: "weather",
         title,
-        summary: assessed.reasons.join(" "),
+        summary:
+          (chosen.kind === "forecast" ? "Forecast (model), not an observation. " : "") +
+          chosen.reasons.join(" "),
         observed_at: observedAt,
         latitude,
         longitude,
@@ -240,7 +250,14 @@ export const capturePortWeather = createServerFn({ method: "POST" })
         confidence: "medium",
         source_ref: "https://open-meteo.com/ (marine + forecast APIs)",
         dedupe_key: dedupe,
-        raw: JSON.parse(JSON.stringify(latest)) as Json,
+        raw: JSON.parse(
+          JSON.stringify({
+            dataType: chosen.kind,
+            validTime: chosen.validTime,
+            retrievedAt: new Date().toISOString(),
+            conditions: latest,
+          }),
+        ) as Json,
         created_by: context.user.id,
       })
       .select("*")
@@ -261,9 +278,9 @@ export const capturePortWeather = createServerFn({ method: "POST" })
     const spread = await insertAlertsForEvent(
       { supabase: context.supabase, tenantId: context.tenantId, userId: context.user.id },
       event,
-      assessed.severity,
+      chosen.severity,
     );
-    return { captured: true as const, event, conditions: latest, duplicate: !!error, ...spread };
+    return { captured: true as const, event, dataType: chosen.kind, validTime: chosen.validTime, conditions: latest, duplicate: !!error, ...spread };
   });
 
 export const listRiskEvents = createServerFn({ method: "GET" })
@@ -406,14 +423,10 @@ export const verifyRiskAlert = createServerFn({ method: "POST" })
       .eq("tenant_id", context.tenantId)
       .eq("id", data.alertId);
     if (upErr) throw upErr;
-    if (status === "confirmed" || status === "rejected") {
-      const { error: evErr } = await context.supabase
-        .from("risk_events")
-        .update({ verification_status: status })
-        .eq("tenant_id", context.tenantId)
-        .eq("id", alert.event_id);
-      if (evErr) throw evErr;
-    }
+    // Deliberately NOT updating risk_events.verification_status here: the
+    // event is shared across cases, and one case's verdict must not change
+    // what other cases see. Case-scoped truth lives on the alert and in
+    // risk_alert_verifications; the UI derives per-case event state from it.
     return { alertId: data.alertId, verificationStatus: status };
   });
 

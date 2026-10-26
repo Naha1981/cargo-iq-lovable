@@ -34,9 +34,9 @@ export function SimulationLab({ caseId, portCode }: { caseId: string; portCode: 
   const [decisionSummary, setDecisionSummary] = useState("");
 
   const refresh = useCallback(async () => {
-    const rows = await listScenarios();
+    const rows = await listScenarios({ data: { caseId } });
     setScenarios(rows as ScenarioRow[]);
-  }, []);
+  }, [caseId]);
 
   useEffect(() => {
     refresh().catch((e: Error) => setError(e.message));
@@ -159,6 +159,7 @@ export function SimulationLab({ caseId, portCode }: { caseId: string; portCode: 
                 run(async () => {
                   await createScenario({
                     data: {
+                      caseId,
                       name: name.trim(),
                       scenarioType: scenarioType as never,
                       severity: severity as never,

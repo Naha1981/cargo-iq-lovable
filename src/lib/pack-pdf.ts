@@ -1,3 +1,4 @@
+import { featurePackSections } from "@/lib/feature-pack";
 import { parseExtractionStatus } from "./analysis-integrity";
 import { frozenOperationalResults, type FrozenOpsPayload } from "./count-pack";
 // Dependency-free, deterministic PDF writer for the Evidence Pack.
@@ -86,6 +87,10 @@ class Doc {
   }
   private ensure(h: number) {
     if (this.y - h < BOTTOM) {
+      if (this.pages.length >= 200)
+        throw new Error(
+          "PDF_EXPORT_LIMIT: This pack exceeds the 200-page PDF budget. No partial PDF was exported. Use the complete frozen JSON export for review.",
+        );
       this.pages.push({ ops: [], rules: [] });
       this.y = PAGE_H - TOP;
     }
@@ -345,6 +350,10 @@ export interface EvidencePackInput {
 }
 
 export function buildEvidencePackPdf(pack: EvidencePackInput): Uint8Array {
+  if (new TextEncoder().encode(JSON.stringify(pack)).byteLength > 2_000_000)
+    throw new Error(
+      "PDF_EXPORT_LIMIT: This pack exceeds the 2 MB input budget. No partial PDF was exported. Use the complete frozen JSON export for review.",
+    );
   const p: PackPayload = pack.pack_payload ?? {};
   const c = p.case ?? {};
   const docs: PackDocument[] = p.documents ?? [];
@@ -1034,6 +1043,39 @@ export function buildEvidencePackPdf(pack: EvidencePackInput): Uint8Array {
     }
   }
 
+  d.heading("Integrated feature review and resolution trail");
+  if (p.integratedFeaturesVersion !== "1") {
+    d.text(
+      "Integrated feature registers were not frozen in this historical pack. Current records are not appended to this version.",
+      { indent: 4 },
+    );
+  } else {
+    d.text(
+      "This register supports human review and resolution. No causal conclusion, liability, external submission or combined recovery total is inferred.",
+      { indent: 4 },
+    );
+    for (const section of featurePackSections(p)) {
+      d.heading(section.title + " (" + section.rows.length + ")");
+      d.text(section.caveat, { indent: 4, size: 8 });
+      if (!section.rows.length)
+        d.text(
+          "No eligible case-linked records in this frozen version; excluded or withheld history may exist.",
+          { indent: 4 },
+        );
+      for (const row of section.rows) {
+        d.text("Record " + String(row.id ?? "unknown"), { indent: 4, bold: true });
+        for (const [key, value] of Object.entries(row)) {
+          if (value !== null && value !== undefined)
+            d.text(
+              key + ": " + (typeof value === "object" ? JSON.stringify(value) : String(value)),
+              { indent: 14, size: 8 },
+            );
+        }
+      }
+    }
+  }
+
+  d.reserve(250);
   d.heading("Integrity and approval");
   // The database computes this hash over the canonical payload when the pack is generated (draft or approved).
   // A preview or test file that did not come from that path must say so inside the file.
@@ -1070,7 +1112,9 @@ export function buildEvidencePackPdf(pack: EvidencePackInput): Uint8Array {
   d.text(
     (hasMapData
       ? "Limitations: AIS can contain gaps, spoofing or stale identity data. Satellite scene availability is not cargo-level proof. Weather provides context only. "
-      : "Limitations: this pack contains document claims and raw imported source lines only. ") +
+      : p.integratedFeaturesVersion === "1"
+        ? "Limitations: this pack includes frozen feature review registers, not verified causation, liability or a forecast. "
+        : "Limitations: this pack contains document claims and raw imported source lines only. ") +
       "Claims marked PENDING have not been verified. Human review is required for disputed claims.",
     { size: 8, gray: 0.35 },
   );

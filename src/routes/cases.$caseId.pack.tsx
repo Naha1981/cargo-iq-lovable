@@ -1,3 +1,4 @@
+import { frozenPackSummary } from "@/lib/feature-pack";
 import { Route as CaseRoute } from "./cases.$caseId";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
@@ -36,7 +37,7 @@ export function downloadBlob(blob: Blob, filename: string, revokeDelayMs = 1000)
   setTimeout(() => URL.revokeObjectURL(url), revokeDelayMs);
 }
 
-function PackPage() {
+export function PackPage() {
   const { caseId } = Route.useParams();
   const data = CaseRoute.useLoaderData();
   const router = useRouter();
@@ -131,9 +132,6 @@ function PackPage() {
     withPayload(
       pack,
       (full) => {
-        const timeline = (full.pack_payload?.timeline ?? [])
-          .map((x) => String(x.timestamp ?? "") + " — " + String(x.title ?? ""))
-          .join("\n");
         const summary =
           "CargoIQ Evidence Pack v" +
           pack.version +
@@ -142,7 +140,7 @@ function PackPage() {
           "\nStatus: " +
           pack.status +
           "\n\n" +
-          timeline;
+          frozenPackSummary(full.pack_payload ?? {});
         const blob = new Blob([summary], { type: "text/plain;charset=utf-8" });
         downloadBlob(blob, caseId + "-investigation-summary-v" + pack.version + ".txt");
       },
@@ -223,6 +221,10 @@ function PackPage() {
       <Panel title="Integrity rules">
         <ul className="space-y-3 text-sm text-muted-foreground">
           <li>• Snapshot versions never overwrite prior content.</li>
+          <li>
+            • Integrated records must be frozen with sources, uncertainty and review history.
+            Historical packs do not gain new records on export.
+          </li>
           <li>• Hash is calculated over the canonical pack payload.</li>
           <li>• Public observations remain explicitly labelled as corroboration.</li>
           <li>• Approval is a human action and is written to the audit log.</li>

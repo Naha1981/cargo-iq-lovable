@@ -1,3 +1,4 @@
+import { frozenPackSummary } from "@/lib/feature-pack";
 import { assertDocumentSize } from "./extraction-policy";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
@@ -1050,325 +1051,42 @@ export const generateEvidencePack = createServerFn({ method: "POST" })
       throw new Error("Resolve the flagged contradictions before generating an evidence pack.");
     await assertClockGate(db, data.caseId);
 
+    // One database snapshot owns every feature register and exact case association.
+    // Old source objects remain valid during code-first rollout; their exports name
+    // the missing integrated registers. Never append unsealed live data.
+    const { data: frozenSource, error: sourceError } = await db.rpc("current_pack_source", {
+      _case_id: data.caseId,
+    });
+    if (sourceError) throw sourceError;
+    if (!frozenSource || typeof frozenSource !== "object" || Array.isArray(frozenSource))
+      throw new Error("Evidence pack source unavailable. Existing frozen packs remain available.");
     const version = ((existing.data?.[0]?.version as number | undefined) ?? 0) + 1;
     const payload = {
+      ...frozenSource,
       generatedAt: new Date().toISOString(),
       version,
-      case: c.data,
-      documents: docs.data ?? [],
-      operationalDefinitions: definitions.data ?? [],
-      operationalClocks: clocks.data ?? [],
-      appointmentAttributions: attributions.data ?? [],
-      kpiDefinitions: kpis.data ?? [],
-      crossPartyMatches: matches.data ?? [],
-      evidenceGapHistory: gaps.data ?? [],
-      eventIdentityReviews: identityReviews.data ?? [],
-      clockReconciliations: clockDecisions.data ?? [],
-      countSourceRecords: countSources.data ?? [],
-      countRuleVersions: countRules.data ?? [],
-      countComparisons: countComparisons.data ?? [],
-      appointmentLifecycle: appointmentLifecycle.data ?? [],
-      authorisedImports: authorisedImports.data ?? [],
-      countEngineVersion: "1",
-      verifiedClaims: (claims.data ?? []).filter((x) => x.status === "VERIFIED"),
-      claims: claims.data ?? [],
-      contradictions: contradictions.data ?? [],
-      timeline: timeline.data ?? [],
-      externalObservations: observations.data ?? [],
-      financialCalculations: calculations.data ?? [],
-      approvals: [],
-      truthRule:
-        "Public and independent observations are corroboration unless the source directly proves the event. Inference remains inference until human review.",
     };
     const { data: packResult, error: persistError } = await db.rpc("persist_evidence_pack_atomic", {
       _case_id: data.caseId,
       _canonical: stableCanonical(payload),
     });
+    if (persistError?.code === "40001")
+      throw new Error(
+        "Evidence changed or another review is saving. Reload the case and generate a fresh pack; no pack was saved by this attempt.",
+      );
     if (persistError) throw persistError;
     const pack = Array.isArray(packResult) ? packResult[0] : packResult;
     if (!pack?.id) throw new Error("Atomic evidence-pack persistence returned no pack.");
     const hash = pack.sha256_hash as string;
 
+    // This response must describe the sealed source, never earlier parallel reads.
     const summary = [
-      "# CargoIQ Investigation " + (c.data?.reference_no ?? ""),
-      "",
-      "**Case:** " + (c.data?.reference_no ?? "—"),
-      "**Vessel:** " + (c.data?.vessel_name ?? "—"),
-      "**Port:** " + (c.data?.port_code ?? "—"),
-      "**Evidence pack:** v" + version,
-      "**SHA-256:** " + hash,
-      "",
-      "## Timeline",
-      ...(timeline.data ?? []).map(
-        (e) => "- " + e.timestamp + " — " + e.title + " [" + e.nature + "] — " + e.source,
-      ),
-      "",
-      "## Count source records and executable mappings (engine v1)",
-      ...(countSources.data ?? []).map(
-        (x) =>
-          "- " +
-          x.party +
-          " / " +
-          x.physical_reference +
-          " v" +
-          x.version +
-          ": " +
-          x.quantity +
-          " " +
-          x.basis +
-          "; evidence " +
-          x.source_document_id +
-          ", " +
-          x.source_reference,
-      ),
-      ...(countRules.data ?? []).map(
-        (x) =>
-          "- Rule " +
-          x.name +
-          " v" +
-          x.version +
-          ": " +
-          x.input_basis +
-          " -> " +
-          x.output_unit +
-          ", " +
-          x.calculation +
-          " x " +
-          x.numerator +
-          "/" +
-          x.denominator +
-          " [" +
-          x.acceptance +
-          "]",
-      ),
-      ...(countComparisons.data ?? []).map(
-        (x) =>
-          "- Common scope " +
-          x.name +
-          " v" +
-          x.version +
-          ": " +
-          x.physical_references.join(", ") +
-          "; mappings " +
-          x.rule_ids.join(", ") +
-          "; duration definition " +
-          (x.kpi_definition_id ?? "none") +
-          " [" +
-          x.acceptance +
-          "]",
-      ),
-      "",
-      "## Appointment lifecycle and human causal review",
-      ...(appointmentLifecycle.data ?? []).map(
-        (x) =>
-          "- " +
-          x.appointment_reference +
-          " / " +
-          x.record_type +
-          " v" +
-          x.version +
-          ": " +
-          x.explanation +
-          "; issuer " +
-          x.issuer +
-          "; claim target " +
-          (x.claim_target || "not assessed") +
-          " [" +
-          x.outcome +
-          "]; terms " +
-          x.terms_reference,
-      ),
-      "",
-      "## Authorised export provenance (permission is an operator assertion)",
-      ...(authorisedImports.data ?? []).map(
-        (x) =>
-          "- " +
-          x.dataset +
-          " / " +
-          x.row_count +
-          " rows; exported " +
-          x.exported_at +
-          "; SHA256 " +
-          x.raw_sha256 +
-          "; authority basis " +
-          x.authorization_basis,
-      ),
-      "",
-      "## Operational definitions",
-      ...(definitions.data ?? []).map(
-        (x) =>
-          "- " +
-          x.party +
-          " / " +
-          x.metric +
-          " v" +
-          x.version +
-          ": " +
-          x.unit +
-          " [" +
-          x.acceptance +
-          "] - " +
-          x.rule +
-          " (source " +
-          x.source_document_id +
-          ", " +
-          x.source_reference +
-          ")",
-      ),
-      "",
-      "## Clock evidence and appointment attribution",
-      ...(clocks.data ?? []).map(
-        (x) =>
-          "- " +
-          x.physical_reference +
-          " " +
-          x.kind +
-          ": " +
-          x.timestamp_original +
-          " (" +
-          x.time_zone +
-          ") - source " +
-          x.source_party +
-          ", " +
-          x.source_document_id +
-          ", " +
-          x.source_reference,
-      ),
-      ...(attributions.data ?? []).map(
-        (x) =>
-          "- Appointment source " +
-          x.appointment_clock_id +
-          ": claimant " +
-          x.claimant +
-          ", target " +
-          x.claim_target +
-          ", assertion " +
-          x.assertion +
-          " - evidence " +
-          x.source_document_id +
-          ", " +
-          x.source_reference,
-      ),
-      "",
-      "## KPI definitions and benchmarks",
-      ...(kpis.data ?? []).map(
-        (x) =>
-          "- " +
-          x.party +
-          " / " +
-          x.name +
-          " v" +
-          x.version +
-          ": " +
-          x.start_kind +
-          " to " +
-          x.end_kind +
-          " [" +
-          x.acceptance +
-          "] - scope " +
-          x.physical_reference +
-          ", benchmark " +
-          (x.benchmark_hours ?? "not supplied") +
-          "h; " +
-          x.benchmark_basis,
-      ),
-      "",
-      "## Cross-party physical-event matches",
-      ...(matches.data ?? []).map(
-        (x) =>
-          "- " +
-          x.event_reference +
-          ": " +
-          x.result +
-          ", claims " +
-          x.claim_a_id +
-          " / " +
-          x.claim_b_id +
-          ", rationale " +
-          x.rationale,
-      ),
-      "",
-      "## Match review history (retractions and reaffirmations)",
-      ...(identityReviews.data ?? []).map(
-        (x) =>
-          "- match " +
-          x.match_id +
-          " v" +
-          x.version +
-          ": " +
-          x.status +
-          " - " +
-          x.explanation +
-          " (evidence " +
-          x.source_document_id +
-          ", " +
-          x.source_reference +
-          ")",
-      ),
-      "",
-      "## Evidenced clock reconciliation decisions",
-      ...(clockDecisions.data ?? []).map(
-        (x) =>
-          "- " +
-          x.physical_reference +
-          " / " +
-          x.kind +
-          " v" +
-          x.version +
-          ": selected " +
-          x.selected_clock_id +
-          "; considered " +
-          x.considered_clock_ids.join(", ") +
-          " - " +
-          x.explanation +
-          " (evidence " +
-          x.source_document_id +
-          ", " +
-          x.source_reference +
-          ")",
-      ),
-      "",
-      "## Required evidence and gaps (history, not proof of non-occurrence)",
-      ...(gaps.data ?? []).map(
-        (x) =>
-          "- " +
-          x.physical_reference +
-          " / " +
-          x.required_event +
-          " v" +
-          x.version +
-          ": " +
-          x.status +
-          " - " +
-          x.explanation,
-      ),
-      "",
-
-      "## Contradictions",
-      ...(contradictions.data ?? []).map((x) => "- " + x.title + ": " + x.description),
-      "",
-      "## Financial calculations",
-      ...(calculations.data ?? []).map(
-        (x) =>
-          "- " +
-          x.calculation_type +
-          " " +
-          (x.currency ?? "") +
-          ": calculated=" +
-          (x.calculated_amount_minor ?? "—") +
-          " minor, charged=" +
-          (x.charged_amount_minor ?? "—") +
-          " minor, variance=" +
-          (x.variance_minor ?? "—"),
-      ),
-      "",
-      "## Limitations",
-      "- AIS can contain gaps, spoofing or stale identity data.",
-      "- Satellite scene availability is not the same as cargo-level proof.",
-      "- Weather provides context and does not establish responsibility by itself.",
-      "- Human review is required for disputed claims and external action.",
-    ].join("\n");
-
+      "# CargoIQ frozen investigation v" + version,
+      "SHA-256: " + hash,
+      "Status: DRAFT. Not approved for submission.",
+      "Full source registers and prior review history are in this version's JSON and PDF.",
+      frozenPackSummary(frozenSource),
+    ].join("\n\n");
     return { pack, payload, hash, summary };
   });
 

@@ -9,18 +9,21 @@ import type { Json } from "@/integrations/supabase/types";
 // Deploy only with docs/proposals/feature_atomic_audit.sql after approval.
 
 export const listScenarios = createServerFn({ method: "GET" })
+  .validator(z.object({ caseId: z.string().uuid().optional() }))
   .middleware([tenantMiddleware])
-  .handler(async ({ context }) => {
+  .handler(async ({ data, context }) => {
     await requireIntegratedFeatureReady(context.supabase);
-    const { data, error } = await context.supabase
+    let query = context.supabase
       .from("simulation_scenarios")
       .select(
         "id,name,scenario_type,status,severity,corridor,port_code,vessel_name,created_at,decided_at",
       )
       .eq("tenant_id", context.tenantId)
       .order("created_at", { ascending: false });
+    if (data.caseId) query = query.contains("evidence_refs", [{ kind: "case", id: data.caseId }]);
+    const { data: rows, error } = await query;
     if (error) throw error;
-    return data ?? [];
+    return rows ?? [];
   });
 
 export const getScenario = createServerFn({ method: "GET" })
@@ -53,6 +56,15 @@ export const createScenario = createServerFn({ method: "POST" })
     await requireIntegratedFeatureReady(context.supabase);
     if (!["admin", "investigator"].includes(context.role))
       throw new Error("Investigator access required");
+    if (data.caseId) {
+      const { data: caseRow, error: caseError } = await context.supabase
+        .from("cases")
+        .select("id")
+        .eq("id", data.caseId)
+        .eq("tenant_id", context.tenantId)
+        .maybeSingle();
+      if (caseError || !caseRow) throw new Error("Case unavailable in this workspace");
+    }
     const assumptions = data.assumptions.map((a) => ({
       ...a,
       label: a.source === "measurement" ? "USER-REPORTED MEASUREMENT (unverified)" : "ASSUMPTION",
@@ -71,6 +83,7 @@ export const createScenario = createServerFn({ method: "POST" })
         ends_at: data.endsAt ?? null,
         severity: data.severity,
         assumptions,
+        evidence_refs: data.caseId ? [{ kind: "case", id: data.caseId }] : [],
         created_by: context.user.id,
       })
       .select("*")
@@ -111,16 +124,37 @@ export const runScenarioComparison = createServerFn({ method: "POST" })
         source: a.source,
       })),
     });
-    const [casesRes, eventsRes] = await Promise.all([
-      context.supabase
-        .from("cases")
-        .select("id,reference_no,port_code,vessel_name")
-        .eq("tenant_id", context.tenantId),
-      context.supabase
-        .from("risk_events")
-        .select("id,kind,port_code,corridor,vessel_name,verification_status,observed_at")
-        .eq("tenant_id", context.tenantId),
-    ]);
+    const caseIds = Array.isArray(s.evidence_refs)
+      ? s.evidence_refs.flatMap((r) =>
+          r &&
+          typeof r === "object" &&
+          !Array.isArray(r) &&
+          r.kind === "case" &&
+          typeof r.id === "string"
+            ? [r.id]
+            : [],
+        )
+      : [];
+    let casesQuery = context.supabase
+      .from("cases")
+      .select("id,reference_no,port_code,vessel_name")
+      .eq("tenant_id", context.tenantId);
+    let eventsQuery = context.supabase
+      .from("risk_events")
+      .select("id,kind,port_code,corridor,vessel_name,verification_status,observed_at")
+      .eq("tenant_id", context.tenantId);
+    if (caseIds.length) {
+      casesQuery = casesQuery.in("id", caseIds);
+      const { data: links, error: linkError } = await context.supabase
+        .from("risk_event_case_links")
+        .select("event_id")
+        .eq("tenant_id", context.tenantId)
+        .in("case_id", caseIds);
+      if (linkError) throw linkError;
+      // No linked events means empty evidence, never a tenant-wide fallback.
+      eventsQuery = eventsQuery.in("id", [...new Set((links ?? []).map((l) => l.event_id))]);
+    }
+    const [casesRes, eventsRes] = await Promise.all([casesQuery, eventsQuery]);
     if (casesRes.error) throw casesRes.error;
     if (eventsRes.error) throw eventsRes.error;
     const caseRows = (casesRes.data ?? []).map((c) => ({ ...c, corridor: null as string | null }));
@@ -135,6 +169,7 @@ export const runScenarioComparison = createServerFn({ method: "POST" })
         baseline_metrics: {
           shipmentsTotal: (casesRes.data ?? []).length,
           recordedAt: new Date().toISOString(),
+          ...(caseIds.length ? { caseScopeVersion: "1", caseIds } : {}),
         } as never,
         scenario_metrics: result as unknown as unknown as never,
         comparison_summary: {
@@ -142,7 +177,14 @@ export const runScenarioComparison = createServerFn({ method: "POST" })
           evidenceGaps: result.evidenceGaps,
           insufficientData: result.insufficientData,
         } as never,
-        evidence_refs: evidenceRefs,
+        evidence_refs: [
+          ...(Array.isArray(s.evidence_refs)
+            ? s.evidence_refs.filter(
+                (r) => r && typeof r === "object" && !Array.isArray(r) && r.kind === "case",
+              )
+            : []),
+          ...evidenceRefs,
+        ],
         updated_at: new Date().toISOString(),
       })
       .eq("id", data.scenarioId)

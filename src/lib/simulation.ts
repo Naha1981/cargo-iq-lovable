@@ -29,6 +29,7 @@ export function insufficientLabel(metric: string, caseCount: number): string {
 
 export const scenarioInput = z
   .object({
+    caseId: z.string().uuid().optional(),
     name: z.string().min(1).max(200),
     scenarioType: z.enum(SCENARIO_TYPES),
     areaDescription: z.string().max(2000).optional(),

@@ -136,6 +136,19 @@ const canonical = JSON.stringify({ ...source, generatedAt: new Date().toISOStrin
 const pack = (await db.query("select * from persist_evidence_pack_atomic($1,$2)", [C, canonical]))
   .rows[0];
 assert.equal(pack.canonical_payload, canonical);
+const generationAudit = (
+  await db.query(
+    "select action,actor_user_id,entity_id,payload from audit_log where case_id=$1 and action='EVIDENCE_PACK_GENERATED'",
+    [C],
+  )
+).rows;
+assert.equal(generationAudit.length, 1);
+assert.equal(generationAudit[0].actor_user_id, U);
+assert.equal(generationAudit[0].entity_id, pack.id);
+assert.equal(generationAudit[0].payload.sha256_hash, pack.sha256_hash);
+assert.equal(generationAudit[0].payload.version, 1);
+assert.equal(generationAudit[0].payload.status, "DRAFT");
+
 if (process.env.HISTORICAL_SYNTHETIC_PACK_PATH)
   fs.writeFileSync(
     process.env.HISTORICAL_SYNTHETIC_PACK_PATH,
@@ -181,6 +194,15 @@ await assert.rejects(
   /Case evidence changed/,
 );
 
+assert.equal(
+  (
+    await db.query(
+      "select count(*)::int n from audit_log where case_id=$1 and action='EVIDENCE_PACK_GENERATED'",
+      [C],
+    )
+  ).rows[0].n,
+  1,
+);
 await assert.rejects(
   () => db.exec(`update external_observations set source='changed' where id='${R}'`),
   /UPDATE_BLOCKED/,

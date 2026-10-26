@@ -186,3 +186,39 @@ it.skipIf(!process.env.PDF_OUT)("writes a sample", () => {
     buildEvidencePackPdf({ ...pack, status: "APPROVED", approved_by: "user-123" }),
   );
 });
+
+it("renders frozen historical review sources and limits outside independent observations", () => {
+  const pdf = Buffer.from(
+    buildEvidencePackPdf({
+      status: "DRAFT",
+      version: 1,
+      pack_payload: {
+        externalObservations: [
+          {
+            observation_type: "HISTORICAL_RECORD_REVIEW",
+            payload: {
+              candidatePlace: "SYNTHETIC reference",
+              selectedDate: "2025-12-03",
+              timezone: "Africa/Johannesburg",
+              reviewedBy: "SYNTHETIC actor",
+              limitations: "NO HISTORICAL IMAGERY",
+              records: [
+                {
+                  id: "SOURCE-ID-123",
+                  title: "SOURCE TITLE",
+                  timestamp: "2025-12-03T10:00:00Z",
+                  source: "Filed source",
+                },
+              ],
+            },
+          },
+        ],
+      },
+    }),
+  ).toString("latin1");
+  expect(pdf).toContain("HISTORICAL RECORD REVIEWS");
+  expect(pdf).toContain("SOURCE-ID-123");
+  expect(pdf).toContain("SOURCE TITLE");
+  expect(pdf).toContain("NO HISTORICAL IMAGERY");
+  expect(pdf).not.toContain("INDEPENDENT OBSERVATIONS");
+});

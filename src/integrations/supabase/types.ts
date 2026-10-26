@@ -2610,6 +2610,20 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      cargoiq_historical_review_readiness: { Args: Record<PropertyKey, never>; Returns: Json };
+      save_historical_record_review: {
+        Args: {
+          p_case_id: string;
+          p_request_id: string;
+          p_date: string;
+          p_place: string;
+          p_lat: number;
+          p_lon: number;
+          p_confirmed: boolean;
+        };
+        Returns: Json;
+      };
+
       cargoiq_integrated_feature_readiness: { Args: Record<PropertyKey, never>; Returns: Json };
       cargoiq_create_recovery_batch: {
         Args: { p_tenant: string; p_request: string; p_rows: Json };

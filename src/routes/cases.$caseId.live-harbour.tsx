@@ -1,6 +1,10 @@
+import { recoveryRequestKey, clearRecoveryRequest } from "@/lib/recovery-request";
+import { HistoricalContributionReview } from "@/components/HistoricalContributionReview";
 import { Route as CaseRoute } from "./cases.$caseId";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { saveHistoricalReview } from "@/lib/historical-review.functions";
+import { historicalReviewInput } from "@/lib/historical-review";
 import { liveHarbourHref } from "@/lib/live-harbour";
 
 export const Route = createFileRoute("/cases/$caseId/live-harbour")({
@@ -15,7 +19,21 @@ function LiveHarbourPage() {
   const sample = data.case.reference_no === "DUR-2026-0412" ? "1" : "0";
   const src = base + (base.includes("?") ? "&" : "?") + "embed=1&sample=" + sample;
   const caseId = data.case.id as string;
+  const [proposal, setProposal] = useState<{
+    requestId: string;
+    date: string;
+    place: string;
+    lat: number;
+    lon: number;
+  } | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [notice, setNotice] = useState("");
   const frameRef = useRef<HTMLIFrameElement>(null);
+
+  useEffect(() => {
+    setProposal(null);
+    setNotice("");
+  }, [caseId]);
 
   // Repeat the handshake on iframe load so a fast child cannot outrun the effect.
   function requestHistoryBridge() {
@@ -68,6 +86,19 @@ function LiveHarbourPage() {
         );
         return;
       }
+      if (ev.data?.type === "cargo-history-contribution") {
+        const parsed = historicalReviewInput.safeParse({
+          ...ev.data.selection,
+          requestId: crypto.randomUUID(),
+          caseId,
+          confirmed: true,
+        });
+        if (parsed.success) {
+          setProposal(parsed.data);
+          setNotice("");
+        }
+        return;
+      }
       if (ev.data?.type !== "harbour-open-pack") return;
       router.navigate({ to: "/cases/$caseId/pack", params: { caseId } });
     }
@@ -95,6 +126,57 @@ function LiveHarbourPage() {
           Open full page ↗
         </a>
       </div>
+      {proposal && (
+        <HistoricalContributionReview
+          proposal={proposal}
+          saving={saving}
+          onConfirm={async () => {
+            setSaving(true);
+            setNotice("");
+            try {
+              // Shared opaque operation helper persists only filter digest + UUID.
+              // Reload after uncertain response reuses the same request rather than
+              // creating duplicate evidence. Case/feature namespace cannot collide.
+              const filter = {
+                date: proposal.date,
+                place: proposal.place,
+                lat: proposal.lat,
+                lon: proposal.lon,
+              };
+              const requestId = await recoveryRequestKey(
+                sessionStorage,
+                "historical:" + caseId,
+                filter,
+              );
+              const result = await saveHistoricalReview({
+                data: { ...proposal, requestId, caseId, confirmed: true },
+              });
+              await clearRecoveryRequest(sessionStorage, "historical:" + caseId, filter);
+              setNotice(
+                "Saved historical reference review with " +
+                  result.recordCount +
+                  " recorded case entries. Generate a new pack to freeze this contribution; older packs are unchanged.",
+              );
+              setProposal(null);
+              await router.invalidate();
+            } catch (e) {
+              setNotice(
+                e instanceof Error
+                  ? e.message
+                  : "Save not confirmed. Check the case before retrying.",
+              );
+            } finally {
+              setSaving(false);
+            }
+          }}
+          onCancel={() => setProposal(null)}
+        />
+      )}
+      {notice && (
+        <p role="status" className="rounded border p-3 text-sm">
+          {notice}
+        </p>
+      )}
       <div className="overflow-hidden rounded-lg border bg-[#061016]">
         <iframe
           ref={frameRef}

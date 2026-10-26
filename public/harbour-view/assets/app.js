@@ -1342,6 +1342,21 @@
       "Historical place/date selected. Review the recorded evidence list below; no historical imagery has been loaded.",
     );
   });
+  $("history-pack-review").addEventListener("click", function () {
+    if (!EMBED || !historyReady || !historicalReviewActive || !historicalSelection) {
+      historyReply(
+        "Open this view from an authenticated case and select Show recorded evidence first. Nothing saved.",
+      );
+      return;
+    }
+    window.parent.postMessage(
+      { type: "cargo-history-contribution", selection: historicalSelection },
+      window.location.origin,
+    );
+    historyReply(
+      "Review the proposed contribution above the map. Nothing is saved until you confirm there. The server will recheck the current case records.",
+    );
+  });
   function handleVoiceCommand(raw) {
     if (reviewHistory(raw)) return;
     if (historicalReviewActive) {

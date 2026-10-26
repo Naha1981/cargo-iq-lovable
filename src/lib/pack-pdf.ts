@@ -232,7 +232,7 @@ interface PackObservation {
   source?: string;
   latitude?: string | number;
   longitude?: string | number;
-  payload?: MapSnapshotPayload;
+  payload?: MapSnapshotPayload & Record<string, unknown>;
 }
 
 // Operational ledger records (count sources, rules, appointments, clocks,
@@ -634,7 +634,84 @@ export function buildEvidencePackPdf(pack: EvidencePackInput): Uint8Array {
 
   const allObs: PackObservation[] = p.externalObservations ?? [];
   const snapshots = allObs.filter((o) => o.observation_type === "MAP_SNAPSHOT");
-  const obs = allObs.filter((o) => o.observation_type !== "MAP_SNAPSHOT");
+  const reviews = allObs.filter((o) => o.observation_type === "HISTORICAL_RECORD_REVIEW");
+  const obs = allObs.filter(
+    (o) => !["MAP_SNAPSHOT", "HISTORICAL_RECORD_REVIEW"].includes(o.observation_type ?? ""),
+  );
+  if (reviews.length) {
+    d.heading("7a. Historical record reviews (" + reviews.length + ")");
+    d.text(
+      "Reviewed reference filters, not independent observations or historical imagery. Source records, uncertainty and review history below come only from this frozen pack.",
+      { size: 8.5 },
+    );
+    reviews.forEach((review) => {
+      d.text("Review recorded " + stamp(review.observed_at), { size: 9 });
+      const r = review.payload ?? {};
+      d.text(
+        "Candidate place: " +
+          String(r.candidatePlace ?? "Not recorded") +
+          " | Selected day: " +
+          String(r.selectedDate ?? "Not recorded") +
+          " | Timezone: " +
+          String(r.timezone ?? "Not recorded"),
+        { indent: 14, size: 8.5 },
+      );
+      d.text(
+        "Reference filter: " +
+          String(r.radiusKm ?? "Unknown") +
+          " km around " +
+          String(r.referenceLatitude ?? "Unknown") +
+          ", " +
+          String(r.referenceLongitude ?? "Unknown") +
+          ". These are reference coordinates, not a shipment fix.",
+        { indent: 14, size: 8 },
+      );
+      d.text(
+        "Reviewed by: " +
+          String(r.reviewedBy ?? "Not recorded") +
+          " | Review time: " +
+          String(r.reviewedAt ?? "Not recorded"),
+        { indent: 14, size: 8 },
+      );
+      d.text(
+        "Limitations: " +
+          String(
+            r.limitations ??
+              "No recorded limitations; treat as unverified. No historical imagery or identity proof.",
+          ),
+        { indent: 14, size: 8 },
+      );
+      const records = Array.isArray(r.records) ? r.records : [];
+      d.text(
+        "Recorded case entries (" +
+          records.length +
+          "). These are sources as filed, not independent verification:",
+        { indent: 14, size: 8.5 },
+      );
+      if (!records.length)
+        d.text("No matching records. This does not prove no event occurred.", {
+          indent: 20,
+          size: 8,
+        });
+      records.forEach((value) => {
+        const entry = value as Record<string, unknown>;
+        d.text(
+          String(entry.title ?? "Untitled record") +
+            " | " +
+            String(entry.timestamp ?? "No recorded time") +
+            " | " +
+            String(entry.nature ?? "Unknown nature") +
+            " | Source: " +
+            String(entry.source ?? "Not recorded") +
+            " | ID: " +
+            String(entry.id ?? "Not recorded"),
+          { indent: 20, size: 8 },
+        );
+        if (entry.provenance_id)
+          d.text("Provenance claim: " + String(entry.provenance_id), { indent: 20, size: 8 });
+      });
+    });
+  }
   if (obs.length) {
     d.heading("7. Independent observations (" + obs.length + ")");
     d.text("These are corroboration only. " + String(p.truthRule ?? ""), { indent: 4, size: 8.5 });

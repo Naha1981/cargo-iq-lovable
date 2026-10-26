@@ -1,10 +1,20 @@
 import { assertDocumentSize, isPlainDocument } from "@/lib/extraction-policy";
+import {
+  isTransientUploadError,
+  UPLOAD_MAX_ATTEMPTS,
+  UPLOAD_NOT_CONFIRMED_MESSAGE,
+  UPLOAD_RETRY_DELAY_MS,
+  UPLOAD_SERVER_BUSY,
+  UPLOAD_SERVER_BUSY_MESSAGE,
+} from "@/lib/upload-backpressure";
 import { Route as CaseRoute } from "./cases.$caseId";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import { Button, ClassTag, NatureBadge, Panel, DisputeBadge } from "@/components/ui-kit";
 import {
+  acquireUploadSlot,
   registerDocument,
+  releaseUploadSlot,
   resolveContradiction,
   reviewClaim,
   runDocumentExtraction,
@@ -64,29 +74,79 @@ function DocsPage() {
           );
           continue;
         }
+        // Admission semaphore (migration 20261025220000): acquire a slot
+        // before the storage PUT so an honest client never starts an upload
+        // the server cannot absorb. At cap, nothing is uploaded and the batch
+        // stops with the busy message (docs/UPLOAD-BACKPRESSURE.md).
+        const slot = await acquireUploadSlot({ data: {} });
+        if (!slot.leaseId) throw new Error(UPLOAD_SERVER_BUSY);
+        const leaseId = slot.leaseId;
         const safeName = item.name.replace(/[^a-zA-Z0-9._-]+/g, "_");
         const path = data.tenantId + "/" + caseId + "/" + crypto.randomUUID() + "-" + safeName;
-        const { error: uploadError } = await supabase.storage
-          .from("case-documents")
-          .upload(path, item, { upsert: false });
-        if (uploadError) throw uploadError;
-        await registerDocument({
-          data: {
-            caseId,
-            filePath: path,
-            name: item.name,
-            fileType: item.type || "application/octet-stream",
-            sourceParty: sourceParty.trim(),
-          },
-        });
+        // Bounded retry: one automatic retry of transient failures (429/5xx,
+        // network), then an explicit not-confirmed error. The loop is
+        // sequential, so a session never holds more than one concurrent
+        // upload (docs/UPLOAD-BACKPRESSURE.md).
+        let uploadError: unknown = null;
+        for (let attempt = 1; attempt <= UPLOAD_MAX_ATTEMPTS; attempt++) {
+          const { error } = await supabase.storage
+            .from("case-documents")
+            .upload(path, item, { upsert: false });
+          uploadError = error;
+          if (!error) break;
+          if (attempt < UPLOAD_MAX_ATTEMPTS && isTransientUploadError(error))
+            await new Promise((resolve) => setTimeout(resolve, UPLOAD_RETRY_DELAY_MS));
+          else break;
+        }
+        if (uploadError) {
+          // registerDocument was never called, so the server never releases
+          // this lease; release it here (TTL backstops a crashed client).
+          await releaseUploadSlot({ data: { leaseId } }).catch(() => {});
+          throw uploadError;
+        }
+        try {
+          await registerDocument({
+            data: {
+              caseId,
+              filePath: path,
+              name: item.name,
+              fileType: item.type || "application/octet-stream",
+              sourceParty: sourceParty.trim(),
+              leaseId,
+            },
+          });
+        } catch (registerError) {
+          // A lease that expired mid-upload: re-acquire once and re-register
+          // (idempotent by content hash; the object is already in storage).
+          if (registerError instanceof Error && registerError.message === "UPLOAD_SLOT_EXPIRED") {
+            const retrySlot = await acquireUploadSlot({ data: {} });
+            if (!retrySlot.leaseId) throw new Error(UPLOAD_SERVER_BUSY);
+            await registerDocument({
+              data: {
+                caseId,
+                filePath: path,
+                name: item.name,
+                fileType: item.type || "application/octet-stream",
+                sourceParty: sourceParty.trim(),
+                leaseId: retrySlot.leaseId,
+              },
+            });
+          } else {
+            throw registerError;
+          }
+        }
       }
       await router.invalidate();
     } catch (err) {
       const message = err instanceof Error ? err.message : "Upload failed.";
       setError(
-        /failed to fetch|network|load failed/i.test(message)
-          ? "The file could not reach private document storage. Check your connection and try again. If it keeps failing, contact sales@nahalabs.co.za and we will fix it."
-          : message,
+        message === UPLOAD_SERVER_BUSY
+          ? UPLOAD_SERVER_BUSY_MESSAGE
+          : isTransientUploadError(err)
+            ? UPLOAD_NOT_CONFIRMED_MESSAGE
+            : /failed to fetch|network|load failed/i.test(message)
+              ? "The file could not reach private document storage. Check your connection and try again. If it keeps failing, contact sales@nahalabs.co.za and we will fix it."
+              : message,
       );
     } finally {
       setBusy(false);

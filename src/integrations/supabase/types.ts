@@ -1866,6 +1866,10 @@ export type Database = {
         Args: { p_id: string };
         Returns: Json;
       };
+      admin_get_ai_health: {
+        Args: Record<string, never>;
+        Returns: Json;
+      };
       admin_list_cases: {
         Args: { p_limit?: number; p_cursor?: string };
         Returns: Json;
@@ -1893,6 +1897,44 @@ export type Database = {
       reserve_free_extraction_attempt: {
         Args: { p_tenant_id: string; p_daily_cap: number };
         Returns: string;
+      };
+      admin_list_health_email_sends: {
+        Args: { p_days?: number };
+        Returns: Json;
+      };
+      claim_health_email_day: {
+        Args: { p_day: string; p_lease?: string };
+        Returns: string;
+      };
+      complete_health_email_day: {
+        Args: { p_day: string; p_provider_message_id?: string | null };
+        Returns: undefined;
+      };
+      fail_health_email_day: {
+        Args: { p_day: string; p_detail?: string | null };
+        Returns: undefined;
+      };
+      acquire_upload_slot: {
+        Args: {
+          p_tenant_id: string;
+          p_tenant_max: number | null;
+          p_global_max: number | null;
+          p_ttl_seconds: number;
+        };
+        Returns: string | null;
+      };
+      verify_upload_lease: {
+        Args: { p_lease_id: string; p_tenant_id: string; p_ttl_seconds: number };
+        Returns: boolean;
+      };
+      release_upload_slot: { Args: { p_lease_id: string }; Returns: undefined };
+      admin_set_tenant_upload_concurrency: {
+        Args: { p_tenant_id: string; p_max: number | null };
+        Returns: undefined;
+      };
+      admin_list_tenant_upload_concurrency: {
+        Args: Record<string, never>;
+        Returns: { tenant_id: string; max_concurrent: number | null; updated_at: string }[];
       };
       cases_with_unresolved_operational_clocks: {
         Args: { _case_ids: string[] };

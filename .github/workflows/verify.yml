@@ -23,8 +23,11 @@ jobs:
       - run: npm test
       - run: node scripts/verification/atomic-pack-check.mjs
       - run: node scripts/verification/brenda-registers-check.mjs
-      # All ten database test scripts (PGlite, no external services): the green gate
-      # requires every one on every push, not only the two verification checks.
+      # All seventeen database/harness test scripts (PGlite, no external services): the green
+      # gate requires every one on every push, not only the two verification checks.
+      - run: node scripts/admin-ai-health-test.mjs
+      - run: node scripts/documents-content-unique-test.mjs
+      - run: node scripts/upload-admission-test.mjs
       - run: node scripts/app-errors-bounds-test.mjs
       - run: node scripts/batched-clock-test.mjs
       - run: node scripts/extraction-rpc-test.mjs
@@ -35,6 +38,10 @@ jobs:
       - run: node scripts/rls-test.mjs
       - run: node scripts/spend-reservation-test.mjs
       - run: node scripts/tenant-caps-test.mjs
+      - run: node scripts/health-email-claim-test.mjs
+      - run: node scripts/storage-permissive-test.mjs
+      - run: node scripts/fresh-rebuild-test.mjs
+      - run: node scripts/load-50-tenants-mock-test.mjs
       - run: npm run build
         env:
           NODE_OPTIONS: --max-old-space-size=4096

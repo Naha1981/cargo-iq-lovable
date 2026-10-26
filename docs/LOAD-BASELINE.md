@@ -24,7 +24,9 @@ Latency is network-RTT dominated and flat through c50. Zero errors.
 - Burst 10 x 10 repeated back-to-back: intermittent free-tier saturation -
   ~90% fail-closed 403 "new row violates row-level security policy" (the RLS
   policy check cannot complete under connection pressure) plus ~10%
-  429 too_many_connections. Failed uploads left no partial objects.
+  429 too_many_connections. Failed uploads left no partial objects visible via storage list/metadata.
+Canonical byte-level verification against storage-server internals was NOT
+performed; the no-partial-object statement carries that uncertainty.
 - 10 MB single-document uploads (realistic evidence size): 3/3 ok at ~2.1-2.3 s.
 
 ## What this does and does not show

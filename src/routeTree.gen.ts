@@ -19,6 +19,7 @@ import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as WhatsappQuotesRouteImport } from './routes/whatsapp-quotes'
+import { Route as ApiHealthEmailRouteImport } from './routes/api/health-email'
 import { Route as CasesCaseIdRouteImport } from './routes/cases.$caseId'
 import { Route as DemoCufRouteImport } from './routes/demo.cuf'
 import { Route as InviteTokenRouteImport } from './routes/invite.$token'
@@ -89,6 +90,11 @@ const TermsRoute = TermsRouteImport.update({
 const WhatsappQuotesRoute = WhatsappQuotesRouteImport.update({
   id: '/whatsapp-quotes',
   path: '/whatsapp-quotes',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiHealthEmailRoute = ApiHealthEmailRouteImport.update({
+  id: '/api/health-email',
+  path: '/api/health-email',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CasesCaseIdRoute = CasesCaseIdRouteImport.update({
@@ -208,6 +214,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof SettingsRoute
   '/terms': typeof TermsRoute
   '/whatsapp-quotes': typeof WhatsappQuotesRoute
+  '/api/health-email': typeof ApiHealthEmailRoute
   '/cases/$caseId': typeof CasesCaseIdRouteWithChildren
   '/demo/cuf': typeof DemoCufRoute
   '/invite/$token': typeof InviteTokenRoute
@@ -241,6 +248,7 @@ export interface FileRoutesByTo {
   '/settings': typeof SettingsRoute
   '/terms': typeof TermsRoute
   '/whatsapp-quotes': typeof WhatsappQuotesRoute
+  '/api/health-email': typeof ApiHealthEmailRoute
   '/demo/cuf': typeof DemoCufRoute
   '/invite/$token': typeof InviteTokenRoute
   '/admin/disputes/$disputeId': typeof AdminDisputesDisputeIdRoute
@@ -274,6 +282,7 @@ export interface FileRoutesById {
   '/settings': typeof SettingsRoute
   '/terms': typeof TermsRoute
   '/whatsapp-quotes': typeof WhatsappQuotesRoute
+  '/api/health-email': typeof ApiHealthEmailRoute
   '/cases/$caseId': typeof CasesCaseIdRouteWithChildren
   '/demo/cuf': typeof DemoCufRoute
   '/invite/$token': typeof InviteTokenRoute
@@ -309,6 +318,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/terms'
     | '/whatsapp-quotes'
+    | '/api/health-email'
     | '/cases/$caseId'
     | '/demo/cuf'
     | '/invite/$token'
@@ -342,6 +352,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/terms'
     | '/whatsapp-quotes'
+    | '/api/health-email'
     | '/demo/cuf'
     | '/invite/$token'
     | '/admin/disputes/$disputeId'
@@ -374,6 +385,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/terms'
     | '/whatsapp-quotes'
+    | '/api/health-email'
     | '/cases/$caseId'
     | '/demo/cuf'
     | '/invite/$token'
@@ -408,6 +420,7 @@ export interface RootRouteChildren {
   SettingsRoute: typeof SettingsRoute
   TermsRoute: typeof TermsRoute
   WhatsappQuotesRoute: typeof WhatsappQuotesRoute
+  ApiHealthEmailRoute: typeof ApiHealthEmailRoute
   CasesCaseIdRoute: typeof CasesCaseIdRouteWithChildren
   DemoCufRoute: typeof DemoCufRoute
   InviteTokenRoute: typeof InviteTokenRoute
@@ -485,6 +498,13 @@ declare module '@tanstack/react-router' {
       path: '/whatsapp-quotes'
       fullPath: '/whatsapp-quotes'
       preLoaderRoute: typeof WhatsappQuotesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/health-email': {
+      id: '/api/health-email'
+      path: '/api/health-email'
+      fullPath: '/api/health-email'
+      preLoaderRoute: typeof ApiHealthEmailRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/cases/$caseId': {
@@ -698,6 +718,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsRoute: SettingsRoute,
   TermsRoute: TermsRoute,
   WhatsappQuotesRoute: WhatsappQuotesRoute,
+  ApiHealthEmailRoute: ApiHealthEmailRoute,
   CasesCaseIdRoute: CasesCaseIdRouteWithChildren,
   DemoCufRoute: DemoCufRoute,
   InviteTokenRoute: InviteTokenRoute,

@@ -6,6 +6,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json } from "@/integrations/supabase/types";
 import { sha256Hex, stableCanonical } from "@/lib/hash";
 import { resolvePortCenter } from "@/lib/port-centers";
+import {
+  UPLOAD_IDEMPOTENCY_WINDOW_MS,
+  parseUploadConcurrency,
+  parseUploadSlotTtl,
+} from "@/lib/upload-backpressure";
 import { caseRecovery } from "@/lib/recovery-gate";
 import { calculateDemurrage } from "@/lib/investigation-engine";
 import { buildAisBoundingBox, fetchAisSnapshot } from "@/lib/adapters/ais-adapter";
@@ -353,6 +358,73 @@ export const getEvidencePackPayload = createServerFn({ method: "GET" })
     return pack;
   });
 
+// Upload admission controls (docs/UPLOAD-BACKPRESSURE.md, migration
+// 20261025220000). Defaults are code; the owner re-binds or disables per
+// workspace from the admin panel, and re-binds globally via env without a
+// code change.
+const UPLOAD_TENANT_CONCURRENCY_DEFAULT = 3;
+const UPLOAD_GLOBAL_CONCURRENCY_DEFAULT = 25;
+const UPLOAD_SLOT_TTL_DEFAULT_SECONDS = 300;
+function uploadTenantConcurrency(): number {
+  return (
+    parseUploadConcurrency(process.env.CLAIM_UPLOAD_TENANT_CONCURRENCY) ??
+    UPLOAD_TENANT_CONCURRENCY_DEFAULT
+  );
+}
+function uploadGlobalConcurrency(): number {
+  return (
+    parseUploadConcurrency(process.env.CLAIM_UPLOAD_GLOBAL_CONCURRENCY) ??
+    UPLOAD_GLOBAL_CONCURRENCY_DEFAULT
+  );
+}
+function uploadSlotTtlSeconds(): number {
+  return parseUploadSlotTtl(
+    process.env.CLAIM_UPLOAD_SLOT_TTL_SECONDS,
+    UPLOAD_SLOT_TTL_DEFAULT_SECONDS,
+  );
+}
+
+/** Cooperative pre-upload admission: the client acquires before the storage
+ * PUT so honest clients never start an upload the server cannot absorb.
+ * NULL leaseId = at cap. Fails CLOSED when enforcement is unavailable: an
+ * admission check that cannot run is never represented as a bounded upload. */
+export const acquireUploadSlot = createServerFn({ method: "POST" })
+  .validator(z.object({}))
+  .middleware([tenantMiddleware])
+  .handler(async ({ data, context }) => {
+    if (!["admin", "investigator"].includes(context.role))
+      throw new Error("Investigator access required");
+    const { data: lease, error } = await context.supabase.rpc("acquire_upload_slot", {
+      p_tenant_id: context.tenantId,
+      p_tenant_max: uploadTenantConcurrency(),
+      p_global_max: uploadGlobalConcurrency(),
+      p_ttl_seconds: uploadSlotTtlSeconds(),
+    });
+    if (error) {
+      if (error.code === "PGRST202" || error.code === "42883")
+        throw new Error("UPLOAD_ADMISSION_UNAVAILABLE");
+      throw error;
+    }
+    void data;
+    return { leaseId: lease ?? null };
+  });
+
+/** Client-side lease release for the path where registerDocument is never
+ * reached (storage PUT failed). Server-side registration releases its own
+ * lease; the TTL backstops everything else. */
+export const releaseUploadSlot = createServerFn({ method: "POST" })
+  .validator(z.object({ leaseId: z.string().uuid() }))
+  .middleware([tenantMiddleware])
+  .handler(async ({ data, context }) => {
+    if (!["admin", "investigator"].includes(context.role))
+      throw new Error("Investigator access required");
+    const { error } = await context.supabase.rpc("release_upload_slot", {
+      p_lease_id: data.leaseId,
+    });
+    if (error && error.code !== "PGRST202" && error.code !== "42883") throw error;
+    return { released: true };
+  });
+
 export const registerDocument = createServerFn({ method: "POST" })
   .validator(
     z.object({
@@ -361,45 +433,157 @@ export const registerDocument = createServerFn({ method: "POST" })
       name: z.string().min(1),
       fileType: z.string().min(1),
       sourceParty: z.string().trim().min(2).max(200),
+      leaseId: z.string().uuid(),
     }),
   )
   .middleware([tenantMiddleware])
   .handler(async ({ data, context }) => {
     if (!["admin", "investigator"].includes(context.role))
       throw new Error("Investigator access required");
-    const { data: ownedCase } = await context.supabase
-      .from("cases")
-      .select("id")
-      .eq("id", data.caseId)
-      .eq("tenant_id", context.tenantId)
-      .maybeSingle();
-    if (!ownedCase) throw new Error("CASE_NOT_FOUND");
-    const expectedPrefix = context.tenantId + "/" + data.caseId + "/";
-    if (!data.filePath.startsWith(expectedPrefix)) throw new Error("INVALID_STORAGE_PATH");
+    // Registration-time enforcement of the admission lease: a registration
+    // without a live lease is refused even if a client skipped acquire.
+    // The lease is released exactly once, when this handler settles.
+    try {
+      const { data: leaseOk, error: leaseError } = await context.supabase.rpc(
+        "verify_upload_lease",
+        {
+          p_lease_id: data.leaseId,
+          p_tenant_id: context.tenantId,
+          p_ttl_seconds: uploadSlotTtlSeconds(),
+        },
+      );
+      if (leaseError) {
+        if (leaseError.code === "PGRST202" || leaseError.code === "42883")
+          throw new Error("UPLOAD_ADMISSION_UNAVAILABLE");
+        throw leaseError;
+      }
+      if (!leaseOk) throw new Error("UPLOAD_SLOT_EXPIRED");
+      const { data: ownedCase } = await context.supabase
+        .from("cases")
+        .select("id")
+        .eq("id", data.caseId)
+        .eq("tenant_id", context.tenantId)
+        .maybeSingle();
+      if (!ownedCase) throw new Error("CASE_NOT_FOUND");
+      const expectedPrefix = context.tenantId + "/" + data.caseId + "/";
+      if (!data.filePath.startsWith(expectedPrefix)) throw new Error("INVALID_STORAGE_PATH");
 
-    const { data: blob, error: downloadError } = await context.supabase.storage
-      .from("case-documents")
-      .download(data.filePath);
-    if (downloadError || !blob) throw downloadError ?? new Error("DOCUMENT_DOWNLOAD_FAILED");
+      const { data: blob, error: downloadError } = await context.supabase.storage
+        .from("case-documents")
+        .download(data.filePath);
+      if (downloadError || !blob) throw downloadError ?? new Error("DOCUMENT_DOWNLOAD_FAILED");
 
-    assertDocumentSize(blob.size);
-    const sha256 = await sha256Hex(await blob.arrayBuffer());
-    const { data: row, error } = await context.supabase
-      .from("documents")
-      .insert({
-        tenant_id: context.tenantId,
-        case_id: data.caseId,
-        name: data.name,
-        file_path: data.filePath,
-        file_type: data.fileType,
-        sha256_hash: sha256,
-        source_party: data.sourceParty || null,
-      })
-      .select("*")
-      .single();
+      assertDocumentSize(blob.size);
+      const sha256 = await sha256Hex(await blob.arrayBuffer());
 
-    if (error) throw error;
-    return row;
+      // Sequential-retry idempotency: the same content re-uploaded within the
+      // window returns the already-registered row, and the duplicate object
+      // uploaded with this attempt is removed again. This does NOT close the
+      // concurrent-same-content race - that needs the partial unique index
+      // (owner-gated migration, docs/UPLOAD-BACKPRESSURE.md).
+      // Cleanup deletes ONLY an object no documents row references, so a
+      // filePath pointing at the canonical (or any registered) object is never
+      // deleted. The reference check runs through the service role across ALL
+      // tenants: a tenant-scoped RLS query is blind to another tenant's row
+      // pointing at the same object. An UNKNOWN reference-check outcome (query
+      // error) means NO delete - the object is kept and the failure is
+      // retained. The check and the delete are still not atomic (TOCTOU) until
+      // the owner-gated unique index provides committed-row atomicity; until
+      // then the check errs toward keeping the object.
+      // Cleanup uses the service-role storage client because tenant-JWT
+      // per-object DELETE is denied at the storage layer
+      // (docs/DB-OPERATIONS.md). Cleanup failures are retained in app_errors
+      // (owner-visible error log) and logged, never hidden; a failed cleanup
+      // leaves an orphaned object but never a wrong row.
+      const reportCleanupFailure = async (message: string, cause: unknown) => {
+        console.error(message, cause);
+        try {
+          const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+          await supabaseAdmin.from("app_errors").insert({
+            route: "registerDocument",
+            message: (
+              message +
+              ": " +
+              (cause instanceof Error ? cause.message : String(cause))
+            ).slice(0, 2000),
+            source: "server",
+          });
+        } catch (retentionError) {
+          console.error("upload-cleanup: error retention failed", retentionError);
+        }
+      };
+      const removeUnreferencedObject = async () => {
+        try {
+          const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+          const { data: refs, error: refError } = await supabaseAdmin
+            .from("documents")
+            .select("id")
+            .eq("file_path", data.filePath)
+            .limit(1);
+          if (refError) {
+            await reportCleanupFailure(
+              "upload-cleanup: reference check failed, object kept",
+              refError,
+            );
+            return;
+          }
+          if (refs?.length) return;
+          const { error: removeError } = await supabaseAdmin.storage
+            .from("case-documents")
+            .remove([data.filePath]);
+          if (removeError)
+            await reportCleanupFailure("upload-cleanup: storage remove failed", removeError);
+        } catch (cleanupError) {
+          await reportCleanupFailure(
+            "upload-cleanup: unexpected failure, object kept",
+            cleanupError,
+          );
+        }
+      };
+      const { data: existing } = await context.supabase
+        .from("documents")
+        .select("*")
+        .eq("tenant_id", context.tenantId)
+        .eq("case_id", data.caseId)
+        .eq("sha256_hash", sha256)
+        .gte("created_at", new Date(Date.now() - UPLOAD_IDEMPOTENCY_WINDOW_MS).toISOString())
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (existing) {
+        await removeUnreferencedObject();
+        return existing;
+      }
+
+      const { data: row, error } = await context.supabase
+        .from("documents")
+        .insert({
+          tenant_id: context.tenantId,
+          case_id: data.caseId,
+          name: data.name,
+          file_path: data.filePath,
+          file_type: data.fileType,
+          sha256_hash: sha256,
+          source_party: data.sourceParty || null,
+        })
+        .select("*")
+        .single();
+
+      if (error) {
+        // The insert outcome is ambiguous (the error may follow a lost
+        // response): delete only if no row references the object, then surface
+        // the failure. A retry re-registers idempotently by content hash.
+        await removeUnreferencedObject();
+        throw error;
+      }
+      return row;
+    } finally {
+      try {
+        await context.supabase.rpc("release_upload_slot", { p_lease_id: data.leaseId });
+      } catch (releaseError) {
+        console.error("upload-admission: lease release failed (TTL backstops)", releaseError);
+      }
+    }
   });
 
 export const runDocumentExtraction = createServerFn({ method: "POST" })

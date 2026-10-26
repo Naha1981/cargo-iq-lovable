@@ -5,9 +5,16 @@ import {
   getPlatformAdminMore,
   getPlatformAdminOverview,
   getPlatformAdminTenantCaps,
+  getPlatformAiHealth,
   setPlatformAdminTenantCap,
 } from "@/lib/admin.functions";
-import type { AdminOverview, AdminPage, AdminTenantCaps } from "@/lib/admin.functions";
+import type {
+  AdminOverview,
+  AdminPage,
+  AdminTenantCaps,
+  HealthEmailSendRow,
+} from "@/lib/admin.functions";
+import { AdminAiHealthPanel } from "@/components/admin-ai-health-panel";
 
 // Owner-only platform overview. Authorization is enforced in the database functions;
 // any failure renders the same plain not-found state as a missing route. Lists are
@@ -31,6 +38,12 @@ function AdminPage() {
     queryFn: () => getPlatformAdminTenantCaps({ data: {} }),
     retry: false,
     staleTime: 30_000,
+  });
+  const health = useQuery({
+    queryKey: ["platform-admin-ai-health"],
+    queryFn: () => getPlatformAiHealth({ data: {} }),
+    retry: false,
+    staleTime: 300_000,
   });
 
   if (isLoading)
@@ -62,6 +75,8 @@ function AdminPage() {
         loadingMore={loadingMore}
         onLoadMore={loadMore}
         caps={caps.data ?? null}
+        healthText={health.data?.text ?? null}
+        healthEmailSends={health.data?.emailSends ?? null}
       />
     </>
   );
@@ -73,12 +88,16 @@ export function AdminOverviewView({
   loadingMore = null,
   onLoadMore,
   caps = null,
+  healthText = null,
+  healthEmailSends = null,
 }: {
   data: AdminOverview;
   extra?: Partial<Record<Section, AdminPage<unknown>[]>>;
   loadingMore?: Section | null;
   onLoadMore?: (section: Section, cursor: string) => void;
   caps?: AdminTenantCaps | null;
+  healthText?: string | null;
+  healthEmailSends?: HealthEmailSendRow[] | null;
 }) {
   const pages = <T,>(section: Section, first: AdminPage<T>) => [
     first,
@@ -214,6 +233,7 @@ export function AdminOverviewView({
         {moreButton("disputes", data.disputes)}
       </section>
 
+      {healthText && <AdminAiHealthPanel healthText={healthText} emailSends={healthEmailSends} />}
       {caps && (
         <section className="mt-8">
           <h2 className="text-base font-medium">

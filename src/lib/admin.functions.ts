@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { Database } from "@/integrations/supabase/types";
 import { getAuthed } from "@/lib/supabase/server";
 import { freeWorkspaceDailyAttemptCap } from "@/lib/extraction.functions";
+import { composeAiHealthText, type AiHealthReport } from "./ai-health";
 
 // Deliberately NOT tenantMiddleware: the owner panel is cross-tenant and must never
 // auto-provision an organization for a caller.
@@ -162,6 +163,43 @@ export const getPlatformAdminTenantCaps = createServerFn({ method: "GET" })
       default_cap: freeWorkspaceDailyAttemptCap(),
     } as AdminTenantCaps;
   });
+
+export const getPlatformAiHealth = createServerFn({ method: "GET" })
+  .validator(z.object({}).strict())
+  .middleware([authedOnly])
+  .handler(async ({ context }) => {
+    const supabase = context?.supabase;
+    if (!supabase) throw opaque();
+    const { data, error } = await supabase.rpc("admin_get_ai_health");
+    if (error || !data) throw opaque();
+    // Owner-readable health-email delivery state (migration 20261025240000).
+    // A failure here must not hide the health report itself.
+    let emailSends: HealthEmailSendRow[] = [];
+    try {
+      const sends = await supabase.rpc("admin_list_health_email_sends", { p_days: 7 });
+      if (!sends.error && Array.isArray(sends.data)) {
+        emailSends = sends.data as unknown as HealthEmailSendRow[];
+      }
+    } catch {
+      emailSends = [];
+    }
+    return {
+      report: data as unknown as AiHealthReport,
+      text: composeAiHealthText(
+        data as unknown as AiHealthReport,
+        freeWorkspaceDailyAttemptCap() || null,
+      ),
+      emailSends,
+    };
+  });
+
+export type HealthEmailSendRow = {
+  day: string;
+  status: "sending" | "sent" | "send_failed" | "unknown";
+  detail: string | null;
+  provider_message_id: string | null;
+  updated_at: string;
+};
 
 export const setPlatformAdminTenantCap = createServerFn({ method: "POST" })
   .validator(

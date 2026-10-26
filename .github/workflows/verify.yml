@@ -43,6 +43,8 @@ jobs:
       - run: node scripts/fresh-rebuild-test.mjs
       - run: node scripts/load-50-tenants-mock-test.mjs
       - run: node scripts/historical-review-test.mjs
+      - run: COMBINED_HISTORICAL_PROOF=1 node scripts/historical-review-test.mjs
+      - run: MODEL_LIVE_STAGING_DEFAULT_ACL=1 COMBINED_HISTORICAL_PROOF=1 node scripts/historical-review-test.mjs
       - run: node scripts/integrated-pack-test.mjs
       - run: MODEL_LIVE_STAGING_DEFAULT_ACL=1 node scripts/integrated-pack-test.mjs
       - run: npm run build

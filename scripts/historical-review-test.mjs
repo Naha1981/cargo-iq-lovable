@@ -10,13 +10,38 @@ create function auth.uid() returns uuid language sql stable as $$select nullif(c
 create schema storage; create table storage.buckets(id text primary key,name text,public boolean);
 create table storage.objects(id uuid primary key default gen_random_uuid(),bucket_id text,name text,owner uuid);
 create function storage.foldername(n text) returns text[] language sql immutable as $$select string_to_array(n,'/')$$;`);
+const modeled = process.env.MODEL_LIVE_STAGING_DEFAULT_ACL === "1";
+if (modeled)
+  await db.exec(`alter default privileges in schema public grant all on tables to anon,authenticated,service_role;
+alter default privileges in schema public grant execute on functions to anon,authenticated,service_role;
+alter default privileges in schema public grant all on sequences to anon,authenticated,service_role;
+grant usage on schema public,auth to authenticated,anon,service_role;`);
 for (const dir of ["drizzle/migrations", "supabase/migrations"])
   for (const f of fs
     .readdirSync(dir)
     .filter((f) => f.endsWith(".sql"))
     .sort())
     await db.exec(fs.readFileSync(path.join(dir, f), "utf8"));
-await db.exec(fs.readFileSync("docs/proposals/historical_record_review.sql", "utf8"));
+if (process.env.COMBINED_HISTORICAL_PROOF === "1") {
+  for (const file of [
+    "feature_atomic_audit.sql",
+    "recovery_comparison_batch.sql",
+    "feature_readiness.sql",
+    "integrated_pack_source.sql",
+  ]) {
+    let sql = fs.readFileSync("docs/proposals/" + file, "utf8");
+    if (modeled && file === "integrated_pack_source.sql")
+      sql = sql.replaceAll("026e8afa51cdf2b5e758f08ead4d8c7e", "fa81f1f6a140130fe0322cec5e295f0d");
+    await db.exec(sql);
+  }
+}
+let historicalSql = fs.readFileSync("docs/proposals/historical_record_review.sql", "utf8");
+if (modeled)
+  historicalSql = historicalSql.replaceAll(
+    "8792dbda9eaaae95aa4b713aa0dddfb8",
+    "aa2789627894f250f3bb1693bc3f6699",
+  );
+await db.exec(historicalSql);
 const readinessSql = fs.readFileSync("docs/proposals/historical_record_review.sql", "utf8");
 const fingerprintSql = readinessSql.slice(
   readinessSql.indexOf(" select md5(") + 1,
@@ -82,6 +107,27 @@ assert.equal(
   1,
 );
 await assert.rejects(() => call(C, R, "2025-12-04"), /REVIEW_REQUEST_CONFLICT/);
+if (process.env.COMBINED_HISTORICAL_PROOF === "1" && !modeled) {
+  assert.equal(
+    (await db.query("select cargoiq_integrated_feature_readiness() r")).rows[0].r.ready,
+    true,
+  );
+  await assert.rejects(() => db.query("select current_pack_source($1)", [C]), /permission denied/);
+  console.log(
+    "PASS ordinary ACL combined install: both readiness can be true but authenticated source generation lacks risk SELECT grants; activation is BLOCKED, no owner fallback",
+  );
+  await db.close();
+  process.exit(0);
+}
+assert.equal(
+  (await db.query("select cargoiq_historical_review_readiness() r")).rows[0].r.ready,
+  true,
+);
+if (process.env.COMBINED_HISTORICAL_PROOF === "1")
+  assert.equal(
+    (await db.query("select cargoiq_integrated_feature_readiness() r")).rows[0].r.ready,
+    true,
+  );
 const source = (await db.query("select current_pack_source($1) s", [C])).rows[0].s;
 assert.equal(source.externalObservations[0].payload.records.length, 1);
 assert.equal(JSON.stringify(source).includes("OTHER-CASE-PRIVATE"), false);
@@ -90,6 +136,11 @@ const canonical = JSON.stringify({ ...source, generatedAt: new Date().toISOStrin
 const pack = (await db.query("select * from persist_evidence_pack_atomic($1,$2)", [C, canonical]))
   .rows[0];
 assert.equal(pack.canonical_payload, canonical);
+if (process.env.HISTORICAL_SYNTHETIC_PACK_PATH)
+  fs.writeFileSync(
+    process.env.HISTORICAL_SYNTHETIC_PACK_PATH,
+    JSON.stringify({ ...pack, test_hash: true }),
+  );
 assert.equal(
   pack.pack_payload.externalObservations[0].payload.records[0].title,
   "SAST matching source",

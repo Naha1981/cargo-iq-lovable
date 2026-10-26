@@ -15,7 +15,9 @@
     "test:investigation": "vitest run src/test/investigation-engine.test.ts"
   },
   "overrides": {
-    "rolldown": "1.2.1"
+    "rolldown": "1.2.1",
+    "@loaders.gl/textures": "4.5.4",
+    "fflate": "0.7.5"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.83",
@@ -86,6 +88,7 @@
   "devDependencies": {
     "@electric-sql/pglite": "^0.3.14",
     "@eslint/js": "^9.32.0",
+    "@testing-library/dom": "^10.4.2",
     "@testing-library/jest-dom": "^6.6.0",
     "@testing-library/react": "^16.0.0",
     "@types/d3-array": "^3.2.2",

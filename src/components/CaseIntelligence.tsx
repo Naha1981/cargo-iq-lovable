@@ -8,7 +8,11 @@ import {
   updateAlertStatus,
   verifyRiskAlert,
 } from "@/lib/risk-events.functions";
-import { COST_CATEGORIES, VERIFICATION_DECISIONS, caseScopedVerificationStatus } from "@/lib/risk-events";
+import {
+  COST_CATEGORIES,
+  VERIFICATION_DECISIONS,
+  caseScopedVerificationStatus,
+} from "@/lib/risk-events";
 import type { Database } from "@/integrations/supabase/types";
 
 type RiskEventRow = Database["public"]["Tables"]["risk_events"]["Row"];

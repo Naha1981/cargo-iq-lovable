@@ -1981,6 +1981,418 @@ export type Database = {
           },
         ];
       };
+      simulation_scenario_events: {
+        Row: {
+          action: string;
+          actor: string | null;
+          created_at: string;
+          detail: Json;
+          id: string;
+          scenario_id: string;
+          tenant_id: string;
+        };
+        Insert: {
+          action: string;
+          actor?: string | null;
+          created_at?: string;
+          detail?: Json;
+          id?: string;
+          scenario_id: string;
+          tenant_id: string;
+        };
+        Update: {
+          action?: string;
+          actor?: string | null;
+          created_at?: string;
+          detail?: Json;
+          id?: string;
+          scenario_id?: string;
+          tenant_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "simulation_scenario_events_scenario_id_fkey";
+            columns: ["scenario_id"];
+            isOneToOne: false;
+            referencedRelation: "simulation_scenarios";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      simulation_scenarios: {
+        Row: {
+          area_description: string | null;
+          assumptions: Json;
+          baseline_metrics: Json | null;
+          comparison_summary: Json | null;
+          corridor: string | null;
+          created_at: string;
+          created_by: string | null;
+          decided_at: string | null;
+          decided_by: string | null;
+          decision_action: string | null;
+          decision_summary: string | null;
+          ends_at: string | null;
+          evidence_refs: Json;
+          id: string;
+          name: string;
+          port_code: string | null;
+          scenario_metrics: Json | null;
+          scenario_type: string;
+          severity: string;
+          starts_at: string | null;
+          status: string;
+          tenant_id: string;
+          updated_at: string;
+          vessel_name: string | null;
+        };
+        Insert: {
+          area_description?: string | null;
+          assumptions?: Json;
+          baseline_metrics?: Json | null;
+          comparison_summary?: Json | null;
+          corridor?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          decided_at?: string | null;
+          decided_by?: string | null;
+          decision_action?: string | null;
+          decision_summary?: string | null;
+          ends_at?: string | null;
+          evidence_refs?: Json;
+          id?: string;
+          name: string;
+          port_code?: string | null;
+          scenario_metrics?: Json | null;
+          scenario_type: string;
+          severity?: string;
+          starts_at?: string | null;
+          status?: string;
+          tenant_id: string;
+          updated_at?: string;
+          vessel_name?: string | null;
+        };
+        Update: {
+          area_description?: string | null;
+          assumptions?: Json;
+          baseline_metrics?: Json | null;
+          comparison_summary?: Json | null;
+          corridor?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          decided_at?: string | null;
+          decided_by?: string | null;
+          decision_action?: string | null;
+          decision_summary?: string | null;
+          ends_at?: string | null;
+          evidence_refs?: Json;
+          id?: string;
+          name?: string;
+          port_code?: string | null;
+          scenario_metrics?: Json | null;
+          scenario_type?: string;
+          severity?: string;
+          starts_at?: string | null;
+          status?: string;
+          tenant_id?: string;
+          updated_at?: string;
+          vessel_name?: string | null;
+        };
+        Relationships: [];
+      };
+      recovery_finding_events: {
+        Row: {
+          action: string;
+          actor: string | null;
+          created_at: string;
+          detail: Json;
+          finding_id: string;
+          id: string;
+          tenant_id: string;
+        };
+        Insert: {
+          action: string;
+          actor?: string | null;
+          created_at?: string;
+          detail?: Json;
+          finding_id: string;
+          id?: string;
+          tenant_id: string;
+        };
+        Update: {
+          action?: string;
+          actor?: string | null;
+          created_at?: string;
+          detail?: Json;
+          finding_id?: string;
+          id?: string;
+          tenant_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "recovery_finding_events_finding_id_fkey";
+            columns: ["finding_id"];
+            isOneToOne: false;
+            referencedRelation: "recovery_findings";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      recovery_findings: {
+        Row: {
+          actual_amount: number | null;
+          assigned_to: string | null;
+          calculation: Json;
+          case_id: string | null;
+          created_at: string;
+          created_by: string | null;
+          currency: string;
+          evidence_refs: Json;
+          expected_amount: number | null;
+          finding_type: string;
+          id: string;
+          reviewed_at: string | null;
+          reviewed_by: string | null;
+          source_document_ids: string[];
+          status: string;
+          tenant_id: string;
+          title: string;
+          updated_at: string;
+        };
+        Insert: {
+          actual_amount?: number | null;
+          assigned_to?: string | null;
+          calculation?: Json;
+          case_id?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          currency?: string;
+          evidence_refs?: Json;
+          expected_amount?: number | null;
+          finding_type: string;
+          id?: string;
+          reviewed_at?: string | null;
+          reviewed_by?: string | null;
+          source_document_ids?: string[];
+          status?: string;
+          tenant_id: string;
+          title: string;
+          updated_at?: string;
+        };
+        Update: {
+          actual_amount?: number | null;
+          assigned_to?: string | null;
+          calculation?: Json;
+          case_id?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          currency?: string;
+          evidence_refs?: Json;
+          expected_amount?: number | null;
+          finding_type?: string;
+          id?: string;
+          reviewed_at?: string | null;
+          reviewed_by?: string | null;
+          source_document_ids?: string[];
+          status?: string;
+          tenant_id?: string;
+          title?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "recovery_findings_case_id_fkey";
+            columns: ["case_id"];
+            isOneToOne: false;
+            referencedRelation: "cases";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "recovery_findings_tenant_id_fkey";
+            columns: ["tenant_id"];
+            isOneToOne: false;
+            referencedRelation: "tenants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      geospatial_finding_events: {
+        Row: {
+          action: string;
+          actor: string | null;
+          created_at: string;
+          detail: Json;
+          finding_id: string;
+          id: string;
+          tenant_id: string;
+        };
+        Insert: {
+          action: string;
+          actor?: string | null;
+          created_at?: string;
+          detail?: Json;
+          finding_id: string;
+          id?: string;
+          tenant_id: string;
+        };
+        Update: {
+          action?: string;
+          actor?: string | null;
+          created_at?: string;
+          detail?: Json;
+          finding_id?: string;
+          id?: string;
+          tenant_id?: string;
+        };
+        Relationships: [];
+      };
+      geospatial_findings: {
+        Row: {
+          alternatives: string | null;
+          case_id: string | null;
+          confidence: string;
+          created_at: string;
+          created_by: string | null;
+          event_time: string | null;
+          id: string;
+          latitude: number | null;
+          limitations: string | null;
+          longitude: number | null;
+          method: string;
+          next_action: string | null;
+          observation_time: string | null;
+          rationale: string | null;
+          review_status: string;
+          source: string;
+          summary: string | null;
+          tenant_id: string;
+          title: string;
+          updated_at: string;
+        };
+        Insert: {
+          alternatives?: string | null;
+          case_id?: string | null;
+          confidence?: string;
+          created_at?: string;
+          created_by?: string | null;
+          event_time?: string | null;
+          id?: string;
+          latitude?: number | null;
+          limitations?: string | null;
+          longitude?: number | null;
+          method: string;
+          next_action?: string | null;
+          observation_time?: string | null;
+          rationale?: string | null;
+          review_status?: string;
+          source: string;
+          summary?: string | null;
+          tenant_id: string;
+          title: string;
+          updated_at?: string;
+        };
+        Update: {
+          alternatives?: string | null;
+          case_id?: string | null;
+          confidence?: string;
+          created_at?: string;
+          created_by?: string | null;
+          event_time?: string | null;
+          id?: string;
+          latitude?: number | null;
+          limitations?: string | null;
+          longitude?: number | null;
+          method?: string;
+          next_action?: string | null;
+          observation_time?: string | null;
+          rationale?: string | null;
+          review_status?: string;
+          source?: string;
+          summary?: string | null;
+          tenant_id?: string;
+          title?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      scene_asset_events: {
+        Row: {
+          action: string;
+          actor: string | null;
+          asset_id: string;
+          created_at: string;
+          detail: Json;
+          id: string;
+          tenant_id: string;
+        };
+        Insert: {
+          action: string;
+          actor?: string | null;
+          asset_id: string;
+          created_at?: string;
+          detail?: Json;
+          id?: string;
+          tenant_id: string;
+        };
+        Update: {
+          action?: string;
+          actor?: string | null;
+          asset_id?: string;
+          created_at?: string;
+          detail?: Json;
+          id?: string;
+          tenant_id?: string;
+        };
+        Relationships: [];
+      };
+      scene_assets: {
+        Row: {
+          acquired_at: string | null;
+          case_id: string | null;
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          name: string;
+          provenance: Json;
+          source_ref: string | null;
+          source_type: string;
+          status: string;
+          tenant_id: string;
+          tileset_url: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          acquired_at?: string | null;
+          case_id?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          name: string;
+          provenance?: Json;
+          source_ref?: string | null;
+          source_type: string;
+          status?: string;
+          tenant_id: string;
+          tileset_url?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          acquired_at?: string | null;
+          case_id?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          name?: string;
+          provenance?: Json;
+          source_ref?: string | null;
+          source_type?: string;
+          status?: string;
+          tenant_id?: string;
+          tileset_url?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       risk_events: {
         Row: {
           confidence: string;
@@ -2198,6 +2610,10 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      cargoiq_create_recovery_batch: {
+        Args: { p_tenant: string; p_request: string; p_rows: Json };
+        Returns: Database["public"]["Tables"]["recovery_findings"]["Row"][];
+      };
       admin_get_dispute: {
         Args: { p_id: string };
         Returns: Json;

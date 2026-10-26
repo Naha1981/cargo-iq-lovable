@@ -8,6 +8,8 @@
   var EMBED = qs0.get("embed") === "1"; // running inside a CargoIQ case tab
   var SAMPLE_CASE = !EMBED || qs0.get("sample") === "1"; // fictional sample case UI only for the sample case
   var MAX_VESSELS = 400;
+  var historicalReviewActive = false;
+  var historicalSelection = null;
 
   var VIEW = {
     durban: { lon: 31.045, lat: -29.872, alt: 11000 },
@@ -141,7 +143,8 @@
         document.querySelector(".card:not(.hidden), #scrub-bar:not(.hidden), #fp-hud:not(.hidden)")
       ) {
         noteShown = true;
-        $("desktop-note").classList.add("hidden");
+        if (!$("desktop-note").classList.contains("hidden"))
+          $("desktop-note").classList.add("hidden");
       }
     }).observe(document.body, { attributes: true, subtree: true, attributeFilter: ["class"] });
   }
@@ -212,6 +215,7 @@
       if (rec.name) v.entity.label.text = rec.name;
       v.rec = rec;
     }
+    if (historicalReviewActive) v.entity.show = false;
     var hist = v.history || (v.history = []);
     var last = hist[hist.length - 1];
     if (!last || last.lon !== rec.lon || last.lat !== rec.lat) {
@@ -1183,7 +1187,169 @@
     });
     return best;
   }
+  // Historical intent is reviewed before any live camera, conditions, replay,
+  // external TTS or miss logging. Records come only from the authenticated parent.
+  var historyRecords = [],
+    historyReady = false;
+  var historyPlaces = VOICE_TERMINALS.concat(VOICE_PLACES)
+    .map(function (p) {
+      return p.view && VIEW[p.view] ? Object.assign({}, p, VIEW[p.view]) : p;
+    })
+    .filter(function (p) {
+      return Number.isFinite(p.lat) && Number.isFinite(p.lon);
+    });
+  historyPlaces.forEach(function (p, i) {
+    var option = document.createElement("option");
+    option.value = String(i);
+    option.textContent = p.names[0];
+    $("history-place").appendChild(option);
+  });
+  function historyReply(text) {
+    $("voice-reply").textContent = text;
+    $("voice-reply").classList.remove("hidden");
+    $("voice-panel").classList.remove("hidden");
+  }
+  function reviewHistory(raw) {
+    var parsed = window.CargoHistoryCommand.parse(raw);
+    if (!parsed.historical) return false;
+    cargoHeard(raw);
+    stopReplay();
+    stopTrack();
+    $("history-command").classList.remove("hidden");
+    $("history-date").value = parsed.date || "";
+    $("history-confirm-date").textContent =
+      "Proposed date: " + window.CargoHistoryCommand.formatDate(parsed.date);
+    $("history-place").value = "";
+    var normalized = normVoice(raw);
+    var hits = historyPlaces
+      .map(function (p, i) {
+        return { place: p, index: i };
+      })
+      .filter(function (x) {
+        return (
+          x.place.names.some(function (alias) {
+            return normalized.indexOf(alias) >= 0;
+          }) ||
+          (x.place.key === "point" && /terminal point/.test(normalized))
+        );
+      });
+    if (hits.length === 1) $("history-place").value = String(hits[0].index);
+    $("history-records").replaceChildren();
+    $("history-status").textContent =
+      "Not executed. Confirm the exact place and complete date. Ambiguous numeric and relative dates are not guessed.";
+    historyReply(
+      "Historical request needs place/date review below. No live feed or fictional replay is used as historical evidence.",
+    );
+    return true;
+  }
+  window.addEventListener("message", function (event) {
+    if (event.origin !== window.location.origin || event.source !== window.parent) return;
+    if (EMBED && event.data?.type === "cargo-history-request-ready") {
+      window.parent.postMessage({ type: "cargo-history-ready" }, window.location.origin);
+      return;
+    }
+    if (event.data?.type !== "cargo-history-records") return;
+    historyRecords = Array.isArray(event.data.records) ? event.data.records.slice(0, 3000) : [];
+    historyReady = true;
+    if (historicalReviewActive) {
+      $("history-status").textContent =
+        "Case timeline updated. Select Show recorded evidence again to refresh this historical review.";
+      $("history-records").replaceChildren();
+    }
+  });
+  if (EMBED) window.parent.postMessage({ type: "cargo-history-ready" }, window.location.origin);
+  $("history-date").addEventListener("change", function () {
+    $("history-confirm-date").textContent =
+      "Selected date: " + window.CargoHistoryCommand.formatDate($("history-date").value);
+  });
+  $("history-apply").addEventListener("click", function () {
+    var value = $("history-place").value,
+      date = $("history-date").value;
+    if (value === "" || !date) {
+      $("history-status").textContent = "Choose an exact place and a complete date first.";
+      return;
+    }
+    var place = historyPlaces[Number(value)];
+    if (!place) return;
+    stopReplay();
+    stopTrack();
+    clearScrubEntities();
+    clearWorldLine();
+    fpStop();
+    [
+      "cond-panel",
+      "scrub-bar",
+      "recon-panel",
+      "risk-panel",
+      "cam-panel",
+      "ev-card",
+      "dispute-card",
+      "replay-panel",
+    ].forEach(function (id) {
+      if ($(id)) $(id).classList.add("hidden");
+    });
+    selectedMmsi = null;
+    historicalReviewActive = true;
+    historicalSelection = { date: date, place: place.names[0], lat: place.lat, lon: place.lon };
+    $("history-map-label").textContent =
+      "Historical record filter: " +
+      window.CargoHistoryCommand.formatDate(date) +
+      ". Candidate place: " +
+      place.names[0] +
+      ". Basemap is reference imagery, NOT imagery from the selected date. Live vessel markers hidden.";
+    $("history-map-label").classList.remove("hidden");
+    // Hide live markers while reviewing a historical day. Do not present now as then.
+    vessels.forEach(function (v) {
+      if (v.entity) v.entity.show = false;
+    });
+    disputeEntity.show = false;
+    flyToPoint(place.lon, place.lat, place.alt || 10000);
+    var matches = window.CargoHistoryCommand.recordsFor(historyRecords, date, place);
+    $("history-records").replaceChildren();
+    matches.forEach(function (r) {
+      var li = document.createElement("li"),
+        button = document.createElement("button");
+      button.textContent = r.title + " | " + r.timestamp + " | " + r.nature + " | " + r.source;
+      button.addEventListener("click", function () {
+        flyToPoint(r.lon, r.lat, 6000);
+        historyReply(
+          "Selected recorded evidence: " +
+            r.title +
+            ". " +
+            r.timestamp +
+            ". " +
+            r.source +
+            ". No imagery or vessel identity inferred.",
+        );
+      });
+      li.appendChild(button);
+      $("history-records").appendChild(li);
+    });
+    $("history-status").textContent =
+      "Map moved to candidate reference place: " +
+      place.names[0] +
+      ". Selected day " +
+      window.CargoHistoryCommand.formatDate(date) +
+      " (Africa/Johannesburg). " +
+      (!historyReady
+        ? "Case evidence is not connected in this view; availability cannot be checked."
+        : matches.length
+          ? matches.length +
+            " case timeline record(s) within 2 km. Listed times are recorded event times, not upload times."
+          : "No geolocated case timeline records for this day within 2 km. This does not prove no event occurred.") +
+      " Historical imagery and footage availability are not established. Live markers hidden for this historical review.";
+    historyReply(
+      "Historical place/date selected. Review the recorded evidence list below; no historical imagery has been loaded.",
+    );
+  });
   function handleVoiceCommand(raw) {
+    if (reviewHistory(raw)) return;
+    if (historicalReviewActive) {
+      historyReply(
+        "Historical review stays active. Use Exit historical review before live commands, conditions or fictional replay.",
+      );
+      return;
+    }
     var t0 = (raw || "").toLowerCase().trim();
     if (!t0) return;
     cargoHeard(raw);
@@ -1640,6 +1806,8 @@
     SCRUB.entities = [];
   }
   function applyScrub(t) {
+    historicalReviewActive = false;
+    $("history-map-label").classList.add("hidden");
     SCRUB.t = t;
     var inWindow = SCRUB.evidence && t >= CASE.events[0].ts && t <= CASE.events[3].ts;
     var winPrefix = inWindow ? "DISPUTED WINDOW - " : "";
@@ -1685,6 +1853,7 @@
     } else {
       Promise.all([loadHistoryDay(utcDay(t)), loadHistoryDay(utcDay(t - 86400))]).then(
         function (days) {
+          if (historicalReviewActive) return; // A later explicit historical review wins over in-flight scrub snapshots.
           var recs = days[0].concat(days[1]);
           var best = null,
             bd = 1e9;
@@ -1948,7 +2117,9 @@
           doc.text(
             "Sealed " +
               fmtSAST(it.sealedAt) +
-              " SAST - view as of " +
+              (it.historicalReview
+                ? " SAST - reference view saved, NOT selected-date imagery. Save time: "
+                : " SAST - view as of ") +
               fmtSAST(it.shownTime) +
               " SAST",
             14,
@@ -2600,6 +2771,18 @@
     }
   }
   function traySubject() {
+    if (historicalReviewActive && historicalSelection)
+      return {
+        label:
+          "Historical record review: " +
+          window.CargoHistoryCommand.formatDate(historicalSelection.date) +
+          ", candidate " +
+          historicalSelection.place,
+        source:
+          "Esri reference basemap, NOT imagery from selected date. Case timeline filter only.",
+        limits:
+          "Candidate reference location, not verified terminal identity. Nearby records do not establish imagery coverage or vessel identity. Live markers hidden. Selected date is a record filter, not image capture time. Local browser tray only, not saved to authenticated case evidence pack.",
+      };
     if (!$("ev-card").classList.contains("hidden"))
       return {
         label: $("ev-title").textContent,
@@ -2657,7 +2840,7 @@
   function sealEvidence() {
     var subj = traySubject();
     var t = SCRUB.active && SCRUB.t ? SCRUB.t : Math.floor(Date.now() / 1000);
-    var img = captureMapImage();
+    var img = historicalReviewActive ? null : captureMapImage();
     var item = {
       sealedAt: Math.floor(Date.now() / 1000),
       shownTime: t,
@@ -2665,12 +2848,31 @@
       source: subj.source,
       limits: subj.limits + (img ? "" : " Map image unavailable in this mode; text record sealed."),
       img: img,
+      historicalReview: historicalReviewActive
+        ? {
+            ...historicalSelection,
+            basemapIsHistorical: false,
+            terminalIdentityVerified: false,
+            recordIds: window.CargoHistoryCommand.recordsFor(
+              historyRecords,
+              historicalSelection.date,
+              historicalSelection,
+            ).map(function (r) {
+              return r.id;
+            }),
+          }
+        : null,
     };
     tray.push(item);
     if (tray.length > 20) tray.shift();
     saveTray();
     renderTray();
-    cargoSay("Sealed into the evidence pack: " + subj.label + ", " + fmtSAST(t) + " SAST.", null);
+    if (historicalReviewActive)
+      historyReply(
+        "Saved reference-view provenance in this browser's local tray only. Not attached to the authenticated case evidence pack.",
+      );
+    else
+      cargoSay("Sealed into the evidence pack: " + subj.label + ", " + fmtSAST(t) + " SAST.", null);
   }
   function renderTray() {
     $("ev-count").textContent = tray.length;
@@ -2689,8 +2891,13 @@
         '<div class="ev-meta"><b>' +
         esc(it.label) +
         "</b><br>" +
-        fmtSAST(it.shownTime) +
-        " SAST" +
+        (it.historicalReview
+          ? "Selected record day: " +
+            window.CargoHistoryCommand.formatDate(it.historicalReview.date) +
+            "; saved " +
+            fmtSAST(it.sealedAt) +
+            " SAST"
+          : fmtSAST(it.shownTime) + " SAST") +
         '<span class="ev-src">Source: ' +
         esc(it.source) +
         "<br>Limits: " +
@@ -2717,6 +2924,56 @@
     $("ev-tray").classList.add("hidden");
   });
   renderTray();
+
+  [
+    "cond-btn",
+    "scrub-chip",
+    "scrub-slider",
+    "risk-btn",
+    "recon-btn",
+    "replay-btn",
+    "case-replay",
+    "case-pdf",
+    "recon-samples",
+    "recon-fp",
+  ].forEach(function (id) {
+    if (!$(id)) return;
+    ["click", "input"].forEach(function (kind) {
+      $(id).addEventListener(
+        kind,
+        function (event) {
+          if (!historicalReviewActive) return;
+          event.stopImmediatePropagation();
+          event.preventDefault();
+          historyReply(
+            "Historical review stays active. Exit it explicitly before live conditions, time scrub, reconstruction or fictional replay.",
+          );
+        },
+        true,
+      );
+    });
+  });
+  $("case-pack").addEventListener(
+    "click",
+    function (event) {
+      if (!historicalReviewActive) return;
+      event.stopImmediatePropagation();
+      event.preventDefault();
+      historyReply(
+        "The reference review is stored only in this browser's tray, not the authenticated case evidence pack. Exit historical review to open the case pack; nothing is automatically attached.",
+      );
+    },
+    true,
+  );
+  $("history-exit").addEventListener("click", function () {
+    historicalReviewActive = false;
+    historicalSelection = null;
+    $("history-map-label").classList.add("hidden");
+    applyScrub(Date.now() / 1000);
+    historyReply(
+      "Exited historical review. Returned to live view; selected-day imagery was never loaded.",
+    );
+  });
 
   // ---------- deep links ----------
   var qs = new URLSearchParams(location.search);

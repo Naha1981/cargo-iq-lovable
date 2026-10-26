@@ -30,11 +30,13 @@ import { Route as CasesCaseIdIndexRouteImport } from './routes/cases.$caseId.ind
 import { Route as CasesCaseIdAppointmentsRouteImport } from './routes/cases.$caseId.appointments'
 import { Route as CasesCaseIdCctvRouteImport } from './routes/cases.$caseId.cctv'
 import { Route as CasesCaseIdClocksRouteImport } from './routes/cases.$caseId.clocks'
+import { Route as CasesCaseIdCorridorRouteImport } from './routes/cases.$caseId.corridor'
 import { Route as CasesCaseIdCountsRouteImport } from './routes/cases.$caseId.counts'
 import { Route as CasesCaseIdDefinitionsRouteImport } from './routes/cases.$caseId.definitions'
 import { Route as CasesCaseIdDocumentsRouteImport } from './routes/cases.$caseId.documents'
 import { Route as CasesCaseIdFinancialsRouteImport } from './routes/cases.$caseId.financials'
 import { Route as CasesCaseIdGapsRouteImport } from './routes/cases.$caseId.gaps'
+import { Route as CasesCaseIdGeospatialRouteImport } from './routes/cases.$caseId.geospatial'
 import { Route as CasesCaseIdImportsRouteImport } from './routes/cases.$caseId.imports'
 import { Route as CasesCaseIdIntelligenceRouteImport } from './routes/cases.$caseId.intelligence'
 import { Route as CasesCaseIdKpisRouteImport } from './routes/cases.$caseId.kpis'
@@ -42,6 +44,9 @@ import { Route as CasesCaseIdLiveHarbourRouteImport } from './routes/cases.$case
 import { Route as CasesCaseIdMapRouteImport } from './routes/cases.$caseId.map'
 import { Route as CasesCaseIdMatchesRouteImport } from './routes/cases.$caseId.matches'
 import { Route as CasesCaseIdPackRouteImport } from './routes/cases.$caseId.pack'
+import { Route as CasesCaseIdRecoveryRouteImport } from './routes/cases.$caseId.recovery'
+import { Route as CasesCaseIdSceneRouteImport } from './routes/cases.$caseId.scene'
+import { Route as CasesCaseIdSimulationRouteImport } from './routes/cases.$caseId.simulation'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -148,6 +153,11 @@ const CasesCaseIdClocksRoute = CasesCaseIdClocksRouteImport.update({
   path: '/clocks',
   getParentRoute: () => CasesCaseIdRoute,
 } as any)
+const CasesCaseIdCorridorRoute = CasesCaseIdCorridorRouteImport.update({
+  id: '/corridor',
+  path: '/corridor',
+  getParentRoute: () => CasesCaseIdRoute,
+} as any)
 const CasesCaseIdCountsRoute = CasesCaseIdCountsRouteImport.update({
   id: '/counts',
   path: '/counts',
@@ -171,6 +181,11 @@ const CasesCaseIdFinancialsRoute = CasesCaseIdFinancialsRouteImport.update({
 const CasesCaseIdGapsRoute = CasesCaseIdGapsRouteImport.update({
   id: '/gaps',
   path: '/gaps',
+  getParentRoute: () => CasesCaseIdRoute,
+} as any)
+const CasesCaseIdGeospatialRoute = CasesCaseIdGeospatialRouteImport.update({
+  id: '/geospatial',
+  path: '/geospatial',
   getParentRoute: () => CasesCaseIdRoute,
 } as any)
 const CasesCaseIdImportsRoute = CasesCaseIdImportsRouteImport.update({
@@ -208,6 +223,21 @@ const CasesCaseIdPackRoute = CasesCaseIdPackRouteImport.update({
   path: '/pack',
   getParentRoute: () => CasesCaseIdRoute,
 } as any)
+const CasesCaseIdRecoveryRoute = CasesCaseIdRecoveryRouteImport.update({
+  id: '/recovery',
+  path: '/recovery',
+  getParentRoute: () => CasesCaseIdRoute,
+} as any)
+const CasesCaseIdSceneRoute = CasesCaseIdSceneRouteImport.update({
+  id: '/scene',
+  path: '/scene',
+  getParentRoute: () => CasesCaseIdRoute,
+} as any)
+const CasesCaseIdSimulationRoute = CasesCaseIdSimulationRouteImport.update({
+  id: '/simulation',
+  path: '/simulation',
+  getParentRoute: () => CasesCaseIdRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -230,11 +260,13 @@ export interface FileRoutesByFullPath {
   '/cases/$caseId/appointments': typeof CasesCaseIdAppointmentsRoute
   '/cases/$caseId/cctv': typeof CasesCaseIdCctvRoute
   '/cases/$caseId/clocks': typeof CasesCaseIdClocksRoute
+  '/cases/$caseId/corridor': typeof CasesCaseIdCorridorRoute
   '/cases/$caseId/counts': typeof CasesCaseIdCountsRoute
   '/cases/$caseId/definitions': typeof CasesCaseIdDefinitionsRoute
   '/cases/$caseId/documents': typeof CasesCaseIdDocumentsRoute
   '/cases/$caseId/financials': typeof CasesCaseIdFinancialsRoute
   '/cases/$caseId/gaps': typeof CasesCaseIdGapsRoute
+  '/cases/$caseId/geospatial': typeof CasesCaseIdGeospatialRoute
   '/cases/$caseId/imports': typeof CasesCaseIdImportsRoute
   '/cases/$caseId/intelligence': typeof CasesCaseIdIntelligenceRoute
   '/cases/$caseId/kpis': typeof CasesCaseIdKpisRoute
@@ -242,6 +274,9 @@ export interface FileRoutesByFullPath {
   '/cases/$caseId/map': typeof CasesCaseIdMapRoute
   '/cases/$caseId/matches': typeof CasesCaseIdMatchesRoute
   '/cases/$caseId/pack': typeof CasesCaseIdPackRoute
+  '/cases/$caseId/recovery': typeof CasesCaseIdRecoveryRoute
+  '/cases/$caseId/scene': typeof CasesCaseIdSceneRoute
+  '/cases/$caseId/simulation': typeof CasesCaseIdSimulationRoute
   '/cases/$caseId/': typeof CasesCaseIdIndexRoute
 }
 export interface FileRoutesByTo {
@@ -264,11 +299,13 @@ export interface FileRoutesByTo {
   '/cases/$caseId/appointments': typeof CasesCaseIdAppointmentsRoute
   '/cases/$caseId/cctv': typeof CasesCaseIdCctvRoute
   '/cases/$caseId/clocks': typeof CasesCaseIdClocksRoute
+  '/cases/$caseId/corridor': typeof CasesCaseIdCorridorRoute
   '/cases/$caseId/counts': typeof CasesCaseIdCountsRoute
   '/cases/$caseId/definitions': typeof CasesCaseIdDefinitionsRoute
   '/cases/$caseId/documents': typeof CasesCaseIdDocumentsRoute
   '/cases/$caseId/financials': typeof CasesCaseIdFinancialsRoute
   '/cases/$caseId/gaps': typeof CasesCaseIdGapsRoute
+  '/cases/$caseId/geospatial': typeof CasesCaseIdGeospatialRoute
   '/cases/$caseId/imports': typeof CasesCaseIdImportsRoute
   '/cases/$caseId/intelligence': typeof CasesCaseIdIntelligenceRoute
   '/cases/$caseId/kpis': typeof CasesCaseIdKpisRoute
@@ -276,6 +313,9 @@ export interface FileRoutesByTo {
   '/cases/$caseId/map': typeof CasesCaseIdMapRoute
   '/cases/$caseId/matches': typeof CasesCaseIdMatchesRoute
   '/cases/$caseId/pack': typeof CasesCaseIdPackRoute
+  '/cases/$caseId/recovery': typeof CasesCaseIdRecoveryRoute
+  '/cases/$caseId/scene': typeof CasesCaseIdSceneRoute
+  '/cases/$caseId/simulation': typeof CasesCaseIdSimulationRoute
   '/cases/$caseId': typeof CasesCaseIdIndexRoute
 }
 export interface FileRoutesById {
@@ -300,11 +340,13 @@ export interface FileRoutesById {
   '/cases/$caseId/appointments': typeof CasesCaseIdAppointmentsRoute
   '/cases/$caseId/cctv': typeof CasesCaseIdCctvRoute
   '/cases/$caseId/clocks': typeof CasesCaseIdClocksRoute
+  '/cases/$caseId/corridor': typeof CasesCaseIdCorridorRoute
   '/cases/$caseId/counts': typeof CasesCaseIdCountsRoute
   '/cases/$caseId/definitions': typeof CasesCaseIdDefinitionsRoute
   '/cases/$caseId/documents': typeof CasesCaseIdDocumentsRoute
   '/cases/$caseId/financials': typeof CasesCaseIdFinancialsRoute
   '/cases/$caseId/gaps': typeof CasesCaseIdGapsRoute
+  '/cases/$caseId/geospatial': typeof CasesCaseIdGeospatialRoute
   '/cases/$caseId/imports': typeof CasesCaseIdImportsRoute
   '/cases/$caseId/intelligence': typeof CasesCaseIdIntelligenceRoute
   '/cases/$caseId/kpis': typeof CasesCaseIdKpisRoute
@@ -312,6 +354,9 @@ export interface FileRoutesById {
   '/cases/$caseId/map': typeof CasesCaseIdMapRoute
   '/cases/$caseId/matches': typeof CasesCaseIdMatchesRoute
   '/cases/$caseId/pack': typeof CasesCaseIdPackRoute
+  '/cases/$caseId/recovery': typeof CasesCaseIdRecoveryRoute
+  '/cases/$caseId/scene': typeof CasesCaseIdSceneRoute
+  '/cases/$caseId/simulation': typeof CasesCaseIdSimulationRoute
   '/cases/$caseId/': typeof CasesCaseIdIndexRoute
 }
 export interface FileRouteTypes {
@@ -337,11 +382,13 @@ export interface FileRouteTypes {
     | '/cases/$caseId/appointments'
     | '/cases/$caseId/cctv'
     | '/cases/$caseId/clocks'
+    | '/cases/$caseId/corridor'
     | '/cases/$caseId/counts'
     | '/cases/$caseId/definitions'
     | '/cases/$caseId/documents'
     | '/cases/$caseId/financials'
     | '/cases/$caseId/gaps'
+    | '/cases/$caseId/geospatial'
     | '/cases/$caseId/imports'
     | '/cases/$caseId/intelligence'
     | '/cases/$caseId/kpis'
@@ -349,6 +396,9 @@ export interface FileRouteTypes {
     | '/cases/$caseId/map'
     | '/cases/$caseId/matches'
     | '/cases/$caseId/pack'
+    | '/cases/$caseId/recovery'
+    | '/cases/$caseId/scene'
+    | '/cases/$caseId/simulation'
     | '/cases/$caseId/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -371,11 +421,13 @@ export interface FileRouteTypes {
     | '/cases/$caseId/appointments'
     | '/cases/$caseId/cctv'
     | '/cases/$caseId/clocks'
+    | '/cases/$caseId/corridor'
     | '/cases/$caseId/counts'
     | '/cases/$caseId/definitions'
     | '/cases/$caseId/documents'
     | '/cases/$caseId/financials'
     | '/cases/$caseId/gaps'
+    | '/cases/$caseId/geospatial'
     | '/cases/$caseId/imports'
     | '/cases/$caseId/intelligence'
     | '/cases/$caseId/kpis'
@@ -383,6 +435,9 @@ export interface FileRouteTypes {
     | '/cases/$caseId/map'
     | '/cases/$caseId/matches'
     | '/cases/$caseId/pack'
+    | '/cases/$caseId/recovery'
+    | '/cases/$caseId/scene'
+    | '/cases/$caseId/simulation'
     | '/cases/$caseId'
   id:
     | '__root__'
@@ -406,11 +461,13 @@ export interface FileRouteTypes {
     | '/cases/$caseId/appointments'
     | '/cases/$caseId/cctv'
     | '/cases/$caseId/clocks'
+    | '/cases/$caseId/corridor'
     | '/cases/$caseId/counts'
     | '/cases/$caseId/definitions'
     | '/cases/$caseId/documents'
     | '/cases/$caseId/financials'
     | '/cases/$caseId/gaps'
+    | '/cases/$caseId/geospatial'
     | '/cases/$caseId/imports'
     | '/cases/$caseId/intelligence'
     | '/cases/$caseId/kpis'
@@ -418,6 +475,9 @@ export interface FileRouteTypes {
     | '/cases/$caseId/map'
     | '/cases/$caseId/matches'
     | '/cases/$caseId/pack'
+    | '/cases/$caseId/recovery'
+    | '/cases/$caseId/scene'
+    | '/cases/$caseId/simulation'
     | '/cases/$caseId/'
   fileRoutesById: FileRoutesById
 }
@@ -589,6 +649,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CasesCaseIdClocksRouteImport
       parentRoute: typeof CasesCaseIdRoute
     }
+    '/cases/$caseId/corridor': {
+      id: '/cases/$caseId/corridor'
+      path: '/corridor'
+      fullPath: '/cases/$caseId/corridor'
+      preLoaderRoute: typeof CasesCaseIdCorridorRouteImport
+      parentRoute: typeof CasesCaseIdRoute
+    }
     '/cases/$caseId/counts': {
       id: '/cases/$caseId/counts'
       path: '/counts'
@@ -622,6 +689,13 @@ declare module '@tanstack/react-router' {
       path: '/gaps'
       fullPath: '/cases/$caseId/gaps'
       preLoaderRoute: typeof CasesCaseIdGapsRouteImport
+      parentRoute: typeof CasesCaseIdRoute
+    }
+    '/cases/$caseId/geospatial': {
+      id: '/cases/$caseId/geospatial'
+      path: '/geospatial'
+      fullPath: '/cases/$caseId/geospatial'
+      preLoaderRoute: typeof CasesCaseIdGeospatialRouteImport
       parentRoute: typeof CasesCaseIdRoute
     }
     '/cases/$caseId/imports': {
@@ -673,6 +747,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CasesCaseIdPackRouteImport
       parentRoute: typeof CasesCaseIdRoute
     }
+    '/cases/$caseId/recovery': {
+      id: '/cases/$caseId/recovery'
+      path: '/recovery'
+      fullPath: '/cases/$caseId/recovery'
+      preLoaderRoute: typeof CasesCaseIdRecoveryRouteImport
+      parentRoute: typeof CasesCaseIdRoute
+    }
+    '/cases/$caseId/scene': {
+      id: '/cases/$caseId/scene'
+      path: '/scene'
+      fullPath: '/cases/$caseId/scene'
+      preLoaderRoute: typeof CasesCaseIdSceneRouteImport
+      parentRoute: typeof CasesCaseIdRoute
+    }
+    '/cases/$caseId/simulation': {
+      id: '/cases/$caseId/simulation'
+      path: '/simulation'
+      fullPath: '/cases/$caseId/simulation'
+      preLoaderRoute: typeof CasesCaseIdSimulationRouteImport
+      parentRoute: typeof CasesCaseIdRoute
+    }
   }
 }
 
@@ -690,11 +785,13 @@ interface CasesCaseIdRouteChildren {
   CasesCaseIdAppointmentsRoute: typeof CasesCaseIdAppointmentsRoute
   CasesCaseIdCctvRoute: typeof CasesCaseIdCctvRoute
   CasesCaseIdClocksRoute: typeof CasesCaseIdClocksRoute
+  CasesCaseIdCorridorRoute: typeof CasesCaseIdCorridorRoute
   CasesCaseIdCountsRoute: typeof CasesCaseIdCountsRoute
   CasesCaseIdDefinitionsRoute: typeof CasesCaseIdDefinitionsRoute
   CasesCaseIdDocumentsRoute: typeof CasesCaseIdDocumentsRoute
   CasesCaseIdFinancialsRoute: typeof CasesCaseIdFinancialsRoute
   CasesCaseIdGapsRoute: typeof CasesCaseIdGapsRoute
+  CasesCaseIdGeospatialRoute: typeof CasesCaseIdGeospatialRoute
   CasesCaseIdImportsRoute: typeof CasesCaseIdImportsRoute
   CasesCaseIdIntelligenceRoute: typeof CasesCaseIdIntelligenceRoute
   CasesCaseIdKpisRoute: typeof CasesCaseIdKpisRoute
@@ -702,6 +799,9 @@ interface CasesCaseIdRouteChildren {
   CasesCaseIdMapRoute: typeof CasesCaseIdMapRoute
   CasesCaseIdMatchesRoute: typeof CasesCaseIdMatchesRoute
   CasesCaseIdPackRoute: typeof CasesCaseIdPackRoute
+  CasesCaseIdRecoveryRoute: typeof CasesCaseIdRecoveryRoute
+  CasesCaseIdSceneRoute: typeof CasesCaseIdSceneRoute
+  CasesCaseIdSimulationRoute: typeof CasesCaseIdSimulationRoute
   CasesCaseIdIndexRoute: typeof CasesCaseIdIndexRoute
 }
 
@@ -709,11 +809,13 @@ const CasesCaseIdRouteChildren: CasesCaseIdRouteChildren = {
   CasesCaseIdAppointmentsRoute: CasesCaseIdAppointmentsRoute,
   CasesCaseIdCctvRoute: CasesCaseIdCctvRoute,
   CasesCaseIdClocksRoute: CasesCaseIdClocksRoute,
+  CasesCaseIdCorridorRoute: CasesCaseIdCorridorRoute,
   CasesCaseIdCountsRoute: CasesCaseIdCountsRoute,
   CasesCaseIdDefinitionsRoute: CasesCaseIdDefinitionsRoute,
   CasesCaseIdDocumentsRoute: CasesCaseIdDocumentsRoute,
   CasesCaseIdFinancialsRoute: CasesCaseIdFinancialsRoute,
   CasesCaseIdGapsRoute: CasesCaseIdGapsRoute,
+  CasesCaseIdGeospatialRoute: CasesCaseIdGeospatialRoute,
   CasesCaseIdImportsRoute: CasesCaseIdImportsRoute,
   CasesCaseIdIntelligenceRoute: CasesCaseIdIntelligenceRoute,
   CasesCaseIdKpisRoute: CasesCaseIdKpisRoute,
@@ -721,6 +823,9 @@ const CasesCaseIdRouteChildren: CasesCaseIdRouteChildren = {
   CasesCaseIdMapRoute: CasesCaseIdMapRoute,
   CasesCaseIdMatchesRoute: CasesCaseIdMatchesRoute,
   CasesCaseIdPackRoute: CasesCaseIdPackRoute,
+  CasesCaseIdRecoveryRoute: CasesCaseIdRecoveryRoute,
+  CasesCaseIdSceneRoute: CasesCaseIdSceneRoute,
+  CasesCaseIdSimulationRoute: CasesCaseIdSimulationRoute,
   CasesCaseIdIndexRoute: CasesCaseIdIndexRoute,
 }
 

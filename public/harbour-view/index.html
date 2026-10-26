@@ -1,230 +1,420 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8">
-<!-- CSP delivered in-document because the static host does not send response headers for
+  <head>
+    <meta charset="utf-8" />
+    <!-- CSP delivered in-document because the static host does not send response headers for
      /harbour-view (verified 25 Oct). frame-ancestors is intentionally omitted: ignored in meta.
      Keep in sync with public/_headers and src/server.ts. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://server.arcgisonline.com https://cdn.jsdelivr.net; connect-src 'self' https://yeaflwgwrjznigykplur.supabase.co wss://yeaflwgwrjznigykplur.supabase.co https://naha1981.github.io wss://cargoiq-gods-eye.onrender.com https://cargoiq-gods-eye.onrender.com https://api.open-meteo.com https://marine-api.open-meteo.com https://terrain.reearth.land https://cdn.jsdelivr.net https://server.arcgisonline.com; worker-src 'self' blob: https://cdn.jsdelivr.net; frame-src https://restreamer.cd.net.za; object-src 'none'; base-uri 'self'; form-action 'self'">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CargoIQ Live Harbour View - NahaLabs</title>
-<meta name="description" content="Live vessel picture over Durban and Richards Bay, with disputed-cargo evidence pinned on the map. A CargoIQ proof by NahaLabs.">
-<meta property="og:title" content="CargoIQ Live Harbour View">
-<meta property="og:description" content="Live vessels around Durban and Richards Bay. One disputed container, pinned.">
-<meta property="og:type" content="website">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230a0f1a'/%3E%3Ccircle cx='16' cy='16' r='7' fill='none' stroke='%2322c55e' stroke-width='2.5'/%3E%3Ccircle cx='16' cy='16' r='2.4' fill='%2322c55e'/%3E%3C/svg%3E">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cesium@1.146.0/Build/Cesium/Widgets/widgets.css">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600;700&family=JetBrains+Mono:wght@600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/styles.css">
-<script src="assets/cesium-base.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/cesium@1.146.0/Build/Cesium/Cesium.js" integrity="sha384-1lWK5deN/B+lLaUw4lk6xKp/L19ii/98SZLk6K8YthDskgvc+GbdixLzbCnSS2Wn" crossorigin="anonymous"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" integrity="sha384-JcnsjUPPylna1s1fvi1u12X5qjY5OL56iySh75FdtrwhO/SWXgMjoVqcKyIIWOLk" crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/npm/exifr@7.1.3/dist/full.umd.min.js" integrity="sha384-GqsRTy0JWDEKvfibA1TiYY0lGRodW4PS02lggVHvO/CNVs/zoNx+DNfjs1Ikisbz" crossorigin="anonymous"></script>
-</head>
-<body>
-<div id="cesiumContainer"></div>
-  <button id="voice-btn" aria-label="Voice commands">
-    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v1a7 7 0 0 0 14 0v-1"/><line x1="12" y1="18" x2="12" y2="22"/></svg>
-  </button>
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://server.arcgisonline.com https://cdn.jsdelivr.net; connect-src 'self' https://yeaflwgwrjznigykplur.supabase.co wss://yeaflwgwrjznigykplur.supabase.co https://naha1981.github.io wss://cargoiq-gods-eye.onrender.com https://cargoiq-gods-eye.onrender.com https://api.open-meteo.com https://marine-api.open-meteo.com https://terrain.reearth.land https://cdn.jsdelivr.net https://server.arcgisonline.com; worker-src 'self' blob: https://cdn.jsdelivr.net; frame-src https://restreamer.cd.net.za; object-src 'none'; base-uri 'self'; form-action 'self'"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>CargoIQ Live Harbour View - NahaLabs</title>
+    <meta
+      name="description"
+      content="Live vessel picture over Durban and Richards Bay, with disputed-cargo evidence pinned on the map. A CargoIQ proof by NahaLabs."
+    />
+    <meta property="og:title" content="CargoIQ Live Harbour View" />
+    <meta
+      property="og:description"
+      content="Live vessels around Durban and Richards Bay. One disputed container, pinned."
+    />
+    <meta property="og:type" content="website" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230a0f1a'/%3E%3Ccircle cx='16' cy='16' r='7' fill='none' stroke='%2322c55e' stroke-width='2.5'/%3E%3Ccircle cx='16' cy='16' r='2.4' fill='%2322c55e'/%3E%3C/svg%3E"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/cesium@1.146.0/Build/Cesium/Widgets/widgets.css"
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600;700&family=JetBrains+Mono:wght@600;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="assets/styles.css" />
+    <script src="assets/cesium-base.js"></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/cesium@1.146.0/Build/Cesium/Cesium.js"
+      integrity="sha384-1lWK5deN/B+lLaUw4lk6xKp/L19ii/98SZLk6K8YthDskgvc+GbdixLzbCnSS2Wn"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"
+      integrity="sha384-JcnsjUPPylna1s1fvi1u12X5qjY5OL56iySh75FdtrwhO/SWXgMjoVqcKyIIWOLk"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/exifr@7.1.3/dist/full.umd.min.js"
+      integrity="sha384-GqsRTy0JWDEKvfibA1TiYY0lGRodW4PS02lggVHvO/CNVs/zoNx+DNfjs1Ikisbz"
+      crossorigin="anonymous"
+    ></script>
+  </head>
+  <body>
+    <div id="cesiumContainer"></div>
+    <div
+      id="history-map-label"
+      class="hidden"
+      style="
+        position: absolute;
+        left: 14px;
+        right: 76px;
+        bottom: 66px;
+        z-index: 20;
+        padding: 10px;
+        background: #fff8d7;
+        color: #322b13;
+        border: 1px solid #a08625;
+        border-radius: 10px;
+        font-size: 12px;
+        pointer-events: none;
+      "
+    ></div>
+    <button id="voice-btn" aria-label="Voice commands">
+      <svg
+        viewBox="0 0 24 24"
+        width="20"
+        height="20"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <rect x="9" y="2" width="6" height="12" rx="3" />
+        <path d="M5 10v1a7 7 0 0 0 14 0v-1" />
+        <line x1="12" y1="18" x2="12" y2="22" />
+      </svg>
+    </button>
 
-  <button id="scrub-chip" class="cond-chip" style="right: 14px; top: calc(112px + env(safe-area-inset-top));">TIME</button>
-  <div id="scrub-bar" class="hidden">
-    <div id="scrub-readout">Live - now</div>
-    <input id="scrub-slider" type="range" min="0" max="384" value="192" step="1">
-    <div id="scrub-track"><div id="scrub-window"><span>Disputed window</span></div></div>
-    <div id="scrub-ends"><span id="scrub-min"></span><span id="scrub-max"></span></div>
-  </div>
-
-  <div id="case-card" class="card hidden">
-    <button id="case-close" class="close-x" aria-label="Close">&times;</button>
-    <h3>Case DUR-2026-0412</h3>
-    <div class="kv">
-      <dt>Container</dt><dd>MSKU 482931 7</dd>
-      <dt>Vessel</dt><dd>MV Umhlanga Trader</dd>
-      <dt>Issue</dt><dd>Demurrage: free-time expiry vs berthing delay</dd>
+    <button
+      id="scrub-chip"
+      class="cond-chip"
+      style="right: 14px; top: calc(112px + env(safe-area-inset-top))"
+    >
+      TIME
+    </button>
+    <div id="scrub-bar" class="hidden">
+      <div id="scrub-readout">Live - now</div>
+      <input id="scrub-slider" type="range" min="0" max="384" value="192" step="1" />
+      <div id="scrub-track">
+        <div id="scrub-window"><span>Disputed window</span></div>
+      </div>
+      <div id="scrub-ends"><span id="scrub-min"></span><span id="scrub-max"></span></div>
     </div>
-    <div id="case-timeline"></div>
-    <div style="display:flex; gap:6px; margin-top:10px; flex-wrap:wrap;">
-      <button id="case-replay" class="mini-btn">Replay</button>
-      <button id="case-share" class="mini-btn">Copy replay link</button>
-      <button id="case-pdf" class="mini-btn">Evidence pack PDF</button>
+
+    <div id="case-card" class="card hidden">
+      <button id="case-close" class="close-x" aria-label="Close">&times;</button>
+      <h3>Case DUR-2026-0412</h3>
+      <div class="kv">
+        <dt>Container</dt>
+        <dd>MSKU 482931 7</dd>
+        <dt>Vessel</dt>
+        <dd>MV Umhlanga Trader</dd>
+        <dt>Issue</dt>
+        <dd>Demurrage: free-time expiry vs berthing delay</dd>
+      </div>
+      <div id="case-timeline"></div>
+      <div style="display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap">
+        <button id="case-replay" class="mini-btn">Replay</button>
+        <button id="case-share" class="mini-btn">Copy replay link</button>
+        <button id="case-pdf" class="mini-btn">Evidence pack PDF</button>
+      </div>
+      <div class="fine">Sample data. Fictional records.</div>
     </div>
-    <div class="fine">Sample data. Fictional records.</div>
-  </div>
-  <div id="ev-card" class="card hidden">
-    <button id="ev-close" class="close-x" aria-label="Close">&times;</button>
-    <h3 id="ev-title">Evidence</h3>
-    <div id="ev-meta" class="kv"></div>
-    <img id="ev-img" class="cam-frame hidden" alt="evidence frame">
-    <p id="ev-desc" class="replay-desc"></p>
-    <div class="fine">Sample data. Fictional records.</div>
-  </div>
-  <section id="recon-panel" class="card hidden">
-    <button id="recon-close" class="card-close" aria-label="Close">&times;</button>
-    <h3>Incident reconstruction <span class="dispute-badge">DISPUTED</span></h3>
-    <p class="card-source">Drop photos from the scene. GPS-tagged photos pin to their exact spot; others pin to the berth (assumed, labelled).</p>
-    <input type="file" id="recon-upload" accept="image/*" multiple style="margin-top:8px; font-size:12px;">
-    <div id="recon-list"></div>
-    <div style="display:flex; gap:6px; margin-top:8px; flex-wrap:wrap;">
-      <button id="recon-fp" class="mini-btn">First-person replay (NTSB)</button>
-      <button id="recon-samples" class="mini-btn">Load sample scene photos</button>
-      <button id="recon-clear" class="mini-btn">Clear photos</button>
+    <div id="ev-card" class="card hidden">
+      <button id="ev-close" class="close-x" aria-label="Close">&times;</button>
+      <h3 id="ev-title">Evidence</h3>
+      <div id="ev-meta" class="kv"></div>
+      <img id="ev-img" class="cam-frame hidden" alt="evidence frame" />
+      <p id="ev-desc" class="replay-desc"></p>
+      <div class="fine">Sample data. Fictional records.</div>
     </div>
-    <div class="fine">Reconstruction workspace. Sample case. Photos stay in this browser.</div>
-  </section>
-  <div id="fp-hud" class="hidden">
-    <button id="fp-stop" class="card-close" aria-label="Stop">&times;</button>
-    <div id="fp-step"></div>
-    <div id="fp-tele"></div>
-    <div id="fp-cap"></div>
-  </div>
-  <div id="voice-toast" class="hidden"></div>
-  <div id="voice-panel" class="card hidden">
-    <button id="voice-close" class="close-x" aria-label="Close">&times;</button>
-    <h3>Talk to CargoIQ</h3>
-    <div id="voice-status">Tap the mic to speak. Tap again to stop. Or type below.</div>
-    <div id="voice-heard" class="voice-line hidden"></div>
-    <div id="voice-reply" class="voice-line hidden"></div>
-    <div id="voice-input-row">
-      <input id="voice-text" type="text" placeholder='Try "show the disputed container"' autocomplete="off">
-      <button id="voice-send">Send</button>
+    <section id="recon-panel" class="card hidden">
+      <button id="recon-close" class="card-close" aria-label="Close">&times;</button>
+      <h3>Incident reconstruction <span class="dispute-badge">DISPUTED</span></h3>
+      <p class="card-source">
+        Drop photos from the scene. GPS-tagged photos pin to their exact spot; others pin to the
+        berth (assumed, labelled).
+      </p>
+      <input
+        type="file"
+        id="recon-upload"
+        accept="image/*"
+        multiple
+        style="margin-top: 8px; font-size: 12px"
+      />
+      <div id="recon-list"></div>
+      <div style="display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap">
+        <button id="recon-fp" class="mini-btn">First-person replay (NTSB)</button>
+        <button id="recon-samples" class="mini-btn">Load sample scene photos</button>
+        <button id="recon-clear" class="mini-btn">Clear photos</button>
+      </div>
+      <div class="fine">Reconstruction workspace. Sample case. Photos stay in this browser.</div>
+    </section>
+    <div id="fp-hud" class="hidden">
+      <button id="fp-stop" class="card-close" aria-label="Stop">&times;</button>
+      <div id="fp-step"></div>
+      <div id="fp-tele"></div>
+      <div id="fp-cap"></div>
     </div>
-    <details id="voice-help"><summary>What you can say</summary>
-      <ul>
-        <li>"Show Durban" / "Fly to Richards Bay"</li>
-        <li>"Show the disputed container"</li>
-        <li>"Track MSC Grenada"</li>
-        <li>"Show the nearest camera"</li>
-        <li>"Port conditions"</li>
-        <li>"Replay the case"</li>
-        <li>"Stop"</li>
-      </ul>
-    </details>
-  </div>
+    <div id="voice-toast" class="hidden"></div>
+    <div id="voice-panel" class="card hidden">
+      <button id="voice-close" class="close-x" aria-label="Close">&times;</button>
+      <h3>Talk to CargoIQ</h3>
+      <div id="voice-status">Tap the mic to speak. Tap again to stop. Or type below.</div>
+      <div id="voice-heard" class="voice-line hidden"></div>
+      <div id="voice-reply" class="voice-line hidden"></div>
+      <div id="voice-input-row">
+        <input
+          id="voice-text"
+          type="text"
+          placeholder='Try "show the disputed container"'
+          autocomplete="off"
+        />
+        <button id="voice-send">Send</button>
+      </div>
+      <section id="history-command" class="hidden" aria-label="Historical evidence navigation">
+        <h4>Review historical place and date</h4>
+        <p>
+          Confirm both fields before moving the map. Dates use South African time. Nearby recorded
+          coordinates do not prove terminal identity or historical imagery coverage.
+        </p>
+        <label
+          >Candidate reference place
+          <select id="history-place">
+            <option value="">Choose an exact place</option>
+          </select></label
+        >
+        <label>Date <input id="history-date" type="date" /></label>
+        <p id="history-confirm-date" role="status"></p>
+        <p>
+          Place choices are reference locations, not verified terminal identities. Choose a
+          different place if the proposal is wrong.
+        </p>
+        <button id="history-exit" type="button">Exit historical review</button>
+        <button id="history-apply">Show recorded evidence</button>
+        <p id="history-status" role="status"></p>
+        <ul id="history-records"></ul>
+      </section>
+      <details id="voice-help">
+        <summary>What you can say</summary>
+        <ul>
+          <li>"Show Durban" / "Fly to Richards Bay"</li>
+          <li>
+            "Take me to Point terminal on 3 December 2025" (review place/date, then recorded
+            evidence only)
+          </li>
+          <li>"Show the disputed container"</li>
+          <li>"Track MSC Grenada"</li>
+          <li>"Show the nearest camera"</li>
+          <li>"Port conditions"</li>
+          <li>"Replay the case"</li>
+          <li>"Stop"</li>
+        </ul>
+      </details>
+    </div>
 
-<header id="hud-top">
-  <div class="brand">
-    <span class="wordmark">NAHALABS</span>
-    <span class="product">CargoIQ <em>Live Harbour View</em></span>
-    <span class="purpose-line"><b>Purpose:</b> evidence map for the case. <b>Look at:</b> any ship, camera or pin. <b>Then:</b> ADD TO EVIDENCE seals this exact view into the pack.</span>
-  </div>
-  <button id="case-pack" class="pack-chip hidden">Open case evidence pack</button>
-  <div id="status-pill" class="pill pill-warm"><span class="dot"></span><span id="status-text">CONNECTING</span></div>
-</header>
+    <header id="hud-top">
+      <div class="brand">
+        <span class="wordmark">NAHALABS</span>
+        <span class="product">CargoIQ <em>Live Harbour View</em></span>
+        <span class="purpose-line"
+          ><b>Purpose:</b> evidence map for the case. <b>Look at:</b> any ship, camera or pin.
+          <b>Then:</b> ADD TO EVIDENCE stores a local reference record with its source and
+          limits.</span
+        >
+      </div>
+      <button id="case-pack" class="pack-chip hidden">Open case evidence pack</button>
+      <div id="status-pill" class="pill pill-warm">
+        <span class="dot"></span><span id="status-text">CONNECTING</span>
+      </div>
+    </header>
 
-<nav id="hud-flyto" aria-label="Fly to">
-  <button class="flybtn" data-target="durban">Durban</button>
-  <button class="flybtn" data-target="richards">Richards Bay</button>
-  <button class="flybtn flybtn-alert" data-target="dispute" aria-label="Fly to the disputed container">Disputed</button>
-</nav>
+    <nav id="hud-flyto" aria-label="Fly to">
+      <button class="flybtn" data-target="durban">Durban</button>
+      <button class="flybtn" data-target="richards">Richards Bay</button>
+      <button
+        class="flybtn flybtn-alert"
+        data-target="dispute"
+        aria-label="Fly to the disputed container"
+      >
+        Disputed
+      </button>
+    </nav>
 
-<div id="vessel-count" class="count-chip">0 vessels</div>
+    <div id="vessel-count" class="count-chip">0 vessels</div>
 
-<div id="track-chip" class="track-chip hidden">
-  <span class="track-dot"></span><span id="track-name">Tracking</span>
-  <button id="track-stop" aria-label="Stop tracking">STOP</button>
-</div>
+    <div id="track-chip" class="track-chip hidden">
+      <span class="track-dot"></span><span id="track-name">Tracking</span>
+      <button id="track-stop" aria-label="Stop tracking">STOP</button>
+    </div>
 
-<section id="cam-panel" class="card hidden" aria-live="polite">
-  <button id="cam-close" class="card-close" aria-label="Close">&times;</button>
-  <h3 id="cam-title">Camera</h3>
-  <div class="cam-frame"><img id="cam-img" alt="Live camera frame"><iframe id="cam-live" class="hidden" title="Live camera stream" allow="autoplay" style="width:100%;height:180px;border:0;display:block"></iframe></div>
-  <p class="card-source" id="cam-source">Live public camera</p>
-</section>
+    <section id="cam-panel" class="card hidden" aria-live="polite">
+      <button id="cam-close" class="card-close" aria-label="Close">&times;</button>
+      <h3 id="cam-title">Camera</h3>
+      <div class="cam-frame">
+        <img id="cam-img" alt="Live camera frame" /><iframe
+          id="cam-live"
+          class="hidden"
+          title="Live camera stream"
+          allow="autoplay"
+          style="width: 100%; height: 180px; border: 0; display: block"
+        ></iframe>
+      </div>
+      <p class="card-source" id="cam-source">Live public camera</p>
+    </section>
 
-<button id="cond-btn" class="cond-chip" aria-label="Port conditions">CONDITIONS</button>
-  <button id="ev-add" class="cond-chip" style="right: 14px; top: calc(250px + env(safe-area-inset-top));">ADD TO EVIDENCE</button>
-  <button id="ev-tray-btn" class="cond-chip" style="right: 14px; top: calc(296px + env(safe-area-inset-top));">PACK (<span id="ev-count">0</span>)</button>
-  <section id="ev-tray" class="card hidden">
-    <button id="ev-tray-close" class="card-close" aria-label="Close">&times;</button>
-    <h3>Sealed into the pack</h3>
-    <p class="purpose">Each snapshot lands in the exported evidence pack (PDF) with its <b>source</b> and <b>limits</b>, exactly as sealed.</p>
-    <div id="ev-tray-list"></div>
-    <p class="card-source">Stored on this device only. Open the case card and choose Export PDF to build the pack.</p>
-  </section>
-  <button id="recon-btn" class="cond-chip" aria-label="Incident reconstruction">RECONSTRUCT</button>
-  <button id="risk-btn" class="cond-chip" style="right: 14px; top: calc(158px + env(safe-area-inset-top));">BERTH RISK</button>
-  <section id="risk-panel" class="card hidden">
-    <button id="risk-close" class="card-close" aria-label="Close">&times;</button>
-    <h3>Berth window risk - Durban, next 48h</h3>
-  <p class="purpose"><b>Pack value:</b> how congested the terminal was when the vessel needed a berth.</p>
-    <dl id="risk-body"></dl>
-    <p id="risk-delta" class="card-source"></p>
-    <p class="card-source">Open-Meteo forecast (CC BY 4.0). Risk flag: gusts &gt; 25kn or waves &gt; 2.5m.</p>
-  </section>
-<section id="cond-panel" class="card hidden" aria-live="polite">
-  <button id="cond-close" class="card-close" aria-label="Close">&times;</button>
-  <h3>Port conditions - Durban</h3>
-  <p class="purpose">Pack value: the sea and wind state at the exact time in question - weather claims can be checked against it.</p>
-  <dl id="cond-body"></dl>
-  <p class="card-source">Open-Meteo marine &amp; weather (CC BY 4.0)</p>
-</section>
+    <button id="cond-btn" class="cond-chip" aria-label="Port conditions">CONDITIONS</button>
+    <button
+      id="ev-add"
+      class="cond-chip"
+      style="right: 14px; top: calc(250px + env(safe-area-inset-top))"
+    >
+      ADD TO EVIDENCE
+    </button>
+    <button
+      id="ev-tray-btn"
+      class="cond-chip"
+      style="right: 14px; top: calc(296px + env(safe-area-inset-top))"
+    >
+      PACK (<span id="ev-count">0</span>)
+    </button>
+    <section id="ev-tray" class="card hidden">
+      <button id="ev-tray-close" class="card-close" aria-label="Close">&times;</button>
+      <h3>Local evidence tray</h3>
+      <p class="purpose">
+        Local records keep their <b>source</b> and <b>limits</b>, exactly as sealed.
+      </p>
+      <div id="ev-tray-list"></div>
+      <p class="card-source">
+        Stored on this device only. Not automatically attached to the authenticated case pack.
+        Historical review records are text-only provenance; exit review before any sample-case PDF
+        workflow.
+      </p>
+    </section>
+    <button id="recon-btn" class="cond-chip" aria-label="Incident reconstruction">
+      RECONSTRUCT
+    </button>
+    <button
+      id="risk-btn"
+      class="cond-chip"
+      style="right: 14px; top: calc(158px + env(safe-area-inset-top))"
+    >
+      BERTH RISK
+    </button>
+    <section id="risk-panel" class="card hidden">
+      <button id="risk-close" class="card-close" aria-label="Close">&times;</button>
+      <h3>Berth window risk - Durban, next 48h</h3>
+      <p class="purpose">
+        <b>Pack value:</b> how congested the terminal was when the vessel needed a berth.
+      </p>
+      <dl id="risk-body"></dl>
+      <p id="risk-delta" class="card-source"></p>
+      <p class="card-source">
+        Open-Meteo forecast (CC BY 4.0). Risk flag: gusts &gt; 25kn or waves &gt; 2.5m.
+      </p>
+    </section>
+    <section id="cond-panel" class="card hidden" aria-live="polite">
+      <button id="cond-close" class="card-close" aria-label="Close">&times;</button>
+      <h3>Port conditions - Durban</h3>
+      <p class="purpose">
+        Pack value: the sea and wind state at the exact time in question - weather claims can be
+        checked against it.
+      </p>
+      <dl id="cond-body"></dl>
+      <p class="card-source">Open-Meteo marine &amp; weather (CC BY 4.0)</p>
+    </section>
 
-<button id="replay-btn" class="replay-chip">&#9654; Replay case DUR-2026-0412</button>
-<section id="replay-card" class="card hidden" aria-live="polite">
-  <button id="replay-close" class="card-close" aria-label="Close">&times;</button>
-  <h3 id="replay-title">Replay</h3>
-  <p id="replay-desc" class="replay-desc"></p>
-  <p class="card-source">Sample data. Fictional records.</p>
-</section>
+    <button id="replay-btn" class="replay-chip">&#9654; Replay case DUR-2026-0412</button>
+    <section id="replay-card" class="card hidden" aria-live="polite">
+      <button id="replay-close" class="card-close" aria-label="Close">&times;</button>
+      <h3 id="replay-title">Replay</h3>
+      <p id="replay-desc" class="replay-desc"></p>
+      <p class="card-source">Sample data. Fictional records.</p>
+    </section>
 
-<div id="desktop-note" class="desktop-note hidden">
-  Full 3D globe - best experienced on desktop. <button id="desktop-note-ok">Got it</button>
-</div>
+    <div id="desktop-note" class="desktop-note hidden">
+      Full 3D globe - best experienced on desktop. <button id="desktop-note-ok">Got it</button>
+    </div>
 
-<section id="info-card" class="card hidden" aria-live="polite">
-  <button id="info-close" class="card-close" aria-label="Close">&times;</button>
-  <h3 id="info-title">Vessel</h3>
-  <dl id="info-body"></dl>
-  <button id="vessel-cam" class="mini-btn">Nearest camera</button>
-  <button id="vessel-worldline" class="mini-btn">World-line</button>
-  <button id="vessel-worldline-clear" class="mini-btn">Clear line</button>
-  <p class="card-source">Live AIS position</p>
-</section>
+    <section id="info-card" class="card hidden" aria-live="polite">
+      <button id="info-close" class="card-close" aria-label="Close">&times;</button>
+      <h3 id="info-title">Vessel</h3>
+      <dl id="info-body"></dl>
+      <button id="vessel-cam" class="mini-btn">Nearest camera</button>
+      <button id="vessel-worldline" class="mini-btn">World-line</button>
+      <button id="vessel-worldline-clear" class="mini-btn">Clear line</button>
+      <p class="card-source">Live AIS position</p>
+    </section>
 
-<section id="dispute-card" class="card card-alert hidden" aria-live="polite">
-  <button id="dispute-close" class="card-close" aria-label="Close">&times;</button>
-  <h3>Disputed container <span class="tag">DUR-2026-0412</span></h3>
-  <dl>
-    <dt>Container</dt><dd>MSKU 482931 7</dd>
-    <dt>Vessel</dt><dd>MV Umhlanga Trader</dd>
-    <dt>Issue</dt><dd>Demurrage: free-time expiry vs berthing delay</dd>
-    <dt>Status</dt><dd>2 open contradictions on the evidence timeline</dd>
-  </dl>
-  <button id="dispute-cam" class="mini-btn">Nearest camera</button>
-  <p class="card-source">Sample data. Fictional records.</p>
-</section>
+    <section id="dispute-card" class="card card-alert hidden" aria-live="polite">
+      <button id="dispute-close" class="card-close" aria-label="Close">&times;</button>
+      <h3>Disputed container <span class="tag">DUR-2026-0412</span></h3>
+      <dl>
+        <dt>Container</dt>
+        <dd>MSKU 482931 7</dd>
+        <dt>Vessel</dt>
+        <dd>MV Umhlanga Trader</dd>
+        <dt>Issue</dt>
+        <dd>Demurrage: free-time expiry vs berthing delay</dd>
+        <dt>Status</dt>
+        <dd>2 open contradictions on the evidence timeline</dd>
+      </dl>
+      <button id="dispute-cam" class="mini-btn">Nearest camera</button>
+      <p class="card-source">Sample data. Fictional records.</p>
+    </section>
 
-<section id="peek-card" class="card hidden" aria-live="polite">
-  <button id="peek-close" class="card-close" aria-label="Close">&times;</button>
-  <h3 id="peek-title"></h3>
-  <dl id="peek-body"></dl>
-  <button id="peek-more" class="mini-btn">Full details</button>
-  <p class="card-source" id="peek-source"></p>
-</section>
+    <section id="peek-card" class="card hidden" aria-live="polite">
+      <button id="peek-close" class="card-close" aria-label="Close">&times;</button>
+      <h3 id="peek-title"></h3>
+      <dl id="peek-body"></dl>
+      <button id="peek-more" class="mini-btn">Full details</button>
+      <p class="card-source" id="peek-source"></p>
+    </section>
 
-<button id="attr-btn" aria-label="Data and sources">i</button>
-<div id="attr-modal" class="hidden" role="dialog" aria-modal="true" aria-label="Data and sources">
-  <div class="attr-box">
-    <button id="attr-close" class="card-close" aria-label="Close">&times;</button>
-    <h3>Data &amp; sources</h3>
-    <ul>
-      <li>Live vessel positions: AIS stream (terrestrial coastal stations).</li>
-      <li>Imagery: Esri World Imagery (Esri, Maxar, Earthstar Geographics).</li>
-      <li>Terrain: Re:Earth Terrain.</li>
-      <li>Map engine: CesiumJS (Apache-2.0).</li>
-      <li>The pinned disputed container (case DUR-2026-0412) is sample data. Fictional records.</li>
-    </ul>
-    <p class="attr-note">Terrestrial AIS covers coastal waters; ships beyond receiver range are not shown.</p>
-    <p class="support-line">Support: <a href="mailto:sales@nahalabs.co.za">sales@nahalabs.co.za</a></p>
-  </div>
-</div>
+    <button id="attr-btn" aria-label="Data and sources">i</button>
+    <div
+      id="attr-modal"
+      class="hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Data and sources"
+    >
+      <div class="attr-box">
+        <button id="attr-close" class="card-close" aria-label="Close">&times;</button>
+        <h3>Data &amp; sources</h3>
+        <ul>
+          <li>Live vessel positions: AIS stream (terrestrial coastal stations).</li>
+          <li>Imagery: Esri World Imagery (Esri, Maxar, Earthstar Geographics).</li>
+          <li>Terrain: Re:Earth Terrain.</li>
+          <li>Map engine: CesiumJS (Apache-2.0).</li>
+          <li>
+            The pinned disputed container (case DUR-2026-0412) is sample data. Fictional records.
+          </li>
+        </ul>
+        <p class="attr-note">
+          Terrestrial AIS covers coastal waters; ships beyond receiver range are not shown.
+        </p>
+        <p class="support-line">
+          Support: <a href="mailto:sales@nahalabs.co.za">sales@nahalabs.co.za</a>
+        </p>
+      </div>
+    </div>
 
-<div id="fatal" class="hidden">
-  <div class="attr-box"><h3>Map failed to start</h3><p class="attr-note">This device or browser could not start WebGL. Try a current version of Chrome, Edge or Safari.</p></div>
-</div>
+    <div id="fatal" class="hidden">
+      <div class="attr-box">
+        <h3>Map failed to start</h3>
+        <p class="attr-note">
+          This device or browser could not start WebGL. Try a current version of Chrome, Edge or
+          Safari.
+        </p>
+      </div>
+    </div>
 
-<script src="assets/app.js"></script>
-</body>
+    <script src="assets/history-command.js"></script>
+    <script src="assets/app.js"></script>
+  </body>
 </html>

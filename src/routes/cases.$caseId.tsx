@@ -56,9 +56,14 @@ const tabs = [
   { to: "/cases/$caseId/kpis", label: "KPIs" },
   { to: "/cases/$caseId/matches", label: "Matches" },
   { to: "/cases/$caseId/intelligence", label: "Intelligence" },
+  { to: "/cases/$caseId/simulation", label: "Simulation Lab" },
+  { to: "/cases/$caseId/corridor", label: "Corridor" },
+  { to: "/cases/$caseId/scene", label: "3D Scene" },
+  { to: "/cases/$caseId/geospatial", label: "Geospatial" },
   { to: "/cases/$caseId/gaps", label: "Gaps" },
   // CCTV stays off the demo navigation until server encryption is configured.
   { to: "/cases/$caseId/financials", label: "Financials" },
+  { to: "/cases/$caseId/recovery", label: "Revenue Recovery" },
   { to: "/cases/$caseId/pack", label: "Evidence Pack" },
 ] as const;
 

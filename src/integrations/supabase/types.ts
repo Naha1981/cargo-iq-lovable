@@ -2610,6 +2610,7 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      cargoiq_integrated_feature_readiness: { Args: Record<PropertyKey, never>; Returns: Json };
       cargoiq_create_recovery_batch: {
         Args: { p_tenant: string; p_request: string; p_rows: Json };
         Returns: Database["public"]["Tables"]["recovery_findings"]["Row"][];

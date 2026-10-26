@@ -49,8 +49,10 @@ export function CorridorMap({
   events,
   portCode,
   fixtureLabel,
+  onSelectRecord,
 }: {
   events: CorridorEvent[];
+  onSelectRecord?: (event: CorridorEvent) => void;
   portCode: string | null;
   /** When set, a visible badge marks everything on screen as synthetic demo data. */
   fixtureLabel?: string;
@@ -59,6 +61,8 @@ export function CorridorMap({
   const mapRef = useRef<MapLibreMap | null>(null);
   const overlayRef = useRef<MapLibreOverlay | null>(null);
   const [selected, setSelected] = useState<CorridorEvent | null>(null);
+  const onSelectRef = useRef(onSelectRecord);
+  onSelectRef.current = onSelectRecord;
   const eventsRef = useRef<CorridorEvent[]>(events);
   eventsRef.current = events;
   const [is3D, setIs3D] = useState(false);
@@ -260,7 +264,10 @@ export function CorridorMap({
                 pickable: true,
                 onClick: (info) => {
                   const e = (info.object as { event?: CorridorEvent } | undefined)?.event;
-                  if (e) setSelected(e);
+                  if (e) {
+                    setSelected(e);
+                    onSelectRef.current?.(e);
+                  }
                 },
               }),
             ]
@@ -277,7 +284,10 @@ export function CorridorMap({
                 pickable: true,
                 onClick: (info) => {
                   const e = (info.object as { event?: CorridorEvent } | undefined)?.event;
-                  if (e) setSelected(e);
+                  if (e) {
+                    setSelected(e);
+                    onSelectRef.current?.(e);
+                  }
                 },
               }),
             ]
@@ -388,6 +398,7 @@ export function CorridorMap({
                     className="w-full rounded border p-2 text-left text-sm"
                     onClick={() => {
                       setSelected(e);
+                      onSelectRef.current?.(e);
                       mapRef.current?.easeTo({
                         center: [e.longitude, e.latitude],
                         zoom: 8,

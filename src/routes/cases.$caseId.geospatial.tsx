@@ -1,4 +1,4 @@
-import { IntegratedFeatureUnavailable } from "@/components/IntegratedFeatureUnavailable";
+import { IntegratedFeatureGate } from "@/components/IntegratedFeatureGate";
 import { Route as CaseRoute } from "./cases.$caseId";
 import { createFileRoute } from "@tanstack/react-router";
 import { lazy, Suspense } from "react";
@@ -25,6 +25,7 @@ function GehiPage() {
     >
       <GehiWorkspace
         caseId={caseId}
+        caseLabel={data.case?.reference_no}
         portCode={data.case?.port_code ?? null}
         observations={data.observations}
       />
@@ -33,7 +34,9 @@ function GehiPage() {
 }
 
 function GehiPageGate() {
-  // Keep the implementation retained, but never infer activation from client state.
-  void GehiPage;
-  return <IntegratedFeatureUnavailable title="Geospatial Evidence" />;
+  return (
+    <IntegratedFeatureGate title="Geospatial Evidence">
+      <GehiPage />
+    </IntegratedFeatureGate>
+  );
 }

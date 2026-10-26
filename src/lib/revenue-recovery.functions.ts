@@ -23,7 +23,7 @@ export const listRecoveryFindings = createServerFn({ method: "GET" })
   )
   .middleware([tenantMiddleware])
   .handler(async ({ data, context }) => {
-    requireIntegratedFeatureReady();
+    await requireIntegratedFeatureReady(context.supabase);
     let q = context.supabase
       .from("recovery_findings")
       .select("*")
@@ -40,7 +40,7 @@ export const getRecoveryFinding = createServerFn({ method: "GET" })
   .validator(z.object({ findingId: z.string().uuid() }))
   .middleware([tenantMiddleware])
   .handler(async ({ data, context }) => {
-    requireIntegratedFeatureReady();
+    await requireIntegratedFeatureReady(context.supabase);
     const { data: f, error } = await context.supabase
       .from("recovery_findings")
       .select("*")
@@ -72,7 +72,7 @@ export const runInvoiceComparison = createServerFn({ method: "POST" })
   )
   .middleware([tenantMiddleware])
   .handler(async ({ data, context }) => {
-    requireIntegratedFeatureReady();
+    await requireIntegratedFeatureReady(context.supabase);
     if (!["admin", "investigator"].includes(context.role))
       throw new Error("Investigator access required");
     if (data.caseId) {
@@ -134,7 +134,7 @@ export const updateRecoveryStatus = createServerFn({ method: "POST" })
   )
   .middleware([tenantMiddleware])
   .handler(async ({ data, context }) => {
-    requireIntegratedFeatureReady();
+    await requireIntegratedFeatureReady(context.supabase);
     if (!["admin", "investigator"].includes(context.role))
       throw new Error("Investigator access required");
     const { data: current, error } = await context.supabase
@@ -190,7 +190,7 @@ export const assignRecoveryFinding = createServerFn({ method: "POST" })
   .validator(z.object({ findingId: z.string().uuid(), assignee: z.string().uuid().nullable() }))
   .middleware([tenantMiddleware])
   .handler(async ({ data, context }) => {
-    requireIntegratedFeatureReady();
+    await requireIntegratedFeatureReady(context.supabase);
     if (!["admin", "investigator"].includes(context.role))
       throw new Error("Investigator access required");
     if (data.assignee) {
@@ -220,7 +220,7 @@ export const assignRecoveryFinding = createServerFn({ method: "POST" })
 export const listRecoveryOwners = createServerFn({ method: "GET" })
   .middleware([tenantMiddleware])
   .handler(async ({ context }) => {
-    requireIntegratedFeatureReady();
+    await requireIntegratedFeatureReady(context.supabase);
     const { data, error } = await context.supabase
       .from("user_roles")
       .select("user_id,role")

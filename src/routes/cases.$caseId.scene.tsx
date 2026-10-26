@@ -1,4 +1,4 @@
-import { IntegratedFeatureUnavailable } from "@/components/IntegratedFeatureUnavailable";
+import { IntegratedFeatureGate } from "@/components/IntegratedFeatureGate";
 import { Route as CaseRoute } from "./cases.$caseId";
 import { createFileRoute } from "@tanstack/react-router";
 import { lazy, Suspense } from "react";
@@ -29,7 +29,9 @@ function ScenePage() {
 }
 
 function ScenePageGate() {
-  // Keep the implementation retained, but never infer activation from client state.
-  void ScenePage;
-  return <IntegratedFeatureUnavailable title="3D Scene" />;
+  return (
+    <IntegratedFeatureGate title="3D Scene">
+      <ScenePage />
+    </IntegratedFeatureGate>
+  );
 }

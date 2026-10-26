@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
+import { OpenImageryComparison } from "@/components/OpenImageryComparison";
+import { useCallback, useEffect, useState, useMemo } from "react";
 import { Panel, Button } from "@/components/ui-kit";
 import {
   createGeospatialFinding,
@@ -28,12 +29,14 @@ const toneFor = (s: string) =>
 
 export function GehiWorkspace({
   caseId,
+  caseLabel,
   portCode,
   initialFindings,
   fixtureLabel,
   observations = [],
 }: {
   caseId: string;
+  caseLabel?: string;
   observations?: RecordedImagery[];
   portCode: string | null;
   /** Fixture mode (harness/tests): render these rows, skip server fetch. */
@@ -42,6 +45,13 @@ export function GehiWorkspace({
 }) {
   const [findings, setFindings] = useState<FindingRow[]>(initialFindings ?? []);
   const [selected, setSelected] = useState<FindingRow | null>(null);
+  const imageryLocation = useMemo(
+    () =>
+      selected?.longitude != null && selected?.latitude != null
+        ? { longitude: selected.longitude, latitude: selected.latitude, label: selected.title }
+        : undefined,
+    [selected],
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [title, setTitle] = useState("");
@@ -104,6 +114,13 @@ export function GehiWorkspace({
           {fixtureLabel}
         </p>
       )}
+      <OpenImageryComparison
+        key={caseId}
+        caseId={caseId}
+        caseLabel={caseLabel}
+        location={imageryLocation}
+        onSaved={refresh}
+      />
       <RecordedImageryComparison observations={observations} />
       <Panel title="Geospatial Evidence Workspace">
         <p className="mb-4 text-xs text-muted-foreground">
@@ -285,7 +302,14 @@ export function GehiWorkspace({
         </div>
       </Panel>
 
-      <CorridorMap events={mapEvents} portCode={portCode} />
+      <CorridorMap
+        events={mapEvents}
+        portCode={portCode}
+        onSelectRecord={(event) => {
+          const finding = findings.find((f) => f.id === event.id);
+          if (finding) setSelected(finding);
+        }}
+      />
 
       {selected && (
         <Panel title={"Finding: " + selected.title}>

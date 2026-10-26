@@ -1,4 +1,4 @@
-import { IntegratedFeatureUnavailable } from "@/components/IntegratedFeatureUnavailable";
+import { IntegratedFeatureGate } from "@/components/IntegratedFeatureGate";
 import { Route as CaseRoute } from "./cases.$caseId";
 import { createFileRoute } from "@tanstack/react-router";
 import { RevenueRecovery } from "@/components/RevenueRecovery";
@@ -15,7 +15,9 @@ function RecoveryPage() {
 }
 
 function RecoveryPageGate() {
-  // Keep the implementation retained, but never infer activation from client state.
-  void RecoveryPage;
-  return <IntegratedFeatureUnavailable title="Revenue Recovery" />;
+  return (
+    <IntegratedFeatureGate title="Revenue Recovery">
+      <RecoveryPage />
+    </IntegratedFeatureGate>
+  );
 }

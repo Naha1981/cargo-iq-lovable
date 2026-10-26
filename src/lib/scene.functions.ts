@@ -16,7 +16,7 @@ export const listSceneAssets = createServerFn({ method: "GET" })
   .validator(z.object({ caseId: z.string().uuid().optional() }))
   .middleware([tenantMiddleware])
   .handler(async ({ data, context }) => {
-    requireIntegratedFeatureReady();
+    await requireIntegratedFeatureReady(context.supabase);
     let q = context.supabase
       .from("scene_assets")
       .select("*")
@@ -32,7 +32,7 @@ export const registerSceneAsset = createServerFn({ method: "POST" })
   .validator(sceneAssetInput)
   .middleware([tenantMiddleware])
   .handler(async ({ data, context }) => {
-    requireIntegratedFeatureReady();
+    await requireIntegratedFeatureReady(context.supabase);
     if (!["admin", "investigator"].includes(context.role))
       throw new Error("Investigator access required");
     const [events, documents] = await Promise.all([
@@ -98,7 +98,7 @@ export const requestSceneConversion = createServerFn({ method: "POST" })
   .validator(z.object({ assetId: z.string().uuid() }))
   .middleware([tenantMiddleware])
   .handler(async ({ data, context }) => {
-    requireIntegratedFeatureReady();
+    await requireIntegratedFeatureReady(context.supabase);
     if (!["admin", "investigator"].includes(context.role))
       throw new Error("Investigator access required");
     const { data: asset, error } = await context.supabase
@@ -120,7 +120,7 @@ export const setSceneTileset = createServerFn({ method: "POST" })
   .validator(z.object({ assetId: z.string().uuid(), tilesetUrl: z.string().url().max(2000) }))
   .middleware([tenantMiddleware])
   .handler(async ({ data, context }) => {
-    requireIntegratedFeatureReady();
+    await requireIntegratedFeatureReady(context.supabase);
     if (!["admin", "investigator"].includes(context.role))
       throw new Error("Investigator access required");
     const v = validateTilesetUrl(data.tilesetUrl);

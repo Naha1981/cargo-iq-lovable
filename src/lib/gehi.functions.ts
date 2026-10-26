@@ -22,7 +22,7 @@ export const listGeospatialFindings = createServerFn({ method: "GET" })
   )
   .middleware([tenantMiddleware])
   .handler(async ({ data, context }) => {
-    requireIntegratedFeatureReady();
+    await requireIntegratedFeatureReady(context.supabase);
     let q = context.supabase
       .from("geospatial_findings")
       .select("*")
@@ -42,7 +42,7 @@ export const createGeospatialFinding = createServerFn({ method: "POST" })
   .validator(findingInput)
   .middleware([tenantMiddleware])
   .handler(async ({ data, context }) => {
-    requireIntegratedFeatureReady();
+    await requireIntegratedFeatureReady(context.supabase);
     if (!["admin", "investigator"].includes(context.role))
       throw new Error("Investigator access required");
     const { data: row, error } = await context.supabase
@@ -82,7 +82,7 @@ export const reviewGeospatialFinding = createServerFn({ method: "POST" })
   )
   .middleware([tenantMiddleware])
   .handler(async ({ data, context }) => {
-    requireIntegratedFeatureReady();
+    await requireIntegratedFeatureReady(context.supabase);
     if (!["admin", "investigator"].includes(context.role))
       throw new Error("Investigator access required");
     const { data: current, error } = await context.supabase

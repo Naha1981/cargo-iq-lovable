@@ -1,4 +1,4 @@
-import { IntegratedFeatureUnavailable } from "@/components/IntegratedFeatureUnavailable";
+import { IntegratedFeatureGate } from "@/components/IntegratedFeatureGate";
 import { Route as CaseRoute } from "./cases.$caseId";
 import { createFileRoute } from "@tanstack/react-router";
 import { SimulationLab } from "@/components/SimulationLab";
@@ -15,7 +15,9 @@ function SimulationPage() {
 }
 
 function SimulationPageGate() {
-  // Keep the implementation retained, but never infer activation from client state.
-  void SimulationPage;
-  return <IntegratedFeatureUnavailable title="Simulation Lab" />;
+  return (
+    <IntegratedFeatureGate title="Simulation Lab">
+      <SimulationPage />
+    </IntegratedFeatureGate>
+  );
 }

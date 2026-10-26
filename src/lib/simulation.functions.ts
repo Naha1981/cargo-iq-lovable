@@ -11,7 +11,7 @@ import type { Json } from "@/integrations/supabase/types";
 export const listScenarios = createServerFn({ method: "GET" })
   .middleware([tenantMiddleware])
   .handler(async ({ context }) => {
-    requireIntegratedFeatureReady();
+    await requireIntegratedFeatureReady(context.supabase);
     const { data, error } = await context.supabase
       .from("simulation_scenarios")
       .select(
@@ -27,7 +27,7 @@ export const getScenario = createServerFn({ method: "GET" })
   .validator(z.object({ scenarioId: z.string().uuid() }))
   .middleware([tenantMiddleware])
   .handler(async ({ data, context }) => {
-    requireIntegratedFeatureReady();
+    await requireIntegratedFeatureReady(context.supabase);
     const { data: s, error } = await context.supabase
       .from("simulation_scenarios")
       .select("*")
@@ -50,7 +50,7 @@ export const createScenario = createServerFn({ method: "POST" })
   .validator(scenarioInput)
   .middleware([tenantMiddleware])
   .handler(async ({ data, context }) => {
-    requireIntegratedFeatureReady();
+    await requireIntegratedFeatureReady(context.supabase);
     if (!["admin", "investigator"].includes(context.role))
       throw new Error("Investigator access required");
     const assumptions = data.assumptions.map((a) => ({
@@ -84,7 +84,7 @@ export const runScenarioComparison = createServerFn({ method: "POST" })
   .validator(z.object({ scenarioId: z.string().uuid() }))
   .middleware([tenantMiddleware])
   .handler(async ({ data, context }) => {
-    requireIntegratedFeatureReady();
+    await requireIntegratedFeatureReady(context.supabase);
     if (!["admin", "investigator"].includes(context.role))
       throw new Error("Investigator access required");
     const { data: s, error } = await context.supabase
@@ -159,7 +159,7 @@ export const recordScenarioDecision = createServerFn({ method: "POST" })
   .validator(decisionInput)
   .middleware([tenantMiddleware])
   .handler(async ({ data, context }) => {
-    requireIntegratedFeatureReady();
+    await requireIntegratedFeatureReady(context.supabase);
     if (!["admin", "investigator"].includes(context.role))
       throw new Error("Investigator access required");
     const { data: updated, error } = await context.supabase

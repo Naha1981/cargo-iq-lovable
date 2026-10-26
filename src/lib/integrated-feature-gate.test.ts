@@ -1,29 +1,49 @@
 import { describe, expect, it } from "vitest";
 import {
   INTEGRATED_FEATURE_UNAVAILABLE,
+  integratedFeatureReady,
   requireIntegratedFeatureReady,
 } from "./integrated-feature-gate";
 import { readFileSync } from "node:fs";
-
-describe("unfinished integrated workspaces fail closed", () => {
-  it("does not infer readiness from a table read or environment flag", () => {
-    expect(() => requireIntegratedFeatureReady()).toThrow(INTEGRATED_FEATURE_UNAVAILABLE);
+describe("integrated workspaces fail closed unless server safeguards validate", () => {
+  it.each([
+    { data: null, error: null },
+    { data: { ready: false }, error: null },
+    { data: { ready: true }, error: { message: "error" } },
+    { data: { ready: "true" }, error: null },
+  ])("refuses nonvalidated readiness %j", async (result) => {
+    const client = { rpc: async () => result };
+    expect(await integratedFeatureReady(client)).toBe(false);
+    await expect(requireIntegratedFeatureReady(client)).rejects.toThrow(
+      INTEGRATED_FEATURE_UNAVAILABLE,
+    );
   });
+  it("accepts only exact server boolean", async () =>
+    expect(
+      await integratedFeatureReady({ rpc: async () => ({ data: { ready: true }, error: null }) }),
+    ).toBe(true));
+  it("network refusal stays disabled", async () =>
+    expect(
+      await integratedFeatureReady({
+        rpc: async () => {
+          throw new Error("offline");
+        },
+      }),
+    ).toBe(false));
   it.each(["revenue-recovery", "scene", "gehi", "simulation"])(
-    "guards every %s server handler",
+    "awaits gate in each %s handler",
     (name) => {
       const code = readFileSync(`src/lib/${name}.functions.ts`, "utf8");
       expect(code.match(/\.handler\(async/g)?.length).toBe(
-        code.match(/requireIntegratedFeatureReady\(\);/g)?.length,
+        code.match(/await requireIntegratedFeatureReady\(context.supabase\);/g)?.length,
       );
     },
   );
   it.each(["recovery", "scene", "geospatial", "simulation"])(
-    "shows safe %s unavailable route",
-    (name) => {
+    "uses server-checked %s route",
+    (name) =>
       expect(readFileSync(`src/routes/cases.$caseId.${name}.tsx`, "utf8")).toContain(
-        "<IntegratedFeatureUnavailable",
-      );
-    },
+        "<IntegratedFeatureGate",
+      ),
   );
 });

@@ -33,7 +33,7 @@ export const searchOpenImagery = createServerFn({ method: "GET" })
     );
     url.searchParams.set("datetime", day.toISOString() + "/" + end);
     url.searchParams.set("limit", "12");
-    const response = await fetch(url, { signal: AbortSignal.timeout(15000), redirect: "error" });
+    const response = await fetch(url, { signal: AbortSignal.timeout(15000), redirect: "manual" });
     const body = await readCatalogue(response);
     return {
       retrievedAt: new Date().toISOString(),
@@ -52,7 +52,7 @@ export const loadOpenImageryPreview = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     const response = await fetch(data.url, {
       signal: AbortSignal.timeout(15000),
-      redirect: "error",
+      redirect: "manual",
     });
     const bytes = Buffer.from(await readOverview(response));
     return {

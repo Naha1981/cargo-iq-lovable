@@ -46,7 +46,7 @@ describe("public imagery server effects", () => {
     expect(result.dataUri).toMatch(/^data:image\/jpeg;base64,/);
     expect(fetch).toHaveBeenCalledWith(
       expect.any(String),
-      expect.objectContaining({ redirect: "error", signal: expect.any(AbortSignal) }),
+      expect.objectContaining({ redirect: "manual", signal: expect.any(AbortSignal) }),
     );
   });
   it("propagates provider redirect/timeout rejection without retry", async () => {
@@ -60,4 +60,51 @@ describe("public imagery server effects", () => {
     ).rejects.toThrow("redirect refused");
     expect(fetch).toHaveBeenCalledTimes(1);
   });
+});
+
+describe("edge-compatible redirect boundary", () => {
+  it.each([301, 302, 303, 307, 308])(
+    "rejects preview redirect %s without following",
+    async (status) => {
+      vi.mocked(fetch).mockResolvedValue(
+        new Response(null, { status, headers: { location: "https://untrusted.invalid/asset" } }),
+      );
+      await expect(
+        loadOpenImageryPreview({
+          data: {
+            url: "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/36/J/UM/2026/9/S2C_36JUM_20260909_0_L2A/preview.jpg",
+          },
+        }),
+      ).rejects.toThrow("Overview image unavailable");
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(fetch).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ redirect: "manual" }),
+      );
+    },
+  );
+  it.each([301, 302, 303, 307, 308])(
+    "rejects catalogue redirect %s without following",
+    async (status) => {
+      const q = {
+        select: () => q,
+        eq: () => q,
+        maybeSingle: async () => ({ data: { id: "x" }, error: null }),
+      };
+      state.context.supabase.from = vi.fn(() => q);
+      vi.mocked(fetch).mockResolvedValue(
+        new Response(null, { status, headers: { location: "http://127.0.0.1/" } }),
+      );
+      await expect(
+        searchOpenImagery({
+          data: { caseId: "x", longitude: 31, latitude: -30, date: "2026-09-09" },
+        }),
+      ).rejects.toThrow("Public imagery catalogue unavailable");
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(fetch).toHaveBeenCalledWith(
+        expect.any(URL),
+        expect.objectContaining({ redirect: "manual" }),
+      );
+    },
+  );
 });

@@ -943,6 +943,79 @@ export type Database = {
           },
         ];
       };
+      cost_recovery_links: {
+        Row: {
+          alert_id: string | null;
+          amount: number | null;
+          case_id: string;
+          cost_category: string;
+          created_at: string;
+          created_by: string | null;
+          currency: string;
+          event_id: string | null;
+          evidence_ref: string | null;
+          id: string;
+          notes: string | null;
+          status: string;
+          tenant_id: string;
+          updated_at: string;
+        };
+        Insert: {
+          alert_id?: string | null;
+          amount?: number | null;
+          case_id: string;
+          cost_category: string;
+          created_at?: string;
+          created_by?: string | null;
+          currency?: string;
+          event_id?: string | null;
+          evidence_ref?: string | null;
+          id?: string;
+          notes?: string | null;
+          status?: string;
+          tenant_id: string;
+          updated_at?: string;
+        };
+        Update: {
+          alert_id?: string | null;
+          amount?: number | null;
+          case_id?: string;
+          cost_category?: string;
+          created_at?: string;
+          created_by?: string | null;
+          currency?: string;
+          event_id?: string | null;
+          evidence_ref?: string | null;
+          id?: string;
+          notes?: string | null;
+          status?: string;
+          tenant_id?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "cost_recovery_links_alert_id_fkey";
+            columns: ["alert_id"];
+            isOneToOne: false;
+            referencedRelation: "risk_alerts";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "cost_recovery_links_case_id_fkey";
+            columns: ["case_id"];
+            isOneToOne: false;
+            referencedRelation: "cases";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "cost_recovery_links_event_id_fkey";
+            columns: ["event_id"];
+            isOneToOne: false;
+            referencedRelation: "risk_events";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       cross_party_match_reviews: {
         Row: {
           case_id: string;
@@ -1749,6 +1822,269 @@ export type Database = {
             referencedColumns: ["id"];
           },
         ];
+      };
+      risk_alert_verifications: {
+        Row: {
+          alert_id: string;
+          decided_at: string;
+          decided_by: string;
+          decision: string;
+          id: string;
+          notes: string | null;
+          tenant_id: string;
+        };
+        Insert: {
+          alert_id: string;
+          decided_at?: string;
+          decided_by: string;
+          decision: string;
+          id?: string;
+          notes?: string | null;
+          tenant_id: string;
+        };
+        Update: {
+          alert_id?: string;
+          decided_at?: string;
+          decided_by?: string;
+          decision?: string;
+          id?: string;
+          notes?: string | null;
+          tenant_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "risk_alert_verifications_alert_id_fkey";
+            columns: ["alert_id"];
+            isOneToOne: false;
+            referencedRelation: "risk_alerts";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      risk_alerts: {
+        Row: {
+          case_id: string | null;
+          confidence: string;
+          created_at: string;
+          event_id: string;
+          evidence_summary: string;
+          headline: string;
+          id: string;
+          likely_impact: string | null;
+          recommended_action: string | null;
+          risk_explanation: string;
+          severity: string;
+          status: string;
+          tenant_id: string;
+          updated_at: string;
+          verification_status: string;
+        };
+        Insert: {
+          case_id?: string | null;
+          confidence?: string;
+          created_at?: string;
+          event_id: string;
+          evidence_summary: string;
+          headline: string;
+          id?: string;
+          likely_impact?: string | null;
+          recommended_action?: string | null;
+          risk_explanation: string;
+          severity?: string;
+          status?: string;
+          tenant_id: string;
+          updated_at?: string;
+          verification_status?: string;
+        };
+        Update: {
+          case_id?: string | null;
+          confidence?: string;
+          created_at?: string;
+          event_id?: string;
+          evidence_summary?: string;
+          headline?: string;
+          id?: string;
+          likely_impact?: string | null;
+          recommended_action?: string | null;
+          risk_explanation?: string;
+          severity?: string;
+          status?: string;
+          tenant_id?: string;
+          updated_at?: string;
+          verification_status?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "risk_alerts_case_id_fkey";
+            columns: ["case_id"];
+            isOneToOne: false;
+            referencedRelation: "cases";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "risk_alerts_event_id_fkey";
+            columns: ["event_id"];
+            isOneToOne: false;
+            referencedRelation: "risk_events";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      risk_event_case_links: {
+        Row: {
+          case_id: string;
+          confidence: string;
+          created_at: string;
+          created_by: string | null;
+          event_id: string;
+          id: string;
+          match_basis: string;
+          rationale: string;
+          tenant_id: string;
+        };
+        Insert: {
+          case_id: string;
+          confidence?: string;
+          created_at?: string;
+          created_by?: string | null;
+          event_id: string;
+          id?: string;
+          match_basis: string;
+          rationale: string;
+          tenant_id: string;
+        };
+        Update: {
+          case_id?: string;
+          confidence?: string;
+          created_at?: string;
+          created_by?: string | null;
+          event_id?: string;
+          id?: string;
+          match_basis?: string;
+          rationale?: string;
+          tenant_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "risk_event_case_links_case_id_fkey";
+            columns: ["case_id"];
+            isOneToOne: false;
+            referencedRelation: "cases";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "risk_event_case_links_event_id_fkey";
+            columns: ["event_id"];
+            isOneToOne: false;
+            referencedRelation: "risk_events";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      risk_events: {
+        Row: {
+          confidence: string;
+          corridor: string | null;
+          created_at: string;
+          created_by: string | null;
+          dedupe_key: string;
+          id: string;
+          ingested_at: string;
+          kind: string;
+          latitude: number | null;
+          longitude: number | null;
+          observed_at: string;
+          port_code: string | null;
+          raw: Json | null;
+          source: string;
+          source_ref: string | null;
+          summary: string | null;
+          tenant_id: string;
+          title: string;
+          vessel_name: string | null;
+          verification_status: string;
+        };
+        Insert: {
+          confidence?: string;
+          corridor?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          dedupe_key: string;
+          id?: string;
+          ingested_at?: string;
+          kind: string;
+          latitude?: number | null;
+          longitude?: number | null;
+          observed_at: string;
+          port_code?: string | null;
+          raw?: Json | null;
+          source: string;
+          source_ref?: string | null;
+          summary?: string | null;
+          tenant_id: string;
+          title: string;
+          vessel_name?: string | null;
+          verification_status?: string;
+        };
+        Update: {
+          confidence?: string;
+          corridor?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          dedupe_key?: string;
+          id?: string;
+          ingested_at?: string;
+          kind?: string;
+          latitude?: number | null;
+          longitude?: number | null;
+          observed_at?: string;
+          port_code?: string | null;
+          raw?: Json | null;
+          source?: string;
+          source_ref?: string | null;
+          summary?: string | null;
+          tenant_id?: string;
+          title?: string;
+          vessel_name?: string | null;
+          verification_status?: string;
+        };
+        Relationships: [];
+      };
+      risk_source_configs: {
+        Row: {
+          created_at: string;
+          enabled: boolean;
+          id: string;
+          max_events_per_day: number;
+          settings: Json;
+          source: string;
+          tenant_id: string;
+          updated_at: string;
+          updated_by: string | null;
+        };
+        Insert: {
+          created_at?: string;
+          enabled?: boolean;
+          id?: string;
+          max_events_per_day?: number;
+          settings?: Json;
+          source: string;
+          tenant_id: string;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Update: {
+          created_at?: string;
+          enabled?: boolean;
+          id?: string;
+          max_events_per_day?: number;
+          settings?: Json;
+          source?: string;
+          tenant_id?: string;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Relationships: [];
       };
       tenants: {
         Row: {

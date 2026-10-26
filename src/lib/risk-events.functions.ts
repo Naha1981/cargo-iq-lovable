@@ -180,6 +180,16 @@ export const capturePortWeather = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     if (!["admin", "investigator"].includes(context.role))
       throw new Error("Investigator access required");
+    // The hosted Open-Meteo API licence excludes commercial use, so live port
+    // weather stays off until a commercially licensed source is wired in. No
+    // Open-Meteo request is made in production. CLAIM_WEATHER_EVAL=staging-eval
+    // re-enables capture for staging evaluation only and is never set live.
+    if (process.env.CLAIM_WEATHER_EVAL !== "staging-eval")
+      return {
+        captured: false as const,
+        reason:
+          "live port weather is off - the free Open-Meteo licence excludes commercial use. Record a port notice below instead.",
+      };
     const { data: config } = await context.supabase
       .from("risk_source_configs")
       .select("*")

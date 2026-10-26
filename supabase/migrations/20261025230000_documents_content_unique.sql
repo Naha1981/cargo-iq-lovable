@@ -1,32 +1,67 @@
--- Unique invariant for upload object ownership (handover requirement: the
--- concurrent same-content race must be closed by the database, not by a
--- read-window query). One LIVE documents row per (tenant, case, content
--- hash): the committed row is the atomic proof of which upload attempt owns
--- the canonical object; the losing attempt's insert fails with 23505 and the
--- app returns the winner's row after reference-checked cleanup of its own
--- object. Deleted rows free the content for re-upload (index rows go with
--- them). NULL hashes (rows predating hashing) are excluded so they never
--- collide. Fails loudly, mid-transaction, if live duplicates already exist -
--- clean them up before re-applying; never dedupe silently.
+-- REPAIR DRAFT v2 (uncommitted): atomic content ownership WITHOUT modifying
+-- any documents row or the evidence guard. A companion ownership table holds
+-- one row per (tenant, case, content hash); an AFTER INSERT trigger claims
+-- ownership atomically for every new documents row. Historical duplicates are
+-- backfilled deterministically (earliest uploaded_at, then id, is canonical)
+-- and PRESERVED as evidence; no UPDATE/DELETE on documents anywhere.
+-- The trigger raises SQLSTATE 23505 on a losing claim so the app's existing
+-- 23505 contract (return the winner's row) holds unchanged, for historical
+-- AND new content alike. NULL hashes are excluded, as before.
 BEGIN;
 SET LOCAL lock_timeout='10s';
-SET LOCAL statement_timeout='60s';
+SET LOCAL statement_timeout='120s';
 SELECT pg_advisory_xact_lock(hashtextextended('cargoiq-documents-content-unique-v1',0));
 
-DO $$
+CREATE TABLE IF NOT EXISTS public.document_content_ownership (
+  tenant_id uuid NOT NULL,
+  case_id uuid NOT NULL,
+  sha256_hash text NOT NULL,
+  document_id uuid NOT NULL REFERENCES public.documents(id) ON DELETE CASCADE,
+  claimed_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (tenant_id, case_id, sha256_hash)
+);
+REVOKE ALL ON public.document_content_ownership FROM anon, authenticated;
+ALTER TABLE public.document_content_ownership ENABLE ROW LEVEL SECURITY;
+
+CREATE OR REPLACE FUNCTION public.claim_document_content_ownership() RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
 BEGIN
-  IF EXISTS (
-    SELECT 1 FROM public.documents
-     WHERE sha256_hash IS NOT NULL
-     GROUP BY tenant_id, case_id, sha256_hash
-    HAVING count(*) > 1
-  ) THEN
-    RAISE EXCEPTION 'documents_content_unique: live duplicate (tenant_id, case_id, sha256_hash) rows exist; resolve them before applying this invariant';
+  IF NEW.sha256_hash IS NULL THEN RETURN NEW; END IF;
+  PERFORM pg_advisory_xact_lock(hashtextextended('cargoiq-documents-content-unique-v1',0));
+  INSERT INTO public.document_content_ownership (tenant_id, case_id, sha256_hash, document_id)
+  VALUES (NEW.tenant_id, NEW.case_id, NEW.sha256_hash, NEW.id)
+  ON CONFLICT (tenant_id, case_id, sha256_hash) DO NOTHING;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'documents_content_unique: content already owned by another documents row'
+      USING ERRCODE = '23505';
   END IF;
+  RETURN NEW;
 END $$;
 
-CREATE UNIQUE INDEX IF NOT EXISTS documents_tenant_case_sha256_uniq
-  ON public.documents (tenant_id, case_id, sha256_hash)
-  WHERE sha256_hash IS NOT NULL;
+DROP TRIGGER IF EXISTS documents_content_ownership_claim ON public.documents;
+CREATE TRIGGER documents_content_ownership_claim AFTER INSERT ON public.documents
+  FOR EACH ROW EXECUTE FUNCTION public.claim_document_content_ownership();
 
+-- Deterministic backfill: earliest uploaded_at (then id) is canonical per group.
+-- NULLS LAST is explicit: a row with unknown upload time never outranks a
+-- known-earlier row for canonical ownership.
+-- Advisory lock above serializes this against concurrent claim triggers.
+INSERT INTO public.document_content_ownership (tenant_id, case_id, sha256_hash, document_id)
+SELECT DISTINCT ON (tenant_id, case_id, sha256_hash) tenant_id, case_id, sha256_hash, id
+FROM public.documents
+WHERE sha256_hash IS NOT NULL
+ORDER BY tenant_id, case_id, sha256_hash, uploaded_at ASC NULLS LAST, id
+ON CONFLICT (tenant_id, case_id, sha256_hash) DO NOTHING;
+
+DO $$
+DECLARE v_groups integer; v_rows integer;
+BEGIN
+  SELECT count(*), coalesce(sum(n),0) INTO v_groups, v_rows FROM (
+    SELECT count(*) AS n FROM public.documents
+     WHERE sha256_hash IS NOT NULL
+     GROUP BY tenant_id, case_id, sha256_hash HAVING count(*) > 1) d;
+  IF v_groups > 0 THEN
+    RAISE WARNING 'documents_content_unique: % pre-existing duplicate groups across % rows PRESERVED as evidence; canonical owner recorded in document_content_ownership (earliest uploaded_at)', v_groups, v_rows;
+  END IF;
+END $$;
 COMMIT;

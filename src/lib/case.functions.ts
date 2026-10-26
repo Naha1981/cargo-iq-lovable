@@ -570,6 +570,29 @@ export const registerDocument = createServerFn({ method: "POST" })
         .single();
 
       if (error) {
+        // Concurrent same-content upload lost the atomic ownership claim
+        // (document_content_ownership trigger, 23505). Return the canonical
+        // winner - the earliest registered row for this content, matching the
+        // ownership backfill - after reference-checked cleanup of this
+        // attempt's own object, exactly like the sequential-idempotent path.
+        if (
+          (error as { code?: string }).code === "23505" &&
+          String((error as { message?: string }).message ?? "").includes("documents_content_unique")
+        ) {
+          const { data: winner } = await context.supabase
+            .from("documents")
+            .select("*")
+            .eq("tenant_id", context.tenantId)
+            .eq("case_id", data.caseId)
+            .eq("sha256_hash", sha256)
+            .order("uploaded_at", { ascending: true })
+            .order("id", { ascending: true })
+            .limit(1)
+            .maybeSingle();
+          await removeUnreferencedObject();
+          if (winner) return winner;
+          throw error;
+        }
         // The insert outcome is ambiguous (the error may follow a lost
         // response): delete only if no row references the object, then surface
         // the failure. A retry re-registers idempotently by content hash.

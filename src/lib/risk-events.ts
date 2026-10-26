@@ -371,7 +371,12 @@ export function selectWeatherAssessment(
   if (currentEntry) {
     const a = assessPortConditions(currentEntry, thresholds);
     if (a.notable)
-      current = { kind: "current", validTime: currentEntry.time, severity: a.severity, reasons: a.reasons };
+      current = {
+        kind: "current",
+        validTime: currentEntry.time,
+        severity: a.severity,
+        reasons: a.reasons,
+      };
   }
   let forecast: WeatherAssessment | null = null;
   for (const e of entries) {

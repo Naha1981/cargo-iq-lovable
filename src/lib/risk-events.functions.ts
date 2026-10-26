@@ -280,7 +280,15 @@ export const capturePortWeather = createServerFn({ method: "POST" })
       event,
       chosen.severity,
     );
-    return { captured: true as const, event, dataType: chosen.kind, validTime: chosen.validTime, conditions: latest, duplicate: !!error, ...spread };
+    return {
+      captured: true as const,
+      event,
+      dataType: chosen.kind,
+      validTime: chosen.validTime,
+      conditions: latest,
+      duplicate: !!error,
+      ...spread,
+    };
   });
 
 export const listRiskEvents = createServerFn({ method: "GET" })

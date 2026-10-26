@@ -143,9 +143,10 @@ describe("buildAlertDraft", () => {
     expect(d.recommended_action).toContain("verify");
     expect(d.likely_impact).toContain("estimate");
   });
-  it("keeps the alert unverified in its wording", () => {
+  it("keeps status claims out of the created wording (status lives on the badge)", () => {
     const d = buildAlertDraft({ event, link, caseRef: "REF-001", severity: "watch" });
-    expect(d.risk_explanation.toLowerCase()).toContain("unverified");
+    expect(d.risk_explanation.toLowerCase()).not.toContain("unverified");
+    expect(d.risk_explanation).toContain("Reported vessel signal may affect case REF-001.");
   });
   it("adds the AIS gap disclaimer for AIS gap events", () => {
     const gapEvent = {

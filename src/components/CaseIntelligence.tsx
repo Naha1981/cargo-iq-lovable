@@ -111,20 +111,20 @@ export function CaseIntelligence({
         </p>
         <div className="grid gap-2">
           <input
-            className="rounded border border-border bg-background px-2 py-1 text-sm"
+            className="w-full min-w-0 rounded border border-border bg-background px-2 py-1 text-sm"
             placeholder="Notice title (e.g. Durban container terminal gate congestion)"
             value={noticeTitle}
             onChange={(e) => setNoticeTitle(e.target.value)}
           />
           <textarea
-            className="rounded border border-border bg-background px-2 py-1 text-sm"
+            className="w-full min-w-0 rounded border border-border bg-background px-2 py-1 text-sm"
             placeholder="Summary of what is reported"
             rows={2}
             value={noticeSummary}
             onChange={(e) => setNoticeSummary(e.target.value)}
           />
           <input
-            className="rounded border border-border bg-background px-2 py-1 text-sm"
+            className="w-full min-w-0 rounded border border-border bg-background px-2 py-1 text-sm"
             placeholder="Source reference (URL or document name)"
             value={noticeRef}
             onChange={(e) => setNoticeRef(e.target.value)}
@@ -285,7 +285,7 @@ export function CaseIntelligence({
         </p>
         <div className="flex flex-wrap items-center gap-2">
           <select
-            className="rounded border border-border bg-background px-2 py-1 text-sm"
+            className="w-full min-w-0 rounded border border-border bg-background px-2 py-1 text-sm"
             value={costCategory}
             onChange={(e) => setCostCategory(e.target.value)}
           >

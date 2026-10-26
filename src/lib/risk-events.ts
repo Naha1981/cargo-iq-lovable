@@ -315,8 +315,10 @@ export function buildAlertDraft(args: {
       ? " " + AIS_GAP_DISCLAIMER
       : "";
   const headline = `${severity === "critical" || severity === "warning" ? "Risk alert" : "Risk signal"} for ${caseRef}: ${event.title}`;
+  // Neutral wording: verification state is shown by the live status badge and
+  // changes over time; the created text must not freeze a status claim.
   const risk_explanation =
-    `Unverified ${event.kind} signal may affect case ${caseRef}. ${event.summary ?? event.title}`.trim() +
+    `Reported ${event.kind} signal may affect case ${caseRef}. ${event.summary ?? event.title}`.trim() +
     aisNote;
   const likely_impact =
     "Possible schedule delay or operational disruption for the linked shipment; impact is an estimate until verified against shipment milestones.";

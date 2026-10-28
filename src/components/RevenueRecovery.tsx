@@ -10,6 +10,7 @@ import {
 } from "@/lib/revenue-recovery.functions";
 import { RECOVERY_STATUSES, type RecoveryStatus } from "@/lib/revenue-recovery";
 import { recoveryRequestKey, clearRecoveryRequest } from "@/lib/recovery-request";
+import { ManagedDd } from "@/components/ManagedDd";
 import type { Database } from "@/integrations/supabase/types";
 
 type FindingRow = Database["public"]["Tables"]["recovery_findings"]["Row"];
@@ -107,11 +108,13 @@ export function RevenueRecovery({
 
   return (
     <div className="space-y-6">
+      <ManagedDd caseId={caseId} documents={documents} />
       <Panel title="Revenue Recovery">
         <p className="mb-4 text-xs text-muted-foreground">
           Reviewable detection of financial leakage. Statuses: new → under review → approved →
           submitted → recovered. An amount is marked recovered only after the money is confirmed
-          received. Nothing is submitted externally from here.
+          received. Nothing is submitted externally from here: you send the claim, then record it as
+          sent.
         </p>
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-3">

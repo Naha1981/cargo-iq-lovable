@@ -1,4 +1,5 @@
 import { featurePackSections } from "@/lib/feature-pack";
+import { ddPackLines, isDdRow } from "@/lib/dd-pack";
 import { parseExtractionStatus } from "./analysis-integrity";
 import { frozenOperationalResults, type FrozenOpsPayload } from "./count-pack";
 // Dependency-free, deterministic PDF writer for the Evidence Pack.
@@ -1141,7 +1142,10 @@ export function buildEvidencePackPdf(pack: EvidencePackInput): Uint8Array {
         );
       for (const row of section.rows) {
         d.text("Record " + String(row.id ?? "unknown"), { indent: 4, bold: true });
+        const dd = section.key === "recoveryFindings" && isDdRow(row);
+        if (dd) for (const line of ddPackLines(row)) d.text(line, { indent: 14, size: 8 });
         for (const [key, value] of Object.entries(row)) {
+          if (dd && key === "calculation") continue; // readable summary above; full payload stays in the JSON export
           if (value !== null && value !== undefined)
             d.text(
               key + ": " + (typeof value === "object" ? JSON.stringify(value) : String(value)),

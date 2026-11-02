@@ -110,7 +110,7 @@ export function RevenueRecovery({
   return (
     <div className="space-y-6">
       <ManagedDd caseId={caseId} documents={documents} />
-      <DdEvidencePackV0 />
+      <DdEvidencePackV0 key={caseId} caseId={caseId} />
       <Panel title="Revenue Recovery">
         <p className="mb-4 text-xs text-muted-foreground">
           Reviewable detection of financial leakage. Statuses: new → under review → approved →

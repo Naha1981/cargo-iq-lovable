@@ -2610,6 +2610,11 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      cargoiq_load_dd_draft: { Args: { p_case_id: string }; Returns: Json };
+      cargoiq_save_dd_draft: {
+        Args: { p_case_id: string; p_revision: number; p_draft: Json };
+        Returns: Json;
+      };
       cargoiq_historical_review_readiness: { Args: Record<PropertyKey, never>; Returns: Json };
       save_historical_record_review: {
         Args: {

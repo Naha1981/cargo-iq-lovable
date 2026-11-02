@@ -2207,6 +2207,36 @@ export type Database = {
           },
         ]
       }
+      health_email_sends: {
+        Row: {
+          created_at: string
+          day: string
+          detail: string | null
+          lease_expires_at: string
+          provider_message_id: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          day: string
+          detail?: string | null
+          lease_expires_at: string
+          provider_message_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          day?: string
+          detail?: string | null
+          lease_expires_at?: string
+          provider_message_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       kpi_definitions: {
         Row: {
           acceptance: string
@@ -3370,6 +3400,10 @@ export type Database = {
         Args: { p_cursor?: string; p_limit?: number }
         Returns: Json
       }
+      admin_list_health_email_sends: {
+        Args: { p_days?: number }
+        Returns: Json
+      }
       admin_list_tenant_free_caps: { Args: never; Returns: Json }
       admin_list_tenant_upload_concurrency: {
         Args: never
@@ -3458,6 +3492,10 @@ export type Database = {
         Args: { _case_ids: string[] }
         Returns: string[]
       }
+      claim_health_email_day: {
+        Args: { p_day: string; p_lease?: string }
+        Returns: string
+      }
       complete_extraction_cost: {
         Args: {
           p_case_id: string
@@ -3472,12 +3510,20 @@ export type Database = {
         }
         Returns: undefined
       }
+      complete_health_email_day: {
+        Args: { p_day: string; p_provider_message_id?: string }
+        Returns: undefined
+      }
       create_tenant_invitation: {
         Args: { p_email: string; p_role: string; p_tenant_id: string }
         Returns: Json
       }
       current_pack_source: { Args: { _case_id: string }; Returns: Json }
       delete_own_account: { Args: never; Returns: undefined }
+      fail_health_email_day: {
+        Args: { p_day: string; p_detail?: string }
+        Returns: undefined
+      }
       has_unresolved_operational_clocks: {
         Args: { _case_id: string }
         Returns: boolean

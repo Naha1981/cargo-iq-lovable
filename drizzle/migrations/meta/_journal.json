@@ -29,6 +29,13 @@
       "when": 1793605760341,
       "tag": "0003_admin_ai_health",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793605776072,
+      "tag": "0004_health_email_day_claim",
+      "breakpoints": true
     }
   ]
 }

@@ -40,6 +40,8 @@ export const appendCountRecord = createServerFn({ method: "POST" })
       .from("count_source_records")
       .insert({
         tenant_id: c.tenantId,
+        created_by: c.user.id,
+        version: 1,
         case_id: d.caseId,
         physical_reference: d.physicalReference,
         party: d.party.trim(),
@@ -70,6 +72,8 @@ export const appendCountRule = createServerFn({ method: "POST" })
       .from("count_rule_versions")
       .insert({
         tenant_id: c.tenantId,
+        created_by: c.user.id,
+        version: 1,
         case_id: d.caseId,
         name: d.name,
         metric: d.metric,

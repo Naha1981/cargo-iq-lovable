@@ -29,6 +29,8 @@ export const appendAppointmentLifecycle = createServerFn({ method: "POST" })
       .from("appointment_lifecycle")
       .insert({
         tenant_id: c.tenantId,
+        created_by: c.user.id,
+        version: 1,
         case_id: d.caseId,
         appointment_reference: d.appointmentReference,
         physical_reference: d.physicalReference,

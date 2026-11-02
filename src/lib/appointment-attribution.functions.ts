@@ -34,6 +34,7 @@ export const addAppointmentAttribution = createServerFn({ method: "POST" })
       .from("appointment_attributions")
       .insert({
         tenant_id: context.tenantId,
+        created_by: context.user.id,
         case_id: data.caseId,
         appointment_clock_id: data.appointmentClockId,
         claimant: data.claimant,

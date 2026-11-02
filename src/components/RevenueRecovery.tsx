@@ -11,6 +11,7 @@ import {
 import { RECOVERY_STATUSES, type RecoveryStatus } from "@/lib/revenue-recovery";
 import { recoveryRequestKey, clearRecoveryRequest } from "@/lib/recovery-request";
 import { ManagedDd } from "@/components/ManagedDd";
+import { DdEvidencePackV0 } from "@/components/DdEvidencePackV0";
 import type { Database } from "@/integrations/supabase/types";
 
 type FindingRow = Database["public"]["Tables"]["recovery_findings"]["Row"];
@@ -109,6 +110,7 @@ export function RevenueRecovery({
   return (
     <div className="space-y-6">
       <ManagedDd caseId={caseId} documents={documents} />
+      <DdEvidencePackV0 />
       <Panel title="Revenue Recovery">
         <p className="mb-4 text-xs text-muted-foreground">
           Reviewable detection of financial leakage. Statuses: new → under review → approved →

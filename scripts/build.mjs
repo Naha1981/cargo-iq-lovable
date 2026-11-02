@@ -11,7 +11,7 @@ if (!process.env.CARGO_BUILD_STAGE) {
     const r = spawnSync(
       process.execPath,
       [
-        "--max-old-space-size=1100",
+        "--max-old-space-size=1600",
         "--max-semi-space-size=8",
         fileURLToPath(import.meta.url),
         ...args,

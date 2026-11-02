@@ -653,9 +653,11 @@ export const reviewClaim = createServerFn({ method: "POST" })
       .eq("case_id", data.caseId)
       .select("*")
       .single();
-    if (error) throw error;
+    if (error) throw new Error("Review was not saved: " + error.message);
+    if (!row || row.id !== data.claimId || row.status !== data.decision)
+      throw new Error("Review was not confirmed saved. Reload and try again.");
 
-    await context.supabase.from("audit_log").insert({
+    const { error: auditError } = await context.supabase.from("audit_log").insert({
       tenant_id: context.tenantId,
       case_id: data.caseId,
       actor_user_id: context.user.id,
@@ -664,6 +666,11 @@ export const reviewClaim = createServerFn({ method: "POST" })
       entity_id: data.claimId,
       payload: { decision: data.decision },
     });
+    if (auditError)
+      throw new Error(
+        "Review saved, but audit recording failed. Reload before trying again: " +
+          auditError.message,
+      );
     return row;
   });
 

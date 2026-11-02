@@ -1,5 +1,6 @@
 import { createFileRoute, Link, Outlet, notFound, redirect } from "@tanstack/react-router";
 import { AppHeader, DisputeBadge } from "@/components/ui-kit";
+import { isSeededSampleCase } from "@/lib/sample-case";
 import { getCaseWorkspace } from "@/lib/case.functions";
 
 export const Route = createFileRoute("/cases/$caseId")({
@@ -75,6 +76,14 @@ function CaseLayout() {
   return (
     <div className="min-h-screen">
       <AppHeader />
+      {isSeededSampleCase(c) && (
+        <p
+          role="note"
+          className="border-b bg-amber-50 p-4 text-center font-semibold text-amber-900"
+        >
+          SAMPLE ONLY - this case contains fictional demonstration data, not customer evidence.
+        </p>
+      )}
       <div className="border-b bg-panel">
         <div className="mx-auto max-w-[1400px] px-6 pt-6">
           <Link to="/" className="text-xs text-muted-foreground hover:text-foreground">

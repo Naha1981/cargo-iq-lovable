@@ -10,6 +10,8 @@ import { fmtMoney } from "@/lib/case-data";
 import { cn } from "@/lib/utils";
 import { SiteFooter } from "@/components/SiteFooter";
 
+import { isSeededSampleCase } from "@/lib/sample-case";
+
 const PAGE_SIZE = 100;
 
 export const Route = createFileRoute("/")({
@@ -60,6 +62,7 @@ function Index() {
   // Server-side search over the same four fields as the old client filter,
   // debounced; resets paging to the first page of the filtered result.
   useEffect(() => {
+    if (!session.user) return;
     if (firstLoad.current) {
       firstLoad.current = false;
       return;
@@ -114,35 +117,39 @@ function Index() {
       <AppHeader />
       {noCases && <CargoIqOffer firstRun />}
       <main className="mx-auto max-w-[1400px] px-6 py-10">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p className="font-mono text-xs uppercase tracking-[0.2em] text-primary">
-              Investigations
-            </p>
-            {noCases ? (
-              <h2 className="mt-2 max-w-3xl text-3xl font-semibold tracking-tight md:text-4xl">
-                What actually happened — and what can be defensibly proven.
-              </h2>
-            ) : (
-              <h1 className="mt-2 max-w-3xl text-3xl font-semibold tracking-tight md:text-4xl">
-                What actually happened — and what can be defensibly proven.
-              </h1>
-            )}
+        {!noCases && (
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <p className="font-mono text-xs uppercase tracking-[0.2em] text-primary">
+                Investigations
+              </p>
+              {noCases ? (
+                <h2 className="mt-2 max-w-3xl text-3xl font-semibold tracking-tight md:text-4xl">
+                  What actually happened — and what can be defensibly proven.
+                </h2>
+              ) : (
+                <h1 className="mt-2 max-w-3xl text-3xl font-semibold tracking-tight md:text-4xl">
+                  What actually happened — and what can be defensibly proven.
+                </h1>
+              )}
+            </div>
+            <Link
+              to="/new-case"
+              className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+            >
+              + New investigation
+            </Link>
           </div>
-          <Link
-            to="/new-case"
-            className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
-          >
-            + New investigation
-          </Link>
-        </div>
+        )}
 
-        <a
-          href="/demo/cuf"
-          className="mt-6 inline-flex rounded-md border px-4 py-2 text-sm font-semibold"
-        >
-          Explore a worked example
-        </a>
+        {!noCases && (
+          <a
+            href="/demo/cuf"
+            className="mt-6 inline-flex rounded-md border px-4 py-2 text-sm font-semibold"
+          >
+            Explore a worked example
+          </a>
+        )}
         <div className="mt-8 grid grid-cols-2 gap-3 md:grid-cols-4">
           <Stat label="Open cases" value={stats?.openCases ?? 0} />
           <Stat label="Contradictions" value={stats?.contradictions ?? 0} tone="disputed" />
@@ -187,6 +194,11 @@ function Index() {
                   <td className="px-4 py-3">
                     <Link to="/cases/$caseId" params={{ caseId: c.id }} className="block">
                       <div className="font-mono text-xs text-muted-foreground">
+                        {isSeededSampleCase(c) && (
+                          <strong className="block text-amber-700">
+                            SAMPLE ONLY - fictional data, not customer evidence
+                          </strong>
+                        )}
                         {c.reference_no} · {c.port_code ?? "—"}
                       </div>
                       <div className="font-medium">

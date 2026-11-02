@@ -29,7 +29,7 @@ export const Route = createFileRoute("/cases/$caseId/documents")({
   component: DocsPage,
 });
 
-function DocsPage() {
+export function DocsPage() {
   const { caseId } = Route.useParams();
   const data = CaseRoute.useLoaderData();
   const router = useRouter();
@@ -51,7 +51,7 @@ function DocsPage() {
   const [error, setError] = useState("");
   const [freeDataClassConfirmed, setFreeDataClassConfirmed] = useState(false);
   const [notice, setNotice] = useState("");
-  const [decisions, setDecisions] = useState<Record<string, "VERIFIED" | "DISPUTED">>({});
+  const [reviewing, setReviewing] = useState<string | null>(null);
   const disputed = disputedClaimIds(data.contradictions);
   const supabase = createClient();
 
@@ -182,18 +182,24 @@ function DocsPage() {
   }
 
   async function review(claimId: string, decision: "VERIFIED" | "DISPUTED") {
-    // Optimistic: show the decision in place immediately; roll back if the write fails.
-    setDecisions((prev) => ({ ...prev, [claimId]: decision }));
+    if (reviewing) return;
+    setReviewing(claimId);
+    setError("");
+    setNotice("");
     try {
-      await reviewClaim({ data: { claimId, caseId, decision } });
+      const saved = await reviewClaim({ data: { claimId, caseId, decision } });
+      if (!saved || saved.id !== claimId || saved.status !== decision)
+        throw new Error("Review was not confirmed saved. Reload and try again.");
       await router.invalidate();
+      setNotice("Review saved: " + decision.toLowerCase() + ".");
     } catch (err) {
-      setDecisions((prev) => {
-        const next = { ...prev };
-        delete next[claimId];
-        return next;
-      });
-      setError(err instanceof Error ? err.message : "Could not record the review decision.");
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Could not save the review decision. Reload and try again.",
+      );
+    } finally {
+      setReviewing(null);
     }
   }
 
@@ -334,7 +340,7 @@ function DocsPage() {
         <Panel title={"Extracted claims · " + data.claims.length}>
           <ul className="divide-y">
             {data.claims.map((c) => {
-              const status: string = decisions[c.id] ?? c.status;
+              const status: string = c.status;
               return (
                 <li
                   key={c.id}
@@ -375,6 +381,7 @@ function DocsPage() {
                   </div>
                   <div className="flex gap-2">
                     <button
+                      disabled={reviewing !== null || status !== "PENDING"}
                       onClick={() => review(c.id, "VERIFIED")}
                       className={cn(
                         "rounded border px-2.5 py-1 text-xs",
@@ -383,9 +390,14 @@ function DocsPage() {
                           : "hover:bg-accent",
                       )}
                     >
-                      {status === "VERIFIED" ? "Verified" : "Verify"}
+                      {reviewing === c.id
+                        ? "Saving..."
+                        : status === "VERIFIED"
+                          ? "Verified"
+                          : "Verify"}
                     </button>
                     <button
+                      disabled={reviewing !== null || status !== "PENDING"}
                       onClick={() => review(c.id, "DISPUTED")}
                       className={cn(
                         "rounded border px-2.5 py-1 text-xs",

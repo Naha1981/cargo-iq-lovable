@@ -1,5 +1,5 @@
 import { Route as CaseRoute } from "./cases.$caseId";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Panel, Stat, NatureBadge, ClassTag, DisputeBadge } from "@/components/ui-kit";
 import { cn } from "@/lib/utils";
@@ -72,6 +72,15 @@ function TimelinePage() {
           Next action
         </span>
         <div className="mt-1 font-medium text-primary">{nextAction}</div>
+        {docCount === 0 && (
+          <Link
+            to="/cases/$caseId/documents"
+            params={{ caseId: data.case.id }}
+            className="mt-3 inline-flex rounded-md bg-primary px-4 py-2 text-primary-foreground"
+          >
+            Upload your first document
+          </Link>
+        )}
       </div>
       <Panel
         title={

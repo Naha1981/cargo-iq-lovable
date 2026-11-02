@@ -53,7 +53,7 @@ export function CargoIqOffer({ firstRun = false }: { firstRun?: boolean }) {
           </h1>
           <p className="mt-6 max-w-2xl text-lg leading-relaxed text-muted-foreground">
             {firstRun
-              ? "Bring the authorized records. Keep every party's definitions, clocks and unresolved questions visible. This is what CargoIQ is being built to help you prove."
+              ? "1. Create a case. 2. Upload your authorized records. 3. Verify or dispute each claim, then export the saved results. Your workspace starts empty."
               : "An evidence layer, not another tracking dashboard. Reconstruct a freight dispute when records are incomplete, counted differently or contested."}
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
@@ -79,48 +79,50 @@ export function CargoIqOffer({ firstRun = false }: { firstRun?: boolean }) {
             </a>
           </div>
         </section>
-        <section className="border-t py-12 md:py-16" aria-labelledby="six-questions">
-          <div className="max-w-2xl">
-            <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-              The work, made explicit
-            </p>
-            <h2
-              id="six-questions"
-              className="mt-3 text-2xl font-semibold tracking-tight md:text-3xl"
-            >
-              Six questions a case file should answer.
-            </h2>
-            <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
-              Open a question to see how CargoIQ answers it.
-            </p>
-          </div>
-          <div className="mt-8 grid gap-x-10 md:grid-cols-2">
-            {pains.map((p, i) => (
-              <details key={p.title} className="group border-t py-6">
-                <summary className="cursor-pointer list-none">
-                  <div className="flex items-start gap-4">
-                    <span className="mt-1 font-mono text-xs text-muted-foreground">0{i + 1}</span>
-                    <div className="flex-1">
-                      <h3 className="text-lg font-medium">{p.title}</h3>
-                      <p className="mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
-                        {p.answer}
-                      </p>
+        {!firstRun && (
+          <section className="border-t py-12 md:py-16" aria-labelledby="six-questions">
+            <div className="max-w-2xl">
+              <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                The work, made explicit
+              </p>
+              <h2
+                id="six-questions"
+                className="mt-3 text-2xl font-semibold tracking-tight md:text-3xl"
+              >
+                Six questions a case file should answer.
+              </h2>
+              <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
+                Open a question to see how CargoIQ answers it.
+              </p>
+            </div>
+            <div className="mt-8 grid gap-x-10 md:grid-cols-2">
+              {pains.map((p, i) => (
+                <details key={p.title} className="group border-t py-6">
+                  <summary className="cursor-pointer list-none">
+                    <div className="flex items-start gap-4">
+                      <span className="mt-1 font-mono text-xs text-muted-foreground">0{i + 1}</span>
+                      <div className="flex-1">
+                        <h3 className="text-lg font-medium">{p.title}</h3>
+                        <p className="mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
+                          {p.answer}
+                        </p>
+                      </div>
+                      <span
+                        aria-hidden="true"
+                        className="text-xl text-muted-foreground group-open:rotate-45"
+                      >
+                        +
+                      </span>
                     </div>
-                    <span
-                      aria-hidden="true"
-                      className="text-xl text-muted-foreground group-open:rotate-45"
-                    >
-                      +
-                    </span>
+                  </summary>
+                  <div className="ml-8 mt-4 max-w-lg">
+                    <p className="text-sm leading-relaxed">{p.detail}</p>
                   </div>
-                </summary>
-                <div className="ml-8 mt-4 max-w-lg">
-                  <p className="text-sm leading-relaxed">{p.detail}</p>
-                </div>
-              </details>
-            ))}
-          </div>
-        </section>
+                </details>
+              ))}
+            </div>
+          </section>
+        )}
         {!firstRun && (
           <section className="border-t py-12 md:py-16">
             <div className="max-w-2xl">

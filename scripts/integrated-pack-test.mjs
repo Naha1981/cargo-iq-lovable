@@ -31,10 +31,12 @@ for (const f of [
   if (fs.existsSync("docs/proposals/" + f))
     await db.exec(fs.readFileSync("docs/proposals/" + f, "utf8"));
 }
+// Exact synthetic catalog pins after the guard schema-compatibility repair.
+// Production proposal fingerprints remain unchanged and fail closed.
 const fixtureFingerprint =
   process.env.MODEL_LIVE_STAGING_DEFAULT_ACL === "1"
-    ? "fa81f1f6a140130fe0322cec5e295f0d"
-    : "026e8afa51cdf2b5e758f08ead4d8c7e";
+    ? "fecc30b337042dac26f4635e34f4d6a9"
+    : "1d587377a8ccaeda941af1bde5d0ae84";
 const proposal = fs
   .readFileSync("docs/proposals/integrated_pack_source.sql", "utf8")
   .replaceAll("026e8afa51cdf2b5e758f08ead4d8c7e", fixtureFingerprint);

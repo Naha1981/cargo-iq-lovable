@@ -30,17 +30,22 @@ if (process.env.COMBINED_HISTORICAL_PROOF === "1") {
     "integrated_pack_source.sql",
   ]) {
     let sql = fs.readFileSync("docs/proposals/" + file, "utf8");
-    if (modeled && file === "integrated_pack_source.sql")
-      sql = sql.replaceAll("026e8afa51cdf2b5e758f08ead4d8c7e", "fa81f1f6a140130fe0322cec5e295f0d");
+    if (file === "integrated_pack_source.sql")
+      sql = sql.replaceAll(
+        "026e8afa51cdf2b5e758f08ead4d8c7e",
+        modeled ? "fecc30b337042dac26f4635e34f4d6a9" : "1d587377a8ccaeda941af1bde5d0ae84",
+      );
     await db.exec(sql);
   }
 }
 let historicalSql = fs.readFileSync("docs/proposals/historical_record_review.sql", "utf8");
-if (modeled)
-  historicalSql = historicalSql.replaceAll(
-    "8792dbda9eaaae95aa4b713aa0dddfb8",
-    "aa2789627894f250f3bb1693bc3f6699",
-  );
+// Synthetic fixture catalog changed only because the approved compatibility
+// migration repairs guard_evidence_immutable. Keep exact pins, never self-approve
+// a computed fingerprint or change the production proposal's readiness gate.
+historicalSql = historicalSql.replaceAll(
+  "8792dbda9eaaae95aa4b713aa0dddfb8",
+  modeled ? "f19986c166dd53f87bb59a896b561caa" : "7c75ba0e4b3fae2762d1d4507e9d7c5d",
+);
 await db.exec(historicalSql);
 const readinessSql = fs.readFileSync("docs/proposals/historical_record_review.sql", "utf8");
 const fingerprintSql = readinessSql.slice(

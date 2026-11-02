@@ -8,10 +8,14 @@ import { join } from "node:path";
 const args = process.argv.slice(2);
 if (!process.env.CARGO_BUILD_STAGE) {
   for (const stage of ["app", "worker"]) {
+    // Stage-aware caps: the app stage (client + SSR graphs) is proven at 1100 MB,
+    // but the Nitro worker rebundle peaks just above that and was OOM-killed at
+    // 1100 during chunk rendering; it passes at 1400 MB.
+    const heapSize = stage === "worker" ? 1400 : 1100;
     const r = spawnSync(
       process.execPath,
       [
-        "--max-old-space-size=1600",
+        `--max-old-space-size=${heapSize}`,
         "--max-semi-space-size=8",
         fileURLToPath(import.meta.url),
         ...args,

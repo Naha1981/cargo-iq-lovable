@@ -22,6 +22,13 @@
       "when": 1793605744232,
       "tag": "0002_claim_source_order",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793605760341,
+      "tag": "0003_admin_ai_health",
+      "breakpoints": true
     }
   ]
 }

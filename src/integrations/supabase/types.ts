@@ -3360,6 +3360,7 @@ export type Database = {
         }
         Returns: string
       }
+      admin_get_ai_health: { Args: never; Returns: Json }
       admin_get_dispute: { Args: { p_id: string }; Returns: Json }
       admin_list_cases: {
         Args: { p_cursor?: string; p_limit?: number }

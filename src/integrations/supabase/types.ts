@@ -356,6 +356,8 @@ export type Database = {
           counterparty: string | null
           created_at: string
           created_by: string | null
+          dd_evidence_draft: Json | null
+          dd_evidence_draft_revision: number
           dispute_type: string
           id: string
           port_code: string | null
@@ -371,6 +373,8 @@ export type Database = {
           counterparty?: string | null
           created_at?: string
           created_by?: string | null
+          dd_evidence_draft?: Json | null
+          dd_evidence_draft_revision?: number
           dispute_type?: string
           id?: string
           port_code?: string | null
@@ -386,6 +390,8 @@ export type Database = {
           counterparty?: string | null
           created_at?: string
           created_by?: string | null
+          dd_evidence_draft?: Json | null
+          dd_evidence_draft_revision?: number
           dispute_type?: string
           id?: string
           port_code?: string | null
@@ -1844,6 +1850,7 @@ export type Database = {
           nature: string
           normalized_value: Json | null
           page_number: number | null
+          source_seq: number | null
           status: string
           tenant_id: string
           timestamp_claimed: string | null
@@ -1861,6 +1868,7 @@ export type Database = {
           nature?: string
           normalized_value?: Json | null
           page_number?: number | null
+          source_seq?: number | null
           status?: string
           tenant_id: string
           timestamp_claimed?: string | null
@@ -1878,6 +1886,7 @@ export type Database = {
           nature?: string
           normalized_value?: Json | null
           page_number?: number | null
+          source_seq?: number | null
           status?: string
           tenant_id?: string
           timestamp_claimed?: string | null
@@ -3438,7 +3447,12 @@ export type Database = {
         }
       }
       cargoiq_integrated_feature_readiness: { Args: never; Returns: Json }
+      cargoiq_load_dd_draft: { Args: { p_case_id: string }; Returns: Json }
       cargoiq_risk_tenant_ids: { Args: never; Returns: string[] }
+      cargoiq_save_dd_draft: {
+        Args: { p_case_id: string; p_draft: Json; p_revision: number }
+        Returns: Json
+      }
       cases_with_unresolved_operational_clocks: {
         Args: { _case_ids: string[] }
         Returns: string[]

@@ -3375,6 +3375,343 @@ export type Database = {
           },
         ]
       }
+      wa_channels: {
+        Row: {
+          created_at: string
+          display_label: string
+          id: string
+          ingest_enabled: boolean
+          mode: string
+          phone_number_id: string
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          display_label: string
+          id?: string
+          ingest_enabled?: boolean
+          mode?: string
+          phone_number_id: string
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          display_label?: string
+          id?: string
+          ingest_enabled?: boolean
+          mode?: string
+          phone_number_id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wa_channels_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wa_quote_outbox: {
+        Row: {
+          body: string
+          created_at: string
+          id: string
+          snapshot_id: string
+          state: string
+          tenant_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          id?: string
+          snapshot_id: string
+          state?: string
+          tenant_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: string
+          snapshot_id?: string
+          state?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wa_quote_outbox_snapshot_id_tenant_id_fkey"
+            columns: ["snapshot_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "wa_quote_snapshots"
+            referencedColumns: ["id", "tenant_id"]
+          },
+          {
+            foreignKeyName: "wa_quote_outbox_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wa_quote_rates: {
+        Row: {
+          amount_minor: number
+          batch_id: string
+          created_at: string
+          currency: string
+          destination: string
+          disclosure_approved: boolean
+          equipment: string
+          exclusions: string
+          id: string
+          max_kg: number
+          min_kg: number
+          origin: string
+          source_reference: string
+          tenant_id: string
+          terms: string
+          valid_from: string
+          valid_to: string
+          validity_hours: number
+          vat_bps: number
+          vat_treatment: string
+          version: string
+        }
+        Insert: {
+          amount_minor: number
+          batch_id: string
+          created_at?: string
+          currency: string
+          destination: string
+          disclosure_approved: boolean
+          equipment: string
+          exclusions: string
+          id?: string
+          max_kg: number
+          min_kg: number
+          origin: string
+          source_reference: string
+          tenant_id: string
+          terms: string
+          valid_from: string
+          valid_to: string
+          validity_hours: number
+          vat_bps: number
+          vat_treatment: string
+          version: string
+        }
+        Update: {
+          amount_minor?: number
+          batch_id?: string
+          created_at?: string
+          currency?: string
+          destination?: string
+          disclosure_approved?: boolean
+          equipment?: string
+          exclusions?: string
+          id?: string
+          max_kg?: number
+          min_kg?: number
+          origin?: string
+          source_reference?: string
+          tenant_id?: string
+          terms?: string
+          valid_from?: string
+          valid_to?: string
+          validity_hours?: number
+          vat_bps?: number
+          vat_treatment?: string
+          version?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wa_quote_rates_batch_id_tenant_id_fkey"
+            columns: ["batch_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "wa_rate_batches"
+            referencedColumns: ["id", "tenant_id"]
+          },
+          {
+            foreignKeyName: "wa_quote_rates_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wa_quote_requests: {
+        Row: {
+          channel_id: string
+          id: string
+          provider_message_id: string
+          provider_sent_at: string
+          raw_sha256: string
+          raw_text: string
+          received_at: string
+          sender_id: string
+          tenant_id: string
+        }
+        Insert: {
+          channel_id: string
+          id?: string
+          provider_message_id: string
+          provider_sent_at: string
+          raw_sha256: string
+          raw_text: string
+          received_at?: string
+          sender_id: string
+          tenant_id: string
+        }
+        Update: {
+          channel_id?: string
+          id?: string
+          provider_message_id?: string
+          provider_sent_at?: string
+          raw_sha256?: string
+          raw_text?: string
+          received_at?: string
+          sender_id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wa_quote_requests_channel_id_tenant_id_fkey"
+            columns: ["channel_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "wa_channels"
+            referencedColumns: ["id", "tenant_id"]
+          },
+          {
+            foreignKeyName: "wa_quote_requests_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wa_quote_snapshots: {
+        Row: {
+          created_at: string
+          draft_body: string
+          engine_version: string
+          id: string
+          request_id: string
+          snapshot: Json
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          draft_body: string
+          engine_version: string
+          id?: string
+          request_id: string
+          snapshot: Json
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          draft_body?: string
+          engine_version?: string
+          id?: string
+          request_id?: string
+          snapshot?: Json
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wa_quote_snapshots_request_id_tenant_id_fkey"
+            columns: ["request_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "wa_quote_requests"
+            referencedColumns: ["id", "tenant_id"]
+          },
+          {
+            foreignKeyName: "wa_quote_snapshots_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wa_rate_batches: {
+        Row: {
+          created_at: string
+          created_by: string
+          id: string
+          source_sha256: string
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          id?: string
+          source_sha256: string
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          id?: string
+          source_sha256?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wa_rate_batches_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wa_rate_revocations: {
+        Row: {
+          batch_id: string
+          id: string
+          reason: string
+          revoked_at: string
+          revoked_by: string
+          tenant_id: string
+        }
+        Insert: {
+          batch_id: string
+          id?: string
+          reason: string
+          revoked_at?: string
+          revoked_by: string
+          tenant_id: string
+        }
+        Update: {
+          batch_id?: string
+          id?: string
+          reason?: string
+          revoked_at?: string
+          revoked_by?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wa_rate_revocations_batch_id_tenant_id_fkey"
+            columns: ["batch_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "wa_rate_batches"
+            referencedColumns: ["id", "tenant_id"]
+          },
+          {
+            foreignKeyName: "wa_rate_revocations_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -3608,6 +3945,67 @@ export type Database = {
       void_extraction_reservation: {
         Args: { p_request_id: string; p_tenant_id: string }
         Returns: undefined
+      }
+      wa_current_rate_rows: {
+        Args: { p_tenant: string }
+        Returns: {
+          amount_minor: number
+          batch_id: string
+          created_at: string
+          currency: string
+          destination: string
+          disclosure_approved: boolean
+          equipment: string
+          exclusions: string
+          id: string
+          max_kg: number
+          min_kg: number
+          origin: string
+          source_reference: string
+          tenant_id: string
+          terms: string
+          valid_from: string
+          valid_to: string
+          validity_hours: number
+          vat_bps: number
+          vat_treatment: string
+          version: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "wa_quote_rates"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      wa_import_rates: {
+        Args: { p_rates: Json; p_sha256: string; p_tenant: string }
+        Returns: string
+      }
+      wa_is_admin: { Args: { t: string }; Returns: boolean }
+      wa_receive_test: {
+        Args: {
+          p_channel: string
+          p_message: string
+          p_sender: string
+          p_sent: string
+          p_sha: string
+          p_text: string
+        }
+        Returns: string
+      }
+      wa_revoke_rate_batch: {
+        Args: { p_batch: string; p_reason: string; p_tenant: string }
+        Returns: string
+      }
+      wa_save_test_snapshot: {
+        Args: {
+          p_draft: string
+          p_engine: string
+          p_request: string
+          p_snapshot: Json
+        }
+        Returns: string
       }
     }
     Enums: {

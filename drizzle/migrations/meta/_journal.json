@@ -36,6 +36,13 @@
       "when": 1793605776072,
       "tag": "0004_health_email_day_claim",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793605799430,
+      "tag": "0005_whatsapp_quote_foundation",
+      "breakpoints": true
     }
   ]
 }

@@ -28,14 +28,15 @@ export const saveHistoricalReview = createServerFn({ method: "POST" })
     const { data: result, error } = await context.supabase.rpc(
       "save_historical_record_review" as Parameters<typeof context.supabase.rpc>[0],
       {
-      p_case_id: data.caseId,
-      p_request_id: data.requestId,
-      p_date: data.date,
-      p_place: data.place,
-      p_lat: data.lat,
-      p_lon: data.lon,
-      p_confirmed: data.confirmed,
-    });
+        p_case_id: data.caseId,
+        p_request_id: data.requestId,
+        p_date: data.date,
+        p_place: data.place,
+        p_lat: data.lat,
+        p_lon: data.lon,
+        p_confirmed: data.confirmed,
+      },
+    );
     if (error) throw new Error("Historical review was not confirmed saved: " + error.message);
     return result as unknown as { observationId: string; recordCount: number };
   });

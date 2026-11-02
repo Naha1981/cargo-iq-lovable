@@ -1,7 +1,7 @@
+import { migrationFiles } from "./migration-files.mjs";
 // Isolated synthetic PostgreSQL proof. No external connections.
 import { PGlite } from "@electric-sql/pglite";
 import fs from "node:fs";
-import path from "node:path";
 import assert from "node:assert/strict";
 const db = await PGlite.create();
 await db.exec(`create role anon nologin; create role authenticated nologin; create role service_role nologin;
@@ -16,12 +16,7 @@ if (modeled)
 alter default privileges in schema public grant execute on functions to anon,authenticated,service_role;
 alter default privileges in schema public grant all on sequences to anon,authenticated,service_role;
 grant usage on schema public,auth to authenticated,anon,service_role;`);
-for (const dir of ["drizzle/migrations", "supabase/migrations"])
-  for (const f of fs
-    .readdirSync(dir)
-    .filter((f) => f.endsWith(".sql"))
-    .sort())
-    await db.exec(fs.readFileSync(path.join(dir, f), "utf8"));
+for (const file of migrationFiles()) await db.exec(fs.readFileSync(file, "utf8"));
 if (process.env.COMBINED_HISTORICAL_PROOF === "1") {
   for (const file of [
     "feature_atomic_audit.sql",
@@ -33,7 +28,7 @@ if (process.env.COMBINED_HISTORICAL_PROOF === "1") {
     if (file === "integrated_pack_source.sql")
       sql = sql.replaceAll(
         "026e8afa51cdf2b5e758f08ead4d8c7e",
-        modeled ? "fecc30b337042dac26f4635e34f4d6a9" : "1d587377a8ccaeda941af1bde5d0ae84",
+        modeled ? "1425e47736c6ce9635f85d3e35fe228a" : "e177e8f6eb50372339e4ad5b3db85508",
       );
     await db.exec(sql);
   }

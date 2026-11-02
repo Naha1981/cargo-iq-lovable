@@ -40,6 +40,7 @@ jobs:
       - run: node scripts/tenant-caps-test.mjs
       - run: node scripts/health-email-claim-test.mjs
       - run: node scripts/storage-permissive-test.mjs
+      - run: node scripts/migration-files.test.mjs
       - run: node scripts/fresh-rebuild-test.mjs
       - run: node scripts/load-50-tenants-mock-test.mjs
       - run: node scripts/historical-review-test.mjs

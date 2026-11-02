@@ -1,12 +1,12 @@
-// Applies the migration runner's exact two-layer order (scripts/db-migrate.mjs:
-// drizzle/migrations/*.sql then supabase/migrations/*.sql) to a fresh database,
+import { migrationFiles } from "./migration-files.mjs";
+// Applies the runner's canonical inventory (base Drizzle then Supabase,
+// with exact-hash-verified generated mirrors excluded) to a fresh database,
 // mirroring Supabase's built-in schemas/roles (auth, storage, anon,
 // authenticated, service_role) with minimal shims, and fails on the first
 // error. The supabase/migrations directory alone was never the complete set:
 // the base schema lives in drizzle/migrations (runner layer 1).
 import { PGlite } from "@electric-sql/pglite";
 import fs from "node:fs";
-import path from "node:path";
 const db = await PGlite.create();
 await db.exec(`
 create role anon nologin; create role authenticated nologin; create role service_role nologin;
@@ -19,14 +19,7 @@ create table storage.objects(id uuid primary key default gen_random_uuid(), buck
 create function storage.foldername(n text) returns text[] language sql immutable as
 $$ select string_to_array(n, '/') $$;
 `);
-const layers = ["drizzle/migrations", "supabase/migrations"];
-const files = layers.flatMap((dir) =>
-  fs
-    .readdirSync(dir)
-    .filter((f) => f.endsWith(".sql"))
-    .sort()
-    .map((f) => path.join(dir, f)),
-);
+const files = migrationFiles();
 let ok = 0;
 let first = null;
 for (const f of files) {

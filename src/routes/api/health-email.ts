@@ -31,7 +31,10 @@ async function handle(request: Request) {
     },
     failDay: async (day, detail) => {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      await supabaseAdmin.rpc("fail_health_email_day", { p_day: day, p_detail: detail ?? undefined });
+      await supabaseAdmin.rpc("fail_health_email_day", {
+        p_day: day,
+        p_detail: detail ?? undefined,
+      });
     },
     loadReport: async () => {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");

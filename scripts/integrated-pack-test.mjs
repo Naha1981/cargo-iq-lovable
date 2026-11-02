@@ -1,7 +1,7 @@
+import { migrationFiles } from "./migration-files.mjs";
 // ISOLATED synthetic PostgreSQL-compatible proof only. No external connections.
 import { PGlite } from "@electric-sql/pglite";
 import fs from "node:fs";
-import path from "node:path";
 import assert from "node:assert/strict";
 const db = await PGlite.create();
 await db.exec(`create role anon nologin; create role authenticated nologin; create role service_role nologin;
@@ -17,12 +17,7 @@ if (process.env.MODEL_LIVE_STAGING_DEFAULT_ACL === "1") {
  alter default privileges in schema public grant all on sequences to anon,authenticated,service_role;
  grant usage on schema public,auth to authenticated,anon,service_role;`);
 }
-for (const dir of ["drizzle/migrations", "supabase/migrations"])
-  for (const f of fs
-    .readdirSync(dir)
-    .filter((f) => f.endsWith(".sql"))
-    .sort())
-    await db.exec(fs.readFileSync(path.join(dir, f), "utf8"));
+for (const file of migrationFiles()) await db.exec(fs.readFileSync(file, "utf8"));
 for (const f of [
   "feature_atomic_audit.sql",
   "recovery_comparison_batch.sql",
@@ -31,12 +26,12 @@ for (const f of [
   if (fs.existsSync("docs/proposals/" + f))
     await db.exec(fs.readFileSync("docs/proposals/" + f, "utf8"));
 }
-// Exact synthetic catalog pins after the guard schema-compatibility repair.
+// Exact synthetic pins after guard repair and the two approved case-draft columns.
 // Production proposal fingerprints remain unchanged and fail closed.
 const fixtureFingerprint =
   process.env.MODEL_LIVE_STAGING_DEFAULT_ACL === "1"
-    ? "fecc30b337042dac26f4635e34f4d6a9"
-    : "1d587377a8ccaeda941af1bde5d0ae84";
+    ? "1425e47736c6ce9635f85d3e35fe228a"
+    : "e177e8f6eb50372339e4ad5b3db85508";
 const proposal = fs
   .readFileSync("docs/proposals/integrated_pack_source.sql", "utf8")
   .replaceAll("026e8afa51cdf2b5e758f08ead4d8c7e", fixtureFingerprint);

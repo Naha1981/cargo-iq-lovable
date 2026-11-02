@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { migrationFiles } from "./migration-files.mjs";
 // CargoIQ versioned database migration runner.
 //
 // Applies the proven from-zero order ONCE, records every applied file with its
@@ -22,17 +23,11 @@
 // supported). "from-zero" means zero USER tables in public, not a bare instance.
 // Connection: standard libpq env (PGHOST PGPORT PGDATABASE PGUSER PGPASSWORD
 // PGSSLMODE). Requires psql on PATH matching the server major version.
-import { readdirSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 
-const LAYERS = ["drizzle/migrations", "supabase/migrations"];
-const files = LAYERS.flatMap((dir) =>
-  readdirSync(dir)
-    .filter((f) => f.endsWith(".sql"))
-    .sort()
-    .map((f) => ({ path: `${dir}/${f}`, name: `${dir}/${f}` })),
-);
+const files = migrationFiles().map((path) => ({ path, name: path }));
 if (files.length === 0) throw new Error("no migration files found - run from the repo root");
 
 const sha = (p) => createHash("sha256").update(readFileSync(p)).digest("hex");

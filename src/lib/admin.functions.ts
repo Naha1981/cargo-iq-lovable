@@ -216,7 +216,9 @@ export const setPlatformAdminTenantCap = createServerFn({ method: "POST" })
     if (!supabase) throw opaque();
     const { error } = await supabase.rpc("admin_set_tenant_free_cap", {
       p_tenant_id: data.tenantId,
-      p_daily_attempts: data.dailyAttempts,
+      // NULL means "inherit the global default"; the DB function is not STRICT,
+      // so it accepts NULL even though the generated param type says `number`.
+      p_daily_attempts: data.dailyAttempts as number,
     });
     if (error) throw opaque();
     return { tenant_id: data.tenantId, daily_attempts: data.dailyAttempts };

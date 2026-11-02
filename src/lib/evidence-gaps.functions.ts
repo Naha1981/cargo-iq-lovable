@@ -25,6 +25,8 @@ export const appendEvidenceGap = createServerFn({ method: "POST" })
       .from("evidence_gap_entries")
       .insert({
         tenant_id: context.tenantId,
+        created_by: context.user.id,
+        version: 1,
         case_id: data.caseId,
         physical_reference: data.physicalReference,
         required_event: data.requiredEvent,

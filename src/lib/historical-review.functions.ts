@@ -10,7 +10,12 @@ export const saveHistoricalReview = createServerFn({ method: "POST" })
     if (!["admin", "investigator"].includes(context.role))
       throw new Error("Investigator access required");
     await requireIntegratedFeatureReady(context.supabase);
-    const readiness = await context.supabase.rpc("cargoiq_historical_review_readiness");
+    // The historical-review RPCs ship with the reviewed proposal in
+    // docs/proposals/historical_record_review.sql; until that lands on the
+    // database both calls fail here and the feature stays gated off.
+    const readiness = await context.supabase.rpc(
+      "cargoiq_historical_review_readiness" as Parameters<typeof context.supabase.rpc>[0],
+    );
     if (
       readiness.error ||
       (readiness.data as unknown as { ready?: boolean } | null)?.ready !== true
@@ -20,7 +25,9 @@ export const saveHistoricalReview = createServerFn({ method: "POST" })
       );
     // The proposed RPC derives the source records and writes review + audit in one
     // transaction. There is deliberately no browser-provided record ID/payload list.
-    const { data: result, error } = await context.supabase.rpc("save_historical_record_review", {
+    const { data: result, error } = await context.supabase.rpc(
+      "save_historical_record_review" as Parameters<typeof context.supabase.rpc>[0],
+      {
       p_case_id: data.caseId,
       p_request_id: data.requestId,
       p_date: data.date,

@@ -25,12 +25,13 @@ async function handle(request: Request) {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       await supabaseAdmin.rpc("complete_health_email_day", {
         p_day: day,
-        p_provider_message_id: providerMessageId ?? null,
+        // The DB parameter defaults to NULL; omit it when there is no message id.
+        p_provider_message_id: providerMessageId ?? undefined,
       });
     },
     failDay: async (day, detail) => {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      await supabaseAdmin.rpc("fail_health_email_day", { p_day: day, p_detail: detail ?? null });
+      await supabaseAdmin.rpc("fail_health_email_day", { p_day: day, p_detail: detail ?? undefined });
     },
     loadReport: async () => {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");

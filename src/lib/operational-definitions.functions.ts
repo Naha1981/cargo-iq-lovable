@@ -25,6 +25,8 @@ export const addOperationalDefinition = createServerFn({ method: "POST" })
       .from("operational_definitions")
       .insert({
         tenant_id: context.tenantId,
+        created_by: context.user.id,
+        version: 1,
         case_id: data.caseId,
         party: data.party,
         metric: data.metric,

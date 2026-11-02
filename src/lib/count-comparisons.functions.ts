@@ -48,6 +48,8 @@ export const appendCountComparison = createServerFn({ method: "POST" })
       .from("count_comparison_definitions")
       .insert({
         tenant_id: c.tenantId,
+        created_by: c.user.id,
+        version: 1,
         case_id: d.caseId,
         name: d.name,
         metric: d.metric,

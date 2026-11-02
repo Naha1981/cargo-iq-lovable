@@ -25,6 +25,7 @@ export const addOperationalClock = createServerFn({ method: "POST" })
       .from("operational_clocks")
       .insert({
         tenant_id: context.tenantId,
+        created_by: context.user.id,
         case_id: data.caseId,
         physical_reference: data.physicalReference,
         kind: data.kind,
@@ -73,15 +74,27 @@ export const reconcileOperationalClock = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     if (!["admin", "investigator"].includes(context.role))
       throw new Error("Investigator access required");
+    const { data: clock, error: clockErr } = await context.supabase
+      .from("operational_clocks")
+      .select("kind, physical_reference")
+      .eq("id", data.selectedClockId)
+      .eq("tenant_id", context.tenantId)
+      .maybeSingle();
+    if (clockErr || !clock) throw new Error("Selected clock not found in this workspace");
     const { data: row, error } = await context.supabase
       .from("clock_reconciliations")
       .insert({
         tenant_id: context.tenantId,
         case_id: data.caseId,
+        physical_reference: clock.physical_reference,
+        kind: clock.kind,
         selected_clock_id: data.selectedClockId,
+        considered_clock_ids: [data.selectedClockId],
         explanation: data.explanation,
         source_document_id: data.sourceDocumentId,
         source_reference: data.sourceReference,
+        version: 1,
+        created_by: context.user.id,
       })
       .select("*")
       .single();

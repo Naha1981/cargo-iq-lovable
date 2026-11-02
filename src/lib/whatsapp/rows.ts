@@ -1,5 +1,8 @@
 import type { Rate } from "./quote-engine";
-import type { WaQuoteRateRow } from "@/integrations/supabase/types";
+import type { Database } from "@/integrations/supabase/types";
+
+// Row shape of public.wa_quote_rates as returned by the wa_current_rate_rows RPC.
+export type WaQuoteRateRow = Database["public"]["Tables"]["wa_quote_rates"]["Row"];
 
 export function rateFromRow(r: WaQuoteRateRow): Rate {
   return {

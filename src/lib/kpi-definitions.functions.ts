@@ -25,6 +25,8 @@ export const addKpiDefinition = createServerFn({ method: "POST" })
       .from("kpi_definitions")
       .insert({
         tenant_id: context.tenantId,
+        created_by: context.user.id,
+        version: 1,
         case_id: data.caseId,
         party: data.party,
         name: data.name,

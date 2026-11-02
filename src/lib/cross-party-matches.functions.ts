@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { tenantMiddleware } from "@/lib/auth-middleware";
-import { matchInput } from "@/lib/cross-party-matches";
+import { matchInput, classifyMatchedClaims } from "@/lib/cross-party-matches";
 export const listCrossPartyMatches = createServerFn({ method: "GET" })
   .validator(z.object({ caseId: z.string().uuid() }))
   .middleware([tenantMiddleware])
@@ -22,6 +22,15 @@ export const confirmCrossPartyMatch = createServerFn({ method: "POST" })
     if (!["admin", "investigator"].includes(context.role))
       throw new Error("Investigator access required");
     const ids = [data.claimAId, data.claimBId].sort();
+    const { data: claims, error: claimsErr } = await context.supabase
+      .from("extracted_claims")
+      .select("id, claim_type, timestamp_claimed")
+      .in("id", ids)
+      .eq("tenant_id", context.tenantId);
+    if (claimsErr) throw claimsErr;
+    if (!claims || claims.length !== 2)
+      throw new Error("Both matched claims must exist in this workspace");
+    const result = classifyMatchedClaims(claims[0], claims[1]).kind;
     const { data: row, error } = await context.supabase
       .from("cross_party_matches")
       .insert({
@@ -29,8 +38,10 @@ export const confirmCrossPartyMatch = createServerFn({ method: "POST" })
         case_id: data.caseId,
         claim_a_id: ids[0],
         claim_b_id: ids[1],
+        result,
         event_reference: data.eventReference,
         rationale: data.rationale,
+        created_by: context.user.id,
       })
       .select("*")
       .single();
@@ -69,6 +80,8 @@ export const appendMatchIdentityReview = createServerFn({ method: "POST" })
       .from("cross_party_match_reviews")
       .insert({
         tenant_id: context.tenantId,
+        created_by: context.user.id,
+        version: 1,
         case_id: data.caseId,
         match_id: data.matchId,
         status: data.status,

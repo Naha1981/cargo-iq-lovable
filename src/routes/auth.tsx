@@ -1,5 +1,6 @@
+import { signInWithCooldown } from "@/lib/login-cooldown";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button, Panel } from "@/components/ui-kit";
 import { SiteFooter } from "@/components/SiteFooter";
 import { createClient } from "@/lib/supabase/client";
@@ -15,6 +16,8 @@ export const Route = createFileRoute("/auth")({
 
 function AuthPage() {
   const navigate = useNavigate();
+  const loginAbort = useRef<AbortController | null>(null);
+  useEffect(() => () => loginAbort.current?.abort(), []);
   const { mode: requestedMode } = Route.useSearch();
   // New customers arrive via "Create an account" (?mode=signup); default stays sign-in.
   const [mode, setMode] = useState<"signin" | "signup" | "reset">(
@@ -61,7 +64,16 @@ function AuthPage() {
         setMode("signin");
         return;
       } else {
-        const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+        const { error: signInError } = await signInWithCooldown(
+          () => supabase.auth.signInWithPassword({ email, password }),
+          {
+            signal: (loginAbort.current = new AbortController()).signal,
+            onWait: (seconds) =>
+              setNotice(
+                `Sign-in is busy. Waiting ${seconds} seconds before one retry. Keep this page open.`,
+              ),
+          },
+        );
         if (signInError) throw signInError;
         await ensureOrganization({ data: { name: organization } });
       }

@@ -24,7 +24,7 @@ import { recoveryRequestKey, clearRecoveryRequest } from "@/lib/recovery-request
 import type { Database } from "@/integrations/supabase/types";
 
 type FindingRow = Database["public"]["Tables"]["recovery_findings"]["Row"];
-const inputCls = "w-full rounded border bg-background px-2 py-1.5 text-sm";
+const inputCls = "min-w-0 max-w-full w-full rounded border bg-background px-2 py-1.5 text-sm";
 const money = (n: number, c: string) =>
   c + " " + n.toLocaleString("en-ZA", { minimumFractionDigits: 2 });
 const LABEL: Record<string, string> = {
@@ -290,9 +290,9 @@ export function ManagedDd({
           running.
         </p>
         <div className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-3">
+          <div className="min-w-0 space-y-3">
             <h3 className="text-sm font-semibold">1. Evidence</h3>
-            <fieldset className="space-y-1 rounded border p-2 text-xs">
+            <fieldset className="min-w-0 space-y-1 rounded border p-2 text-xs">
               <legend>Case documents (tag type, tick to read)</legend>
               {documents.length === 0 && (
                 <p className="text-muted-foreground">
@@ -300,7 +300,7 @@ export function ManagedDd({
                 </p>
               )}
               {documents.map((d) => (
-                <div key={d.id} className="flex items-center gap-2">
+                <div key={d.id} className="flex min-w-0 flex-wrap items-center gap-2">
                   <input
                     type="checkbox"
                     checked={picked.includes(d.id)}
@@ -310,7 +310,7 @@ export function ManagedDd({
                       )
                     }
                   />
-                  <span className="flex-1 truncate">{d.name}</span>
+                  <span className="min-w-0 flex-1 truncate">{d.name}</span>
                   <select
                     aria-label={"Type of " + d.name}
                     className="rounded border bg-background px-1 py-0.5"
@@ -379,9 +379,9 @@ export function ManagedDd({
               Add delay event from email
             </Button>
           </div>
-          <div className="space-y-2">
+          <div className="min-w-0 space-y-2">
             <h3 className="text-sm font-semibold">2. Facts to check</h3>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2">
               <input
                 className={inputCls}
                 placeholder="Container no."
@@ -469,7 +469,7 @@ export function ManagedDd({
               value={f.clause}
               onChange={set("clause")}
             />
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-3">
               <input
                 className={inputCls}
                 placeholder="Your company"
@@ -550,7 +550,7 @@ export function ManagedDd({
             4. Dispute pack
           </h4>
           <p className="mb-2 text-sm">{preview.pack.recommendedResponse}</p>
-          <div className="space-y-3">{preview.pack.letters.map(letterBlock)}</div>
+          <div className="min-w-0 space-y-3">{preview.pack.letters.map(letterBlock)}</div>
           <div className="mt-3">
             <Button
               disabled={
@@ -602,7 +602,7 @@ export function ManagedDd({
 
       {findings.length > 0 && (
         <Panel title="5. Claims and follow-up">
-          <div className="space-y-3">
+          <div className="min-w-0 space-y-3">
             {findings.map((r) => {
               const dd = (
                 r.calculation as unknown as {
@@ -666,7 +666,7 @@ export function ManagedDd({
                     />
                   )}
                   {r.status === "submitted" && fu && (
-                    <div className="space-y-2">
+                    <div className="min-w-0 space-y-2">
                       <p className="text-xs">
                         Sent {fu.track.sentAt.slice(0, 10)} to {fu.track.recipient}. Next:{" "}
                         <b>{fu.next.action.replace(/_/g, " ")}</b>

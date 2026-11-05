@@ -19,6 +19,24 @@ const type = (ph: string, v: string) =>
   fireEvent.change(screen.getByPlaceholderText(ph), { target: { value: v } });
 
 describe("ManagedDd", () => {
+  it("keeps long document names and form grids shrinkable on phones", async () => {
+    const { container } = render(
+      <ManagedDd
+        caseId="phone"
+        documents={[{ id: "d1", name: "SYNTHETIC-".repeat(25) + ".txt" }]}
+      />,
+    );
+    const docType = screen.getByLabelText(/^Type of SYNTHETIC-/);
+    expect(docType.parentElement?.className).toContain("flex-wrap");
+    expect(docType.closest("fieldset")?.className).toContain("min-w-0");
+    for (const placeholder of ["Container no.", "Your company", "Your name", "Your email"]) {
+      const input = screen.getByPlaceholderText(placeholder);
+      expect(input.className).toContain("min-w-0");
+      expect(input.parentElement?.className).toContain("grid-cols-1");
+    }
+    expect(container.querySelector('input[type="date"]')?.className).toContain("max-w-full");
+    await waitFor(() => expect(screen.getByText("No submitted claims yet.")).toBeTruthy());
+  });
   it("classifies the synthetic R18,500 case and builds a letter that is blocked until evidence is attached", async () => {
     const { container } = render(<ManagedDd caseId="c1" documents={[]} />);
     type("Container no.", "MSCU6639870");

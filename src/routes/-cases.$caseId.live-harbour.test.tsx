@@ -85,3 +85,58 @@ it("cancel never writes; uncertain retry reuses the reviewed request ID", async 
   );
   unmount();
 });
+it("snapshot bridge rejects foreign senders and requires explicit review", async () => {
+  const { frame, unmount } = setup();
+  const item = {
+    img: "data:image/jpeg;base64,/9j/",
+    label: "SYNTHETIC MAP",
+    source: "SYNTHETIC",
+    limits: "No camera footage",
+    shownTime: 1793941200,
+  };
+  fireEvent(
+    window,
+    new MessageEvent("message", {
+      origin: "https://foreign.invalid",
+      source: frame.contentWindow,
+      data: { type: "cargo-snapshot-proposal", item },
+    }),
+  );
+  expect(screen.queryByText("Confirm Save to case")).toBeNull();
+  fireEvent(
+    window,
+    new MessageEvent("message", {
+      origin: location.origin,
+      source: window,
+      data: { type: "cargo-snapshot-proposal", item },
+    }),
+  );
+  expect(screen.queryByText("Confirm Save to case")).toBeNull();
+  fireEvent(
+    window,
+    new MessageEvent("message", {
+      origin: location.origin,
+      source: frame.contentWindow,
+      data: { type: "cargo-snapshot-proposal", item },
+    }),
+  );
+  expect(screen.getByText("Confirm Save to case")).toBeTruthy();
+  expect(state.save).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByText("Cancel snapshot"));
+  expect(screen.queryByText("Confirm Save to case")).toBeNull();
+  unmount();
+});
+it("malformed snapshot has no save action", () => {
+  const { frame, unmount } = setup();
+  fireEvent(
+    window,
+    new MessageEvent("message", {
+      origin: location.origin,
+      source: frame.contentWindow,
+      data: { type: "cargo-snapshot-proposal", item: { img: "https://untrusted.invalid/pixel" } },
+    }),
+  );
+  expect(screen.queryByText("Confirm Save to case")).toBeNull();
+  expect(screen.getByText(/No usable map image/)).toBeTruthy();
+  unmount();
+});

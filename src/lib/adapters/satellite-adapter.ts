@@ -1,3 +1,4 @@
+import { cachedProvider } from "./provider-cache";
 export interface SatelliteScene {
   id: string;
   sensor: "SENTINEL-1" | "SENTINEL-2";
@@ -24,7 +25,7 @@ interface StacFeature {
   bbox?: unknown;
   geometry?: unknown;
 }
-export async function querySentinelScenes(options: {
+async function loadquerySentinelScenes(options: {
   bbox: [number, number, number, number];
   start: string;
   end: string;
@@ -70,4 +71,12 @@ export async function querySentinelScenes(options: {
       sourceUrl: "https://dataspace.copernicus.eu/",
     };
   });
+}
+
+export async function querySentinelScenes(options: Parameters<typeof loadquerySentinelScenes>[0]) {
+  return cachedProvider(
+    "querySentinelScenes:" + JSON.stringify(options),
+    () => loadquerySentinelScenes(options),
+    900000,
+  );
 }

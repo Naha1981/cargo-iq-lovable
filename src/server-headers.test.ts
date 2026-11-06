@@ -51,7 +51,7 @@ describe("worker security headers", () => {
     const hv = withSecurityHeaders(req("/harbour-view/index.html"), new Response("<html></html>"));
     const csp = hv.headers.get("content-security-policy") ?? "";
     expect(csp).toContain("wasm-unsafe-eval");
-    expect(csp).toContain("frame-ancestors 'none'");
+    expect(csp).toContain("frame-ancestors 'self'");
     expect(csp).not.toContain("script-src 'self' 'unsafe-inline'"); // no inline escape hatch
     const other = withSecurityHeaders(req("/diagnostics"), new Response("<html></html>"));
     expect(other.headers.get("content-security-policy")).toBeNull();

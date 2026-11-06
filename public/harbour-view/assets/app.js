@@ -726,7 +726,7 @@
     viewer.trackedEntity = undefined;
     viewer.camera.flyTo({
       destination: Cesium.Cartesian3.fromDegrees(lon, lat, alt),
-      orientation: { heading: 0, pitch: Cesium.Math.toRadians(-55), roll: 0 },
+      orientation: { heading: 0, pitch: Cesium.Math.toRadians(-90), roll: 0 },
       duration: 2.2,
     });
   }
@@ -1008,7 +1008,8 @@
       lon: 31.0395,
       lat: -29.8698,
       alt: 8000,
-      reply: "Flying to the Durban container terminal area, where the disputed container is held.",
+      reply:
+        "Flying to the approximate Durban container terminal reference area. This is not a verified shipment position.",
     },
     {
       key: "bayhead",
@@ -1371,6 +1372,34 @@
     var t = normVoice(t0);
     var resolved = "miss";
 
+    // Entity requests must precede fuzzy generic weather/place aliases.
+    if (/^(track|find|where is|locate|follow)\b/.test(t)) {
+      var exactName = t.replace(/^(track|find|where is|locate|follow)\s+/, "").trim();
+      var entityHit = findVesselFuzzy(exactName);
+      if (entityHit) {
+        var entityRecord = vessels.get(entityHit.mmsi).rec;
+        showVessel(entityHit.mmsi);
+        flyToPoint(entityRecord.lon, entityRecord.lat, 5000);
+        cargoSay(
+          "Selected " +
+            (entityRecord.name || entityHit.mmsi) +
+            ". Position is self-reported AIS; see feed status.",
+          null,
+        );
+      } else cargoSay("No matching vessel in this feed. No position inferred.", null);
+      return;
+    }
+    if (/\bterminal\s*\d+\b/.test(t)) {
+      cargoSay(
+        "That numbered terminal is not in the verified terminal registry. Choose a named terminal or provide a verified location. No shipment location inferred.",
+        null,
+      );
+      return;
+    }
+    if (EMBED && /my shipment|case vessel|shipment in question|disputed container/.test(t)) {
+      window.parent.postMessage({ type: "cargo-shipment-request" }, window.location.origin);
+      return;
+    }
     if (/\bstop\b|\bcancel\b/.test(t)) {
       stopReplay();
       stopTrack();
@@ -1394,18 +1423,7 @@
         "Replaying case DUR-2026-0412: arrival, berthing, free-time expiry, invoice.",
         "replay",
       );
-    } else if (
-      aliasHit(t, [
-        "condition",
-        "conditions",
-        "weather",
-        "wave",
-        "waves",
-        "wind",
-        "swell",
-        "whether",
-      ]).ok
-    ) {
+    } else if (/\b(condition|conditions|weather|wave|waves|wind|swell)\b/.test(t)) {
       $("cond-panel").classList.remove("hidden");
       loadConditions();
       resolved = "conditions";
@@ -2763,6 +2781,63 @@
     }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
   }
 
+  // Explicit camera controls use Cesium's native camera, not CSS rotation.
+  function rotateMap(delta) {
+    if (LITE) return;
+    var camera = viewer.camera;
+    var center = new Cesium.Cartesian2(
+      viewer.canvas.clientWidth / 2,
+      viewer.canvas.clientHeight / 2,
+    );
+    var target = camera.pickEllipsoid(center, scene.globe.ellipsoid);
+    if (!target) {
+      cargoSay("Point the map at the ground before rotating.", null);
+      return;
+    }
+    var range = Cesium.Cartesian3.distance(camera.positionWC, target);
+    camera.lookAt(
+      target,
+      new Cesium.HeadingPitchRange(
+        camera.heading + Cesium.Math.toRadians(delta),
+        camera.pitch,
+        range,
+      ),
+    );
+    camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
+    scene.requestRender();
+  }
+  $("rotate-left").addEventListener("click", function () {
+    rotateMap(15);
+  });
+  $("rotate-right").addEventListener("click", function () {
+    rotateMap(-15);
+  });
+  window.addEventListener("message", function (ev) {
+    if (ev.origin !== location.origin || ev.source !== window.parent) return;
+    if (ev.data?.type === "cargo-shipment-location") {
+      var p = ev.data.position;
+      if (
+        p &&
+        Number.isFinite(p.lat) &&
+        Number.isFinite(p.lon) &&
+        Math.abs(p.lat) <= 90 &&
+        Math.abs(p.lon) <= 180
+      ) {
+        flyToPoint(p.lon, p.lat, 5000);
+        cargoSay(
+          "Case recorded position at " +
+            p.at +
+            ". Not a current fix unless its timestamp is current.",
+          null,
+        );
+      } else
+        cargoSay(
+          "This case has no recorded shipment position. No location has been invented.",
+          null,
+        );
+    }
+  });
+
   // ---------- evidence sealing: every map view can land in the pack ----------
   var TRAY_KEY = "gev-evidence-tray-v1";
   var tray = [];
@@ -2878,6 +2953,17 @@
           }
         : null,
     };
+    if (EMBED && !historicalReviewActive) {
+      window.parent.postMessage(
+        { type: "cargo-snapshot-proposal", item: item },
+        window.location.origin,
+      );
+      cargoSay(
+        "Review this snapshot above the map and confirm Save to case. Nothing has been attached yet.",
+        null,
+      );
+      return;
+    }
     tray.push(item);
     if (tray.length > 20) tray.shift();
     saveTray();
@@ -2887,7 +2973,12 @@
         "Saved reference-view provenance in this browser's local tray only. Not attached to the authenticated case evidence pack.",
       );
     else
-      cargoSay("Sealed into the evidence pack: " + subj.label + ", " + fmtSAST(t) + " SAST.", null);
+      cargoSay(
+        "Saved only in this device local tray: " +
+          subj.label +
+          ". Not attached to an authenticated case pack.",
+        null,
+      );
   }
   function renderTray() {
     $("ev-count").textContent = tray.length;

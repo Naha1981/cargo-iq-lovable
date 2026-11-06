@@ -540,14 +540,29 @@ export function MapPage() {
   async function refreshSensors() {
     setRefreshing(true);
     try {
-      await corroborateCase({
+      const result = await corroborateCase({
         data: {
           caseId,
           start: new Date(initialTime).toISOString(),
           end: new Date(maxTime).toISOString(),
         },
       });
+      setSnapshotNotice(
+        "Sensor results: AIS " +
+          result.ais +
+          ", Sentinel scenes " +
+          result.scenes +
+          ", marine/weather " +
+          result.weather +
+          ". " +
+          result.providerWarnings.join("; ") +
+          ". Sentinel acquisition timestamps are observation times; Esri basemap age remains unknown.",
+      );
       await router.invalidate();
+    } catch (e) {
+      setSnapshotError(
+        e instanceof Error ? e.message : "Sensor refresh failed. No unsupported evidence inferred.",
+      );
     } finally {
       setRefreshing(false);
     }

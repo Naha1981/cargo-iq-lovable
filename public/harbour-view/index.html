@@ -54,6 +54,13 @@
   </head>
   <body>
     <div id="cesiumContainer"></div>
+    <nav
+      aria-label="Map rotation"
+      style="position: absolute; left: 12px; top: 130px; z-index: 30; display: flex; gap: 6px"
+    >
+      <button id="rotate-left" class="mini-btn" aria-label="Rotate map left">Rotate left</button>
+      <button id="rotate-right" class="mini-btn" aria-label="Rotate map right">Rotate right</button>
+    </nav>
     <div
       id="history-map-label"
       class="hidden"

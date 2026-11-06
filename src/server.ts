@@ -54,7 +54,7 @@ const BASELINE_HEADERS: Record<string, string> = {
   "x-content-type-options": "nosniff",
   "referrer-policy": "strict-origin-when-cross-origin",
   "x-frame-options": "DENY",
-  "permissions-policy": "camera=(), microphone=(), geolocation=(), interest-cohort=()",
+  "permissions-policy": "camera=(), microphone=(self), geolocation=(), interest-cohort=()",
 };
 // Keep in sync with the /harbour-view/* block in public/_headers.
 const HARBOUR_VIEW_CSP =
@@ -65,7 +65,7 @@ const HARBOUR_VIEW_CSP =
   "wss://cargoiq-gods-eye.onrender.com https://cargoiq-gods-eye.onrender.com https://api.open-meteo.com https://marine-api.open-meteo.com " +
   "https://terrain.reearth.land https://cdn.jsdelivr.net https://server.arcgisonline.com; " +
   "worker-src 'self' blob: https://cdn.jsdelivr.net; frame-src https://restreamer.cd.net.za; " +
-  "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'";
+  "object-src 'none'; base-uri 'self'; frame-ancestors 'self'; form-action 'self'";
 
 // Report-only CSP for the app shell (audit item 8). Phase 1 of a staged rollout:
 // report-only can never block a resource, so it is safe to ship before every
@@ -88,6 +88,7 @@ export function withSecurityHeaders(request: Request, response: Response): Respo
   }
   const path = new URL(request.url).pathname;
   if (path.startsWith("/harbour-view/")) {
+    out.headers.set("x-frame-options", "SAMEORIGIN");
     if (!out.headers.has("content-security-policy")) {
       out.headers.set("content-security-policy", HARBOUR_VIEW_CSP);
     }

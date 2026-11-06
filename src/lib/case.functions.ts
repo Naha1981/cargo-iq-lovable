@@ -730,7 +730,7 @@ export const corroborateCase = createServerFn({ method: "POST" })
 
     const center = resolvePortCenter(row.port_code);
     const bbox = buildAisBoundingBox(center, 35);
-    const [ais, scenes, weather] = await Promise.all([
+    const providerResults = await Promise.allSettled([
       fetchAisSnapshot({ vesselName: row.vessel_name ?? undefined, bbox }),
       querySentinelScenes({ bbox, start: data.start, end: data.end, limit: 12 }),
       fetchPortConditions({
@@ -741,6 +741,14 @@ export const corroborateCase = createServerFn({ method: "POST" })
       }),
     ]);
 
+    const providerWarnings = providerResults.flatMap((r, i) =>
+      r.status === "rejected"
+        ? [["AIS", "Sentinel", "Marine/weather"][i] + ": " + String(r.reason)]
+        : [],
+    );
+    const ais = providerResults[0].status === "fulfilled" ? providerResults[0].value : [];
+    const scenes = providerResults[1].status === "fulfilled" ? providerResults[1].value : [];
+    const weather = providerResults[2].status === "fulfilled" ? providerResults[2].value : [];
     const observations = [
       ...ais.map((x) => ({
         source: x.source,
@@ -818,7 +826,7 @@ export const corroborateCase = createServerFn({ method: "POST" })
       if (timelineError) throw timelineError;
     }
 
-    return { ais: ais.length, scenes: scenes.length, weather: weather.length };
+    return { ais: ais.length, scenes: scenes.length, weather: weather.length, providerWarnings };
   });
 
 export const calculateCaseDemurrage = createServerFn({ method: "POST" })

@@ -73,6 +73,7 @@ function wrap(text: string, size: number, bold: boolean, maxW: number): string[]
 
 type Op = { x: number; y: number; text: string; size: number; bold: boolean; gray?: number };
 type Rule = { y: number };
+type PdfImage = { hex: string; width: number; height: number; y: number };
 
 const PAGE_W = 595,
   PAGE_H = 842,
@@ -81,7 +82,7 @@ const PAGE_W = 595,
   BOTTOM = 62;
 
 class Doc {
-  pages: { ops: Op[]; rules: Rule[] }[] = [{ ops: [], rules: [] }];
+  pages: { ops: Op[]; rules: Rule[]; images?: PdfImage[] }[] = [{ ops: [], rules: [] }];
   y = PAGE_H - TOP;
   private page() {
     return this.pages[this.pages.length - 1]!;
@@ -125,6 +126,36 @@ class Doc {
   height(t: string, o: { size?: number; bold?: boolean; indent?: number } = {}) {
     const size = o.size ?? 9.5;
     return wrap(t, size, o.bold ?? false, PAGE_W - 2 * MX - (o.indent ?? 0)).length * size * 1.32;
+  }
+  jpeg(dataUrl: string) {
+    const raw = atob(dataUrl.split(",")[1] ?? "");
+    if (raw.charCodeAt(0) !== 255 || raw.charCodeAt(1) !== 216)
+      throw new Error("Invalid JPEG rendition");
+    let w = 0,
+      h = 0;
+    for (let i = 2; i < raw.length - 9;) {
+      if (raw.charCodeAt(i) !== 255) break;
+      const marker = raw.charCodeAt(i + 1),
+        len = (raw.charCodeAt(i + 2) << 8) + raw.charCodeAt(i + 3);
+      if ([192, 193, 194].includes(marker)) {
+        h = (raw.charCodeAt(i + 5) << 8) + raw.charCodeAt(i + 6);
+        w = (raw.charCodeAt(i + 7) << 8) + raw.charCodeAt(i + 8);
+        break;
+      }
+      if (len < 2) break;
+      i += len + 2;
+    }
+    if (!w || !h) throw new Error("JPEG dimensions unavailable");
+    const height = Math.min(300, (495 * h) / w);
+    this.ensure(height + 15);
+    this.y -= height;
+    (this.page().images ??= []).push({
+      hex: Array.from(raw, (c) => c.charCodeAt(0).toString(16).padStart(2, "0")).join("") + ">",
+      width: w,
+      height: h,
+      y: this.y,
+    });
+    this.gap(10);
   }
   heading(t: string) {
     this.gap(10);
@@ -1156,6 +1187,51 @@ export function buildEvidencePackPdf(pack: EvidencePackInput): Uint8Array {
     }
   }
 
+  d.heading("Exhibit index");
+  docs.forEach((doc, i) =>
+    d.text(
+      "EX-" +
+        String(i + 1).padStart(4, "0") +
+        " | " +
+        doc.name +
+        " | Source " +
+        (doc.source_party ?? "not recorded") +
+        " | SHA-256 " +
+        (doc.sha256_hash ?? "not recorded"),
+      { size: 8 },
+    ),
+  );
+  d.text(
+    "Exhibit IDs identify retained source files, not Bates page stamps. Claim page references refer to the original source.",
+    { size: 8 },
+  );
+  d.heading("Frozen custody audit and version history");
+  const custody = Array.isArray(p.custodyAudit) ? p.custodyAudit : [];
+  if (!custody.length)
+    d.text("No custody audit frozen in this version. This is a material evidence gap.");
+  custody.forEach((row) => d.text(JSON.stringify(row), { size: 8 }));
+  const history = Array.isArray(p.versionHistory) ? p.versionHistory : [];
+  if (!history.length) d.text("No prior version history frozen in this version.");
+  history.forEach((row) => d.text(JSON.stringify(row), { size: 8 }));
+  d.text(
+    "Generating investigator: " +
+      (p.exporterIdentity
+        ? JSON.stringify(p.exporterIdentity)
+        : "not recorded in this frozen version"),
+  );
+  for (const obs of allObs) {
+    const image = (
+      obs.payload as MapSnapshotPayload & { imageJpeg?: string; imageJpegSha256?: string }
+    )?.imageJpeg;
+    if (image) {
+      d.heading("Map exhibit rendition");
+      d.text(
+        "Retained JPEG map snapshot, embedded without altering its source bytes. Camera footage is not included. Original file hash and source attribution are listed in the map snapshot section.",
+        { size: 8 },
+      );
+      d.jpeg(image);
+    }
+  }
   d.reserve(250);
   d.heading("Integrity and approval");
   // The database computes this hash over the canonical payload when the pack is generated (draft or approved).
@@ -1203,7 +1279,10 @@ export function buildEvidencePackPdf(pack: EvidencePackInput): Uint8Array {
   return serialize(d.pages, pack);
 }
 
-function serialize(pages: { ops: Op[]; rules: Rule[] }[], pack: EvidencePackInput): Uint8Array {
+function serialize(
+  pages: { ops: Op[]; rules: Rule[]; images?: PdfImage[] }[],
+  pack: EvidencePackInput,
+): Uint8Array {
   const total = pages.length;
   const objs: string[] = [];
   const add = (s: string) => {
@@ -1222,6 +1301,25 @@ function serialize(pages: { ops: Op[]; rules: Rule[] }[], pack: EvidencePackInpu
   const f = (n: number) => (Math.round(n * 100) / 100).toString();
   pages.forEach((pg, i) => {
     let s = "";
+    const imageResources: string[] = [];
+    for (const [index, image] of (pg.images ?? []).entries()) {
+      const id = add(
+        "<< /Type /XObject /Subtype /Image /Width " +
+          image.width +
+          " /Height " +
+          image.height +
+          " /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter [/ASCIIHexDecode /DCTDecode] /Length " +
+          image.hex.length +
+          " >>\nstream\n" +
+          image.hex +
+          "\nendstream",
+      );
+      imageResources.push("/Im" + index + " " + id + " 0 R");
+      const width = Math.min(495, (300 * image.width) / image.height),
+        height = (width * image.height) / image.width;
+      s +=
+        "q " + width + " 0 0 " + height + " " + MX + " " + image.y + " cm /Im" + index + " Do Q\n";
+    }
     for (const r of pg.rules)
       s += "0.75 G 0.5 w " + MX + " " + f(r.y) + " m " + (PAGE_W - MX) + " " + f(r.y) + " l S\n";
     for (const o of pg.ops) {
@@ -1274,7 +1372,9 @@ function serialize(pages: { ops: Op[]; rules: Rule[] }[], pack: EvidencePackInpu
           fReg +
           " 0 R /F2 " +
           fBold +
-          " 0 R >> >> /Contents " +
+          " 0 R >> /XObject << " +
+          imageResources.join(" ") +
+          " >> >> /Contents " +
           content +
           " 0 R >>",
       ),

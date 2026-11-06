@@ -8,7 +8,8 @@ const snapshotInput = z.object({
   caseId: z.string().uuid(),
   filePath: z.string().min(5),
   name: z.string().min(1).max(200),
-  observedAt: z.string().min(10),
+  observedAt: z.string().datetime(),
+  contentType: z.enum(["image/png", "image/jpeg"]).default("image/png"),
   summary: z.object({
     vesselName: z.string().nullish(),
     mmsi: z.string().nullish(),
@@ -37,6 +38,12 @@ export const addMapSnapshot = createServerFn({ method: "POST" })
       .download(data.filePath);
     if (downloadError || !blob) throw downloadError ?? new Error("DOCUMENT_DOWNLOAD_FAILED");
     assertDocumentSize(blob.size);
+    const imageBytes = new Uint8Array(await blob.arrayBuffer());
+    if (
+      data.contentType === "image/jpeg" &&
+      !(imageBytes[0] === 255 && imageBytes[1] === 216 && imageBytes[2] === 255)
+    )
+      throw new Error("INVALID_JPEG_SNAPSHOT");
     const sha256 = await sha256Hex(await blob.arrayBuffer());
 
     const { data: doc, error: docError } = await context.supabase
@@ -46,7 +53,7 @@ export const addMapSnapshot = createServerFn({ method: "POST" })
         case_id: data.caseId,
         name: data.name,
         file_path: data.filePath,
-        file_type: "image/png",
+        file_type: data.contentType,
         sha256_hash: sha256,
         source_party: "CargoIQ harbour map",
       })
@@ -69,13 +76,34 @@ export const addMapSnapshot = createServerFn({ method: "POST" })
         observed_at: data.observedAt,
         latitude: data.summary.lat ?? null,
         longitude: data.summary.lon ?? null,
-        payload: { ...data.summary, document_id: doc.id, sha256 },
+        payload: {
+          ...data.summary,
+          document_id: doc.id,
+          sha256,
+          ...(data.contentType === "image/jpeg"
+            ? {
+                imageJpeg:
+                  "data:image/jpeg;base64," +
+                  btoa(
+                    Array.from(new Uint8Array(await blob.arrayBuffer()), (b) =>
+                      String.fromCharCode(b),
+                    ).join(""),
+                  ),
+                imageRendition:
+                  "Original retained JPEG map capture; SHA-256 matches source document",
+              }
+            : {}),
+        },
         confidence: 0.8,
         limitation,
       })
       .select("*")
       .single();
-    if (obsError) throw obsError;
+    if (obsError)
+      throw new Error(
+        "SNAPSHOT_PARTIAL_SAVE: Source document " + doc.id +
+        " was retained, but the map observation was not confirmed. Do not upload again; inspect case documents. " + obsError.message,
+      );
 
     return { documentId: doc.id as string, observationId: obs.id as string, sha256 };
   });

@@ -1,3 +1,4 @@
+import { cachedProvider } from "./provider-cache";
 export interface PortWeather {
   time: string;
   windSpeed: number | null;
@@ -11,7 +12,7 @@ export interface PortWeather {
   source: string;
 }
 
-export async function fetchPortConditions(options: {
+async function loadfetchPortConditions(options: {
   latitude?: number;
   longitude?: number;
   start?: string;
@@ -80,4 +81,12 @@ export async function fetchPortConditions(options: {
         (!options.end || t <= Date.parse(options.end))
       );
     });
+}
+
+export async function fetchPortConditions(options: Parameters<typeof loadfetchPortConditions>[0]) {
+  return cachedProvider(
+    "fetchPortConditions:" + JSON.stringify(options),
+    () => loadfetchPortConditions(options),
+    300000,
+  );
 }

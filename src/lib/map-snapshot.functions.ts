@@ -101,8 +101,10 @@ export const addMapSnapshot = createServerFn({ method: "POST" })
       .single();
     if (obsError)
       throw new Error(
-        "SNAPSHOT_PARTIAL_SAVE: Source document " + doc.id +
-        " was retained, but the map observation was not confirmed. Do not upload again; inspect case documents. " + obsError.message,
+        "SNAPSHOT_PARTIAL_SAVE: Source document " +
+          doc.id +
+          " was retained, but the map observation was not confirmed. Do not upload again; inspect case documents. " +
+          obsError.message,
       );
 
     return { documentId: doc.id as string, observationId: obs.id as string, sha256 };

@@ -81,7 +81,8 @@ function LiveHarbourPage() {
           typeof item.source === "string" &&
           typeof item.limits === "string" &&
           Number.isFinite(item.shownTime) &&
-          item.shownTime >= 0 && item.shownTime < 8.64e12
+          item.shownTime >= 0 &&
+          item.shownTime < 8.64e12
         ) {
           setSnapshot({
             img: item.img,

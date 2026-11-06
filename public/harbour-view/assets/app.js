@@ -1538,7 +1538,7 @@
     var msg = "Something stopped the microphone. Typing below always works.";
     if (err === "not-allowed" || err === "service-not-allowed") {
       msg = inIframe
-        ? "Microphone is blocked inside the CargoIQ page frame. We are fixing that now - type below meanwhile, or open the map directly at nahalabs.co.za/harbour-view."
+        ? "Speech input was not allowed. Check this site's microphone permission and your browser's speech-recognition support, or type below. This error does not identify the cause."
         : "Microphone permission denied. Allow the mic for this site in your browser settings, then tap the mic again. Typing below works too.";
     } else if (err === "audio-capture") {
       msg = "No microphone found on this device. Typing below works.";

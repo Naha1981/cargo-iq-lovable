@@ -1,6 +1,7 @@
 import { signInWithCooldown } from "@/lib/login-cooldown";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect, useRef } from "react";
+import { PasswordInput } from "../components/PasswordInput";
 import { Button, Panel } from "@/components/ui-kit";
 import { SiteFooter } from "@/components/SiteFooter";
 import { createClient } from "@/lib/supabase/client";
@@ -133,13 +134,12 @@ function AuthPage() {
             {mode !== "reset" && (
               <label className="block text-sm">
                 Password
-                <input
+                <PasswordInput
                   required
                   minLength={8}
-                  type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="mt-1 w-full rounded-md border bg-background px-3 py-2"
+                  className="w-full rounded-md border bg-background px-3 py-2"
                 />
               </label>
             )}

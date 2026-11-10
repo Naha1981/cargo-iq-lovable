@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { PasswordInput } from "../components/PasswordInput";
 import { useEffect, useState } from "react";
 import { Button, Panel } from "@/components/ui-kit";
 import { SiteFooter } from "@/components/SiteFooter";
@@ -70,24 +71,22 @@ function ResetPasswordPage() {
             <form className="space-y-4" onSubmit={submit}>
               <label className="block text-sm">
                 New password
-                <input
+                <PasswordInput
                   required
                   minLength={8}
-                  type="password"
-                  value={password}
+                                    value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="mt-1 w-full rounded-md border bg-background px-3 py-2"
+                  className="w-full rounded-md border bg-background px-3 py-2"
                 />
               </label>
               <label className="block text-sm">
                 Repeat new password
-                <input
+                <PasswordInput
                   required
                   minLength={8}
-                  type="password"
-                  value={confirm}
+                                    value={confirm}
                   onChange={(e) => setConfirm(e.target.value)}
-                  className="mt-1 w-full rounded-md border bg-background px-3 py-2"
+                  className="w-full rounded-md border bg-background px-3 py-2"
                 />
               </label>
               {error && (

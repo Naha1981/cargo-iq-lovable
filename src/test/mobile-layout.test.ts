@@ -6,8 +6,14 @@ describe("phone investigation layout", () => {
     expect(source("src/routes/cases.$caseId.tsx")).toContain("grid grid-cols-2");
   });
   it("uses non-overlapping stacked timeline events on phones", () => {
-    expect(source("src/routes/cases.$caseId.index.tsx")).toContain('aria-label="Timeline events"');
-    expect(source("src/routes/cases.$caseId.index.tsx")).toContain("hidden h-56 sm:block");
+    // The evidence timeline is one stacked vertical list at every width, so
+    // phone events can never overlap the way the old absolute-positioned
+    // desktop-only rail could.
+    expect(source("src/routes/cases.$caseId.index.tsx")).toContain("EvidenceTimeline");
+    const timeline = source("src/components/EvidenceTimeline.tsx");
+    expect(timeline).toContain('aria-label="Evidence timeline"');
+    expect(timeline).toContain("space-y-4");
+    expect(timeline).not.toContain("absolute top-1/2");
   });
   it("keeps map events and playback below the phone map, not over it", () => {
     const map = source("src/routes/cases.$caseId.map.tsx");

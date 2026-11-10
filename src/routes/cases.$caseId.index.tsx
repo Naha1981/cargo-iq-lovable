@@ -1,7 +1,8 @@
 import { Route as CaseRoute } from "./cases.$caseId";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Panel, Stat, NatureBadge, ClassTag, DisputeBadge } from "@/components/ui-kit";
+import { EvidenceTimeline, EvidenceSourceDrawer } from "@/components/EvidenceTimeline";
 import { cn } from "@/lib/utils";
 import { disputedClaimIds, disputedWindow, isDisputeEvent } from "@/lib/dispute";
 import { type Nature } from "@/lib/case-data";
@@ -16,8 +17,11 @@ export const Route = createFileRoute("/cases/$caseId/")({
 
 function TimelinePage() {
   const data = CaseRoute.useLoaderData();
+  const navigate = useNavigate();
   const [events, setEvents] = useState(data.timeline);
   const [selectedId, setSelectedId] = useState(data.timeline[0]?.id ?? "");
+  const [view, setView] = useState<"timeline" | "list">("timeline");
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   useEffect(() => {
     setEvents(data.timeline);
@@ -25,9 +29,6 @@ function TimelinePage() {
   }, [data.timeline, selectedId]);
 
   const selected = events.find((e) => e.id === selectedId) ?? events[0];
-  const t0 = events.length ? Date.parse(events[0].timestamp) : Date.now();
-  const t1 = events.length ? Date.parse(events[events.length - 1].timestamp) : t0 + 1;
-  const pos = (s: string) => (t1 === t0 ? 50 : 6 + ((Date.parse(s) - t0) / (t1 - t0)) * 88);
 
   const docCount = data.documents.length;
   const claimCount = data.claims.length;
@@ -51,6 +52,12 @@ function TimelinePage() {
               ? "Generate the evidence pack"
               : "Review pack";
 
+  const viewBtn = (active: boolean) =>
+    cn(
+      "min-h-11 flex-1 rounded-lg px-4 text-base font-semibold transition-colors sm:flex-none sm:px-6",
+      active ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+    );
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -67,7 +74,7 @@ function TimelinePage() {
           tone="observed"
         />
       </div>
-      <div className="rounded border border-primary/40 bg-primary/5 px-4 py-3 text-sm">
+      <div className="rounded border border-primary/40 bg-primary/5 px-4 py-3 text-base">
         <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
           Next action
         </span>
@@ -82,174 +89,142 @@ function TimelinePage() {
           </Link>
         )}
       </div>
-      <Panel
-        title={
-          "Case timeline · " +
-          (events.length
-            ? new Date(t0).toISOString().slice(0, 10) +
-              " – " +
-              new Date(t1).toISOString().slice(0, 10)
-            : "No events")
-        }
+
+      <div
+        role="group"
+        aria-label="Evidence view"
+        className="flex w-full gap-1.5 rounded-xl bg-secondary p-1.5 sm:w-auto sm:inline-flex"
       >
-        {!events.length ? (
-          <div className="py-14 text-center text-sm text-muted-foreground">
-            No timeline events yet. Upload records or refresh satellite and marine data.
-          </div>
-        ) : (
-          <>
-            {window && (
-              <div
-                className="mb-3 flex items-center gap-2 rounded border border-disputed/40 bg-disputed/10 px-3 py-2 sm:hidden"
-                aria-label="Disputed window"
-              >
-                <DisputeBadge label="Disputed window" />
-                <span className="font-mono text-[11px] text-disputed">
-                  {new Date(window.start).toISOString().slice(5, 16).replace("T", " ")}Z –{" "}
-                  {new Date(window.end).toISOString().slice(5, 16).replace("T", " ")}Z
-                </span>
-              </div>
-            )}
-            <ol aria-label="Timeline events" className="space-y-2 sm:hidden">
+        <button
+          type="button"
+          aria-pressed={view === "timeline"}
+          onClick={() => setView("timeline")}
+          className={viewBtn(view === "timeline")}
+        >
+          Timeline
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            void navigate({ to: "/cases/$caseId/map", params: { caseId: data.case.id } })
+          }
+          className={viewBtn(false)}
+        >
+          Map
+        </button>
+        <button
+          type="button"
+          aria-pressed={view === "list"}
+          onClick={() => setView("list")}
+          className={viewBtn(view === "list")}
+        >
+          List
+        </button>
+      </div>
+
+      {window && (
+        <div
+          className="flex items-center gap-2 rounded border border-disputed/40 bg-disputed/10 px-3 py-2"
+          aria-label="Disputed window"
+        >
+          <DisputeBadge label="Disputed window" />
+          <span className="font-mono text-xs text-disputed">
+            {new Date(window.start).toISOString().slice(5, 16).replace("T", " ")}Z –{" "}
+            {new Date(window.end).toISOString().slice(5, 16).replace("T", " ")}Z
+          </span>
+        </div>
+      )}
+
+      {view === "timeline" ? (
+        <EvidenceTimeline
+          events={events}
+          disputed={disputed}
+          selectedId={selected?.id}
+          onSelect={(id) => {
+            setSelectedId(id);
+            setDrawerOpen(true);
+          }}
+        />
+      ) : (
+        <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
+          <Panel title={"Event ledger · " + events.length}>
+            <ol className="divide-y">
               {events.map((e) => (
                 <li key={e.id}>
                   <button
-                    onClick={() => setSelectedId(e.id)}
+                    onClick={() => {
+                      setSelectedId(e.id);
+                      setDrawerOpen(true);
+                    }}
                     className={cn(
-                      "w-full rounded border px-3 py-3 text-left",
-                      e.id === selected?.id && "border-primary bg-accent",
-                      isDisputeEvent(e, disputed) && "border-disputed/40 bg-disputed/5",
+                      "grid w-full grid-cols-1 items-start gap-1 sm:grid-cols-[150px_1fr_auto] sm:items-center sm:gap-4 px-2 py-3 text-left text-base hover:bg-accent",
+                      e.id === selected?.id && "bg-accent",
                     )}
                   >
-                    <span className="block font-mono text-xs text-muted-foreground">
+                    <span className="font-mono text-sm text-muted-foreground">
                       {new Date(e.timestamp).toISOString().slice(0, 16).replace("T", " ")}Z
                     </span>
-                    <span className="mt-1 block text-sm">{e.title}</span>
-                    <span className="mt-2 flex flex-wrap gap-2">
+                    <span>
+                      {e.title}
+                      <span className="block text-sm text-muted-foreground">{e.source}</span>
+                    </span>
+                    <span className="flex flex-wrap items-center gap-2">
+                      {isDisputeEvent(e, disputed) && <DisputeBadge />}
                       {showNature(e) && (
                         <NatureBadge n={String(e.nature).toLowerCase() as Nature} />
                       )}
-                      {isDisputeEvent(e, disputed) && <DisputeBadge />}
                     </span>
                   </button>
                 </li>
               ))}
-            </ol>
-            <div className="relative hidden h-56 sm:block">
-              <div className="absolute left-0 right-0 top-1/2 h-px bg-border" />
-              {window && t1 > t0 && (
-                <div
-                  className="absolute top-2 bottom-2 rounded border border-disputed/30 bg-disputed/10"
-                  style={{
-                    left: pos(new Date(window.start).toISOString()) + "%",
-                    width:
-                      Math.max(
-                        2,
-                        pos(new Date(window.end).toISOString()) -
-                          pos(new Date(window.start).toISOString()),
-                      ) + "%",
-                  }}
-                  aria-label="Disputed window"
-                >
-                  <span className="absolute -top-0.5 left-1 font-mono text-[9px] uppercase tracking-widest text-disputed">
-                    Disputed window
-                  </span>
-                </div>
+              {!events.length && (
+                <li className="py-14 text-center text-base text-muted-foreground">
+                  No timeline events yet. Upload records or refresh satellite and marine data.
+                </li>
               )}
-              {events.map((e, i) => (
-                <button
-                  key={e.id}
-                  onClick={() => setSelectedId(e.id)}
-                  className="group absolute top-1/2 -translate-x-1/2 -translate-y-1/2"
-                  style={{ left: pos(e.timestamp) + "%" }}
-                >
-                  <span
-                    className={cn(
-                      "block h-3.5 w-3.5 rotate-45 border-2 transition-transform group-hover:scale-125",
-                      e.id === selected?.id && "scale-150",
-                    )}
-                    style={{
-                      borderColor: "var(--" + String(e.nature).toLowerCase() + ")",
-                      background:
-                        e.nature === "INFERRED"
-                          ? "transparent"
-                          : "var(--" + String(e.nature).toLowerCase() + ")",
-                    }}
-                  />
-                  <span
-                    className={
-                      "absolute left-1/2 w-24 -translate-x-1/2 whitespace-nowrap rounded bg-card/80 px-1 text-center font-mono text-[10px] leading-tight text-muted-foreground " +
-                      ["bottom-6", "top-6", "bottom-[3.75rem]", "top-[3.75rem]"][i % 4]
-                    }
-                  >
-                    {new Date(e.timestamp).toISOString().slice(5, 16).replace("T", " ")}Z
-                  </span>
-                </button>
-              ))}
-            </div>
-          </>
-        )}
-      </Panel>
+            </ol>
+          </Panel>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
-        <Panel title={"Event ledger · " + events.length}>
-          <ol className="divide-y">
-            {events.map((e) => (
-              <li key={e.id}>
-                <button
-                  onClick={() => setSelectedId(e.id)}
-                  className={cn(
-                    "grid w-full grid-cols-1 items-start gap-1 sm:grid-cols-[150px_1fr_auto] sm:items-center sm:gap-4 px-2 py-3 text-left text-sm hover:bg-accent",
-                    e.id === selected?.id && "bg-accent",
+          <Panel title="Provenance">
+            {selected ? (
+              <div className="space-y-4 text-base">
+                <div className="flex flex-wrap gap-2">
+                  {showNature(selected) && (
+                    <NatureBadge n={String(selected.nature).toLowerCase() as Nature} />
                   )}
-                >
-                  <span className="font-mono text-xs text-muted-foreground">
-                    {new Date(e.timestamp).toISOString().slice(0, 16).replace("T", " ")}Z
-                  </span>
-                  <span>
-                    {e.title}
-                    <span className="block text-xs text-muted-foreground">{e.source}</span>
-                  </span>
-                  <span className="flex flex-wrap items-center gap-2">
-                    {isDisputeEvent(e, disputed) && <DisputeBadge />}
-                    {showNature(e) && <NatureBadge n={String(e.nature).toLowerCase() as Nature} />}
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ol>
-        </Panel>
-
-        <Panel title="Provenance">
-          {selected ? (
-            <div className="space-y-4 text-sm">
-              <div className="flex flex-wrap gap-2">
-                {showNature(selected) && (
-                  <NatureBadge n={String(selected.nature).toLowerCase() as Nature} />
-                )}
-                {isDisputeEvent(selected, disputed) && <DisputeBadge />}
+                  {isDisputeEvent(selected, disputed) && <DisputeBadge />}
+                </div>
+                <p className="text-base font-medium">{selected.title}</p>
+                <dl className="grid grid-cols-[95px_1fr] gap-y-2 text-sm">
+                  <dt className="text-muted-foreground">Timestamp</dt>
+                  <dd className="font-mono">{selected.timestamp} UTC</dd>
+                  <dt className="text-muted-foreground">Source</dt>
+                  <dd>{selected.source}</dd>
+                  <dt className="text-muted-foreground">Class</dt>
+                  <dd>
+                    <ClassTag c={selected.evidence_class} />
+                  </dd>
+                  <dt className="text-muted-foreground">Coordinates</dt>
+                  <dd className="font-mono">
+                    {selected.coordinates ? JSON.stringify(selected.coordinates) : "—"}
+                  </dd>
+                </dl>
               </div>
-              <p className="text-base font-medium">{selected.title}</p>
-              <dl className="grid grid-cols-[95px_1fr] gap-y-2 text-xs">
-                <dt className="text-muted-foreground">Timestamp</dt>
-                <dd className="font-mono">{selected.timestamp} UTC</dd>
-                <dt className="text-muted-foreground">Source</dt>
-                <dd>{selected.source}</dd>
-                <dt className="text-muted-foreground">Class</dt>
-                <dd>
-                  <ClassTag c={selected.evidence_class} />
-                </dd>
-                <dt className="text-muted-foreground">Coordinates</dt>
-                <dd className="font-mono">
-                  {selected.coordinates ? JSON.stringify(selected.coordinates) : "—"}
-                </dd>
-              </dl>
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">Select an event.</p>
-          )}
-        </Panel>
-      </div>
+            ) : (
+              <p className="text-base text-muted-foreground">Select an event.</p>
+            )}
+          </Panel>
+        </div>
+      )}
+
+      <EvidenceSourceDrawer
+        open={drawerOpen}
+        event={selected}
+        documents={data.documents}
+        caseId={data.case.id}
+        disputed={disputed}
+        onClose={() => setDrawerOpen(false)}
+      />
     </div>
   );
 }

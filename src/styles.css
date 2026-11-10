@@ -68,7 +68,9 @@
 }
 
 /* Light theme. Dark (the console look) is the :root default above; .light is applied on <html>. */
-:root { color-scheme: dark; }
+:root {
+  color-scheme: dark;
+}
 :root.light {
   color-scheme: light;
   --background: oklch(0.975 0.004 240);
@@ -99,7 +101,9 @@
 }
 
 @layer base {
-  * { border-color: var(--color-border); }
+  * {
+    border-color: var(--color-border);
+  }
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
@@ -108,8 +112,32 @@
   }
 }
 
-
 /* Keep the public demo free of the editor badge. */
 #lovable-badge {
   display: none !important;
+}
+
+/* Evidence source drawer - restrained motion, respects reduced motion */
+@keyframes drawer-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes drawer-up {
+  from {
+    transform: translateY(20px);
+    opacity: 0.6;
+  }
+}
+.drawer-scrim {
+  animation: drawer-fade 160ms ease-out;
+}
+.drawer-panel {
+  animation: drawer-up 200ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .drawer-scrim,
+  .drawer-panel {
+    animation: none;
+  }
 }

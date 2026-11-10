@@ -135,7 +135,7 @@ function Index() {
             </div>
             <Link
               to="/new-case"
-              className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+              className="rounded-md bg-primary px-4 py-2 text-base font-semibold text-primary-foreground"
             >
               + New investigation
             </Link>
@@ -145,7 +145,7 @@ function Index() {
         {!noCases && (
           <a
             href="/demo/cuf"
-            className="mt-6 inline-flex rounded-md border px-4 py-2 text-sm font-semibold"
+            className="mt-6 inline-flex rounded-md border px-4 py-2 text-base font-semibold"
           >
             Explore a worked example
           </a>
@@ -174,12 +174,12 @@ function Index() {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search reference, vessel, container…"
-            className="w-full sm:w-72 rounded-md border bg-card px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-ring"
+            className="w-full sm:w-72 rounded-md border bg-card px-3 py-2 text-base outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-ring"
           />
         </div>
 
         <div className="mt-3 overflow-x-auto rounded-lg border">
-          <table className="w-full min-w-[600px] text-sm">
+          <table className="w-full min-w-[600px] text-base">
             <thead className="bg-panel text-left text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
               <tr>
                 <th className="px-4 py-3 font-medium">Case</th>
@@ -193,7 +193,7 @@ function Index() {
                 <tr key={c.id} className="border-t bg-card transition-colors hover:bg-accent">
                   <td className="px-4 py-3">
                     <Link to="/cases/$caseId" params={{ caseId: c.id }} className="block">
-                      <div className="font-mono text-xs text-muted-foreground">
+                      <div className="font-mono text-sm text-muted-foreground">
                         {isSeededSampleCase(c) && (
                           <strong className="block text-amber-700">
                             SAMPLE ONLY - fictional data, not customer evidence
@@ -228,7 +228,10 @@ function Index() {
               ))}
               {!rows.length && (
                 <tr>
-                  <td colSpan={4} className="px-4 py-10 text-center text-sm text-muted-foreground">
+                  <td
+                    colSpan={4}
+                    className="px-4 py-10 text-center text-base text-muted-foreground"
+                  >
                     No investigations yet. Create the first case to begin.
                   </td>
                 </tr>
@@ -241,7 +244,7 @@ function Index() {
             <button
               onClick={loadMore}
               disabled={loading}
-              className="rounded-md border px-4 py-2 text-sm font-semibold disabled:opacity-50"
+              className="rounded-md border px-4 py-2 text-base font-semibold disabled:opacity-50"
             >
               {loading ? "Loading…" : "Load more investigations"}
             </button>

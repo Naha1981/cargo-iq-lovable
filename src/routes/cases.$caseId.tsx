@@ -9,7 +9,7 @@ import {
   useRouterState,
   useNavigate,
 } from "@tanstack/react-router";
-import { AppHeader, DisputeBadge } from "@/components/ui-kit";
+import { AppHeader } from "@/components/ui-kit";
 import { isSeededSampleCase } from "@/lib/sample-case";
 import { getCaseWorkspace } from "@/lib/case.functions";
 
@@ -136,20 +136,31 @@ function CaseLayout() {
                 {c.container_no ? "Container " + c.container_no : "Multiple containers"} · Opened{" "}
                 {new Date(c.created_at).toLocaleDateString("en-GB")}
               </p>
-              {openDisputes > 0 && (
-                <Link
-                  to="/cases/$caseId/documents"
-                  params={{ caseId: c.id }}
-                  className="mt-2 inline-block"
-                  aria-label="Open the disputed items"
-                >
-                  <DisputeBadge
-                    label={
-                      openDisputes + " open dispute" + (openDisputes === 1 ? "" : "s") + " · review"
-                    }
-                  />
-                </Link>
-              )}
+              <div className="mt-3 flex flex-wrap gap-2">
+                <span className="rounded-full bg-secondary px-3 py-1 text-sm font-semibold">
+                  {c.status}
+                </span>
+                {openDisputes > 0 && (
+                  <Link
+                    to="/cases/$caseId/documents"
+                    params={{ caseId: c.id }}
+                    aria-label="Open the disputed items"
+                    className="inline-flex items-center gap-1.5 rounded-full bg-disputed/10 px-3 py-1 text-sm font-semibold text-disputed"
+                  >
+                    <span
+                      className="h-1.5 w-1.5 animate-pulse rounded-full"
+                      style={{ background: "var(--disputed)" }}
+                    />
+                    {openDisputes} contradiction{openDisputes === 1 ? "" : "s"} · review
+                  </Link>
+                )}
+                <span className="rounded-full bg-secondary px-3 py-1 text-sm font-semibold text-muted-foreground">
+                  {data.documents.length} document{data.documents.length === 1 ? "" : "s"}
+                </span>
+                <span className="rounded-full bg-secondary px-3 py-1 text-sm font-semibold text-muted-foreground">
+                  {data.claims.length} claim{data.claims.length === 1 ? "" : "s"}
+                </span>
+              </div>
             </div>
           </div>
 

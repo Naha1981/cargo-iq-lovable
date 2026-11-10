@@ -1,3 +1,4 @@
+import { EvidenceStart } from "./EvidenceStart";
 import { useEffect, useState } from "react";
 import {
   listOperationalDefinitions,
@@ -89,21 +90,29 @@ export function OperationalDefinitionRegister({
   const inputClass = "mt-1 w-full rounded border bg-background p-2 text-sm";
   return (
     <section className="rounded-lg border bg-card p-4 sm:p-5">
-      <h2 className="text-lg font-semibold">Operational definition register</h2>
+      <h2 className="text-xl font-semibold">Counting definitions</h2>
       <p className="mt-2 text-sm text-muted-foreground">
-        Compare each organization's definition without rewriting its reported counts. Agreement
-        labels record a human assertion with supporting evidence, not an automatic legal finding.
-        Different units are review topics, not factual contradictions.
+        Keep each party's counting rules next to its source.
       </p>
+      <details className="mt-3 text-sm">
+        <summary className="cursor-pointer">Why this matters</summary>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Compare each organization's definition without rewriting its reported counts. Agreement
+          labels record a human assertion with supporting evidence, not an automatic legal finding.
+          Different units are review topics, not factual contradictions.
+        </p>
+      </details>
       {error && (
         <p role="alert" className="mt-3 rounded border border-disputed p-3 text-sm text-disputed">
           {error}
         </p>
       )}
-      <label className="my-4 flex gap-2 text-sm">
-        <input type="checkbox" checked={history} onChange={(e) => setHistory(e.target.checked)} />
-        Show all immutable versions
-      </label>
+      {rows.length > 0 && (
+        <label className="my-4 flex gap-2 text-sm">
+          <input type="checkbox" checked={history} onChange={(e) => setHistory(e.target.checked)} />
+          Show all immutable versions
+        </label>
+      )}
       <div className="grid gap-3 md:grid-cols-2">
         {shown.map((r) => (
           <article key={r.id} className="min-w-0 rounded border p-4">
@@ -141,10 +150,17 @@ export function OperationalDefinitionRegister({
           </article>
         ))}
       </div>
-      {!shown.length && (
-        <p className="my-4 text-sm text-muted-foreground">
-          No definitions recorded. Missing definitions do not establish a counting error.
-        </p>
+      {!shown.length && !error && (
+        <EvidenceStart
+          title="No definitions recorded yet"
+          caseId={caseId}
+          hasDocuments={documents.length > 0}
+          steps={[
+            "Choose the source document",
+            "Copy its counting unit and rule",
+            "Record who accepts that rule",
+          ]}
+        />
       )}
       <details className="mt-5 rounded border p-4" open={!!form.supersedesId}>
         <summary className="cursor-pointer text-sm font-semibold">

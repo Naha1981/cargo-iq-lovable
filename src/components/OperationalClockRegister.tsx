@@ -1,3 +1,4 @@
+import { EvidenceStart } from "./EvidenceStart";
 import { useRouter } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { clockKinds, clockInput, compareClocks } from "@/lib/operational-clocks";
@@ -83,12 +84,18 @@ export function OperationalClockRegister({
   const cl = "mt-1 w-full rounded border bg-background p-2 text-sm";
   return (
     <section className="rounded-lg border bg-card p-4 sm:p-5">
-      <h2 className="text-lg font-semibold">Three clocks, kept separate</h2>
+      <h2 className="text-xl font-semibold">Source clocks</h2>
       <p className="mt-2 text-sm text-muted-foreground">
-        Precinct/geofence arrival, appointment slot, and terminal gate events are different
-        evidence. Every supported clock is shown; no convenient start is selected. Elapsed time
-        alone does not prove delay responsibility.
+        Compare arrival, appointment and gate times without treating them as the same event.
       </p>
+      <details className="mt-3 text-sm">
+        <summary className="cursor-pointer">Why this matters</summary>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Precinct/geofence arrival, appointment slot, and terminal gate events are different
+          evidence. Every supported clock is shown; no convenient start is selected. Elapsed time
+          alone does not prove delay responsibility.
+        </p>
+      </details>
       {error && (
         <p role="alert" className="mt-3 rounded border border-disputed p-3 text-sm">
           {error}
@@ -155,10 +162,17 @@ export function OperationalClockRegister({
           </div>
         </article>
       ))}
-      {!rows.length && (
-        <p className="my-4 text-sm text-muted-foreground">
-          No clock evidence received. This does not prove the events did not happen.
-        </p>
+      {!rows.length && !error && (
+        <EvidenceStart
+          title="No clock evidence recorded yet"
+          caseId={caseId}
+          hasDocuments={documents.length > 0}
+          steps={[
+            "Choose the visit and source",
+            "Record the original event time",
+            "Compare supported times",
+          ]}
+        />
       )}
       <details className="mt-4 rounded border p-4">
         <summary className="cursor-pointer text-sm font-semibold">

@@ -1,5 +1,5 @@
 import { Route as CaseRoute } from "./cases.$caseId";
-import { createFileRoute, useRouter } from "@tanstack/react-router";
+import { Link, createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { Button, Panel, Stat } from "@/components/ui-kit";
 import { calculateCaseDemurrage } from "@/lib/case.functions";
@@ -151,6 +151,26 @@ function FinPage() {
               ? `${openContradictions} flagged contradiction(s) must also be resolved with evidence. `
               : ""}
             Earlier figures stay hidden until all evidence gates pass.
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {openContradictions > 0 && (
+              <Link
+                to="/cases/$caseId/documents"
+                params={{ caseId }}
+                className="inline-flex min-h-11 items-center rounded border px-3 font-semibold"
+              >
+                Review unresolved contradictions
+              </Link>
+            )}
+            {data.clockBlocked && (
+              <Link
+                to="/cases/$caseId/clocks"
+                params={{ caseId }}
+                className="inline-flex min-h-11 items-center rounded border px-3 font-semibold"
+              >
+                Review source clocks
+              </Link>
+            )}
           </div>
         </div>
       )}

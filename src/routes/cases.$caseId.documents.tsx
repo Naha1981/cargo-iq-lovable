@@ -228,323 +228,355 @@ export function DocsPage() {
   }
 
   return (
-    <div className="grid min-w-0 grid-cols-1 gap-6 xl:grid-cols-[390px_minmax(0,1fr)]">
-      <Panel
-        title={"Documents · " + data.documents.length}
-        action={
-          <>
-            <input
-              ref={file}
-              type="file"
-              multiple
-              hidden
-              accept=".pdf,.csv,.txt,application/pdf,text/csv,text/plain"
-              onChange={(e) => onUpload(e.target.files)}
-            />
-            <Button
-              disabled={busy}
-              variant="ghost"
-              className="py-1 text-xs"
-              onClick={() => file.current?.click()}
-            >
-              + Upload
-            </Button>
-          </>
-        }
+    <div className="min-w-0 space-y-4">
+      <div
+        className="sticky top-0 z-30 flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card p-3 shadow-sm"
+        aria-label="Document actions"
       >
-        {error && (
-          <div className="mb-3 rounded border border-disputed/40 bg-disputed/10 p-3 text-xs text-disputed">
-            {error}
-          </div>
-        )}
-        <p className="mb-3 text-xs text-muted-foreground">
-          PDF, TXT or CSV, up to 5 MB per file. Import text uses no AI credits (up to 500 lines,
-          200,000 characters and 20 PDF pages). Scanned PDFs need AI or a transcription. If AI is
-          unavailable, readable text is imported and clearly labelled. Human review is always
-          required.
+        <p className="text-sm">
+          <strong>{data.documents.length} documents</strong> ·{" "}
+          {data.contradictions.filter((c) => c.status === "FLAGGED").length} unresolved
+          contradictions
         </p>
-        <label className="mb-3 flex gap-2 text-xs">
-          <input
-            type="checkbox"
-            checked={freeDataClassConfirmed}
-            onChange={(e) => setFreeDataClassConfirmed(e.target.checked)}
-          />
-          Optional Gemini test fallback: I confirm this is synthetic or non-confidential test data.
-          Google unpaid API may use it for training or human review. Disabled unless configured by
-          the owner.
-        </label>
-        {notice && (
-          <div role="status" className="mb-3 rounded border p-3 text-xs">
-            {notice}
-          </div>
-        )}
-        <label className="mb-4 block text-sm">
-          Source organization for this upload
-          <input
-            value={sourceParty}
-            maxLength={200}
-            onChange={(e) => setSourceParty(e.target.value)}
-            placeholder="Organization that supplied the record"
-            className="mt-2 w-full rounded border bg-background p-2 text-sm"
-          />
-          <span className="mt-1 block text-xs text-muted-foreground">
-            Applies to every file in this selection. Upload different organizations separately.
-          </span>
-        </label>
-        <ul className="divide-y">
-          {data.documents.map((d) => (
-            <li key={d.id} className="flex items-start gap-3 px-2 py-3">
-              <div className="grid h-10 w-8 shrink-0 place-items-center rounded-sm border bg-panel font-mono text-[9px] text-muted-foreground">
-                {d.file_type.split("/").pop()?.slice(0, 6).toUpperCase()}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-medium">{d.name}</div>
-                <div className="mt-1 text-xs text-muted-foreground">
-                  Source: {d.source_party || "Not recorded (legacy upload)"}
+        <a
+          href="#contradictions"
+          className="inline-flex min-h-11 items-center rounded border px-3 text-sm font-semibold"
+        >
+          Review contradictions
+        </a>
+      </div>
+      <div className="grid min-w-0 grid-cols-1 gap-6 xl:grid-cols-[390px_minmax(0,1fr)]">
+        <Panel
+          title={"Documents · " + data.documents.length}
+          action={
+            <>
+              <input
+                ref={file}
+                type="file"
+                multiple
+                hidden
+                accept=".pdf,.csv,.txt,application/pdf,text/csv,text/plain"
+                onChange={(e) => onUpload(e.target.files)}
+              />
+              <Button
+                disabled={busy}
+                variant="ghost"
+                className="py-1 text-xs"
+                onClick={() => file.current?.click()}
+              >
+                + Upload
+              </Button>
+            </>
+          }
+        >
+          {error && (
+            <div className="mb-3 rounded border border-disputed/40 bg-disputed/10 p-3 text-xs text-disputed">
+              {error}
+            </div>
+          )}
+          <p className="mb-3 text-sm text-muted-foreground">
+            Upload a PDF, TXT or CSV, up to 5 MB. Review the imported facts before using them.
+          </p>
+          <details className="mb-4 rounded border p-3">
+            <summary className="min-h-8 cursor-pointer text-sm">
+              Import limits and optional AI disclosure
+            </summary>
+            <div className="mt-3">
+              {" "}
+              <p className="mb-3 text-xs text-muted-foreground">
+                PDF, TXT or CSV, up to 5 MB per file. Import text uses no AI credits (up to 500
+                lines, 200,000 characters and 20 PDF pages). Scanned PDFs need AI or a
+                transcription. If AI is unavailable, readable text is imported and clearly labelled.
+                Human review is always required.
+              </p>
+              <label className="mb-3 flex gap-2 text-xs">
+                <input
+                  type="checkbox"
+                  checked={freeDataClassConfirmed}
+                  onChange={(e) => setFreeDataClassConfirmed(e.target.checked)}
+                />
+                Optional Gemini test fallback: I confirm this is synthetic or non-confidential test
+                data. Google unpaid API may use it for training or human review. Disabled unless
+                configured by the owner.
+              </label>
+            </div>
+          </details>
+          {notice && (
+            <div role="status" className="mb-3 rounded border p-3 text-xs">
+              {notice}
+            </div>
+          )}
+          <label className="mb-4 block text-sm">
+            Source organization for this upload
+            <input
+              value={sourceParty}
+              maxLength={200}
+              onChange={(e) => setSourceParty(e.target.value)}
+              placeholder="Organization that supplied the record"
+              className="mt-2 w-full rounded border bg-background p-2 text-sm"
+            />
+            <span className="mt-1 block text-xs text-muted-foreground">
+              Applies to every file in this selection. Upload different organizations separately.
+            </span>
+          </label>
+          <ul className="divide-y">
+            {data.documents.map((d) => (
+              <li key={d.id} className="flex items-start gap-3 px-2 py-3">
+                <div className="grid h-10 w-8 shrink-0 place-items-center rounded-sm border bg-panel font-mono text-[9px] text-muted-foreground">
+                  {d.file_type.split("/").pop()?.slice(0, 6).toUpperCase()}
                 </div>
-                <div className="mt-1 text-xs text-muted-foreground">
-                  {d.sha256_hash.slice(0, 12)}… · {d.evidence_class}
-                </div>
-                <Button
-                  disabled={busy}
-                  variant="ghost"
-                  className="mt-2 py-1 text-xs"
-                  onClick={() => extract(d.id)}
-                >
-                  Extract claims with AI
-                </Button>
-                {(isPlainDocument(d.file_type, d.name) ||
-                  d.file_type === "application/pdf" ||
-                  /\.pdf$/i.test(d.name)) && (
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-medium">{d.name}</div>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    Source: {d.source_party || "Not recorded (legacy upload)"}
+                  </div>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    {d.sha256_hash.slice(0, 12)}… · {d.evidence_class}
+                  </div>
                   <Button
                     disabled={busy}
                     variant="ghost"
                     className="mt-2 py-1 text-xs"
-                    onClick={() => extract(d.id, true)}
+                    onClick={() => extract(d.id)}
                   >
-                    Import text (no AI credits)
+                    Extract claims with AI
                   </Button>
-                )}
-              </div>
-            </li>
-          ))}
-          {!data.documents.length && (
-            <li className="py-10 text-center text-sm text-muted-foreground">
-              Upload Bills of Lading, terminal records, carrier notices or invoices.
-            </li>
-          )}
-        </ul>
-      </Panel>
-
-      <div className="min-w-0 space-y-6">
-        <Panel title={"Extracted claims · " + data.claims.length}>
-          <ul className="divide-y">
-            {data.claims.map((c) => {
-              const status: string = c.status;
-              return (
-                <li
-                  key={c.id}
-                  className={cn(
-                    "grid gap-3 rounded-sm px-2 py-3 md:grid-cols-[1fr_auto]",
-                    isDisputedClaim(c, disputed) && "border border-disputed/30 bg-disputed/5",
+                  {(isPlainDocument(d.file_type, d.name) ||
+                    d.file_type === "application/pdf" ||
+                    /\.pdf$/i.test(d.name)) && (
+                    <Button
+                      disabled={busy}
+                      variant="ghost"
+                      className="mt-2 py-1 text-xs"
+                      onClick={() => extract(d.id, true)}
+                    >
+                      Import text (no AI credits)
+                    </Button>
                   )}
-                >
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                      <span className="font-mono">p.{c.page_number ?? "?"}</span>
-                      <NatureBadge n={String(c.nature).toLowerCase() as Nature} />
-                      <ClassTag c={c.evidence_class} />
-                      <span className="font-mono">
-                        conf {Math.round(Number(c.confidence ?? 0) * 100)}%
-                      </span>
-                      {isDisputedClaim(c, disputed) && <DisputeBadge />}
-                      {status !== "PENDING" &&
-                        !(status === "DISPUTED" && isDisputedClaim(c, disputed)) && (
-                          <span
-                            className={cn(
-                              "rounded px-2 py-0.5 text-xs font-medium",
-                              status === "VERIFIED"
-                                ? "bg-observed/15 text-observed"
-                                : "bg-disputed/15 text-disputed",
-                            )}
-                          >
-                            {status}
-                          </span>
-                        )}
-                    </div>
-                    <div className="mt-1 text-sm">{c.claim_text}</div>
-                    {c.timestamp_claimed && (
-                      <div className="mt-1 break-all font-mono text-xs text-primary">
-                        {c.timestamp_claimed} UTC
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      disabled={reviewing !== null || status !== "PENDING"}
-                      onClick={() => review(c.id, "VERIFIED")}
-                      className={cn(
-                        "rounded border px-2.5 py-1 text-xs",
-                        status === "VERIFIED"
-                          ? "border-observed bg-observed/15 text-observed"
-                          : "hover:bg-accent",
-                      )}
-                    >
-                      {reviewing === c.id
-                        ? "Saving..."
-                        : status === "VERIFIED"
-                          ? "Verified"
-                          : "Verify"}
-                    </button>
-                    <button
-                      disabled={reviewing !== null || status !== "PENDING"}
-                      onClick={() => review(c.id, "DISPUTED")}
-                      className={cn(
-                        "rounded border px-2.5 py-1 text-xs",
-                        status === "DISPUTED"
-                          ? "border-disputed bg-disputed/15 text-disputed"
-                          : "hover:bg-accent",
-                      )}
-                    >
-                      {status === "DISPUTED" ? "Disputed" : "Dispute"}
-                    </button>
-                  </div>
-                </li>
-              );
-            })}
-            {!data.claims.length && (
+                </div>
+              </li>
+            ))}
+            {!data.documents.length && (
               <li className="py-10 text-center text-sm text-muted-foreground">
-                Extraction claims will appear here for human review.
+                Upload Bills of Lading, terminal records, carrier notices or invoices.
               </li>
             )}
           </ul>
         </Panel>
 
-        <Panel
-          title={
-            "Contradictions · " +
-            data.contradictions.filter((c) => c.status === "FLAGGED").length +
-            " flagged"
-          }
-        >
-          <div className="space-y-3">
-            {data.contradictions.map((c) => (
-              <div
-                key={c.id}
-                className={cn(
-                  "rounded-md border p-4",
-                  c.status === "FLAGGED" && "border-disputed/40 bg-disputed/5",
-                )}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-medium">{c.title}</span>
-                  <span className="flex items-center gap-2">
-                    {c.status === "FLAGGED" && <DisputeBadge />}
-                    <span
-                      className={cn(
-                        "rounded px-2 py-1 text-xs",
-                        c.status === "RESOLVED"
-                          ? "bg-observed/15 text-observed"
-                          : "bg-disputed/15 text-disputed",
+        <div className="min-w-0 space-y-6">
+          <Panel title={"Extracted claims · " + data.claims.length}>
+            <ul className="divide-y">
+              {data.claims.map((c) => {
+                const status: string = c.status;
+                return (
+                  <li
+                    key={c.id}
+                    className={cn(
+                      "grid gap-3 rounded-sm px-2 py-3 md:grid-cols-[1fr_auto]",
+                      isDisputedClaim(c, disputed) && "border border-disputed/30 bg-disputed/5",
+                    )}
+                  >
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                        <span className="font-mono">p.{c.page_number ?? "?"}</span>
+                        <NatureBadge n={String(c.nature).toLowerCase() as Nature} />
+                        <ClassTag c={c.evidence_class} />
+                        <span className="font-mono">
+                          conf {Math.round(Number(c.confidence ?? 0) * 100)}%
+                        </span>
+                        {isDisputedClaim(c, disputed) && <DisputeBadge />}
+                        {status !== "PENDING" &&
+                          !(status === "DISPUTED" && isDisputedClaim(c, disputed)) && (
+                            <span
+                              className={cn(
+                                "rounded px-2 py-0.5 text-xs font-medium",
+                                status === "VERIFIED"
+                                  ? "bg-observed/15 text-observed"
+                                  : "bg-disputed/15 text-disputed",
+                              )}
+                            >
+                              {status}
+                            </span>
+                          )}
+                      </div>
+                      <div className="mt-1 text-sm">{c.claim_text}</div>
+                      {c.timestamp_claimed && (
+                        <div className="mt-1 break-all font-mono text-xs text-primary">
+                          {c.timestamp_claimed} UTC
+                        </div>
                       )}
-                    >
-                      {c.status}
-                    </span>
-                  </span>
-                </div>
-                <p className="mt-2 text-sm text-muted-foreground">{c.description}</p>
-                {[c.claim_a_id, c.claim_b_id].filter(Boolean).length > 0 && (
-                  <ul className="mt-3 space-y-1.5">
-                    {[c.claim_a_id, c.claim_b_id].filter(Boolean).map((id) => {
-                      const linked = data.claims.find((cl) => String(cl.id) === String(id));
-                      return (
-                        <li
-                          key={String(id)}
-                          className="flex items-start gap-2 rounded border border-disputed/25 bg-disputed/5 px-2 py-1.5 text-xs"
-                        >
-                          <DisputeBadge label="Linked" className="mt-0.5 shrink-0" />
-                          <span className="text-muted-foreground">
-                            {linked ? linked.claim_text : "Linked claim " + String(id).slice(0, 8)}
-                          </span>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-                {c.status === "FLAGGED" && (
-                  <div className="mt-4 space-y-3">
-                    <label className="block text-sm">
-                      Resolution explanation
-                      <textarea
-                        value={draft(c.id).explanation}
-                        onChange={(e) => editDraft(c.id, "explanation", e.target.value)}
-                        minLength={10}
-                        maxLength={4000}
-                        className="mt-1 min-h-24 w-full rounded border bg-background p-2"
-                        placeholder="Explain how the competing records were reconciled and what remains uncertain."
-                      />
-                    </label>
-                    <label className="block text-sm">
-                      Supporting case document
-                      <select
-                        value={draft(c.id).documentId}
-                        onChange={(e) => editDraft(c.id, "documentId", e.target.value)}
-                        className="mt-1 w-full rounded border bg-background p-2"
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        disabled={reviewing !== null || status !== "PENDING"}
+                        onClick={() => review(c.id, "VERIFIED")}
+                        className={cn(
+                          "rounded border px-2.5 py-1 text-xs",
+                          status === "VERIFIED"
+                            ? "border-observed bg-observed/15 text-observed"
+                            : "hover:bg-accent",
+                        )}
                       >
-                        <option value="">Select source evidence</option>
-                        {data.documents.map((d) => (
-                          <option key={d.id} value={d.id}>
-                            {d.name} ({d.source_party || "source not recorded"})
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="block text-sm">
-                      Evidence location / reference
-                      <input
-                        value={draft(c.id).reference}
-                        onChange={(e) => editDraft(c.id, "reference", e.target.value)}
-                        maxLength={1000}
-                        className="mt-1 w-full rounded border bg-background p-2"
-                        placeholder="Page, row, event ID or section supporting the decision"
-                      />
-                    </label>
-                    <Button
-                      disabled={
-                        busy ||
-                        draft(c.id).explanation.trim().length < 10 ||
-                        !draft(c.id).documentId ||
-                        draft(c.id).reference.trim().length < 3
-                      }
-                      variant="ghost"
-                      className="py-1 text-xs"
-                      onClick={() => resolve(c.id)}
-                    >
-                      Save evidenced resolution
-                    </Button>
+                        {reviewing === c.id
+                          ? "Saving..."
+                          : status === "VERIFIED"
+                            ? "Verified"
+                            : "Verify"}
+                      </button>
+                      <button
+                        disabled={reviewing !== null || status !== "PENDING"}
+                        onClick={() => review(c.id, "DISPUTED")}
+                        className={cn(
+                          "rounded border px-2.5 py-1 text-xs",
+                          status === "DISPUTED"
+                            ? "border-disputed bg-disputed/15 text-disputed"
+                            : "hover:bg-accent",
+                        )}
+                      >
+                        {status === "DISPUTED" ? "Disputed" : "Dispute"}
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
+              {!data.claims.length && (
+                <li className="py-10 text-center text-sm text-muted-foreground">
+                  Extraction claims will appear here for human review.
+                </li>
+              )}
+            </ul>
+          </Panel>
+
+          <div id="contradictions" className="scroll-mt-24" />
+          <Panel
+            title={
+              "Contradictions · " +
+              data.contradictions.filter((c) => c.status === "FLAGGED").length +
+              " flagged"
+            }
+          >
+            <div className="space-y-3">
+              {data.contradictions.map((c) => (
+                <div
+                  key={c.id}
+                  className={cn(
+                    "rounded-md border p-4",
+                    c.status === "FLAGGED" && "border-disputed/40 bg-disputed/5",
+                  )}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium">{c.title}</span>
+                    <span className="flex items-center gap-2">
+                      {c.status === "FLAGGED" && <DisputeBadge />}
+                      <span
+                        className={cn(
+                          "rounded px-2 py-1 text-xs",
+                          c.status === "RESOLVED"
+                            ? "bg-observed/15 text-observed"
+                            : "bg-disputed/15 text-disputed",
+                        )}
+                      >
+                        {c.status}
+                      </span>
+                    </span>
                   </div>
-                )}
-                {c.status === "RESOLVED" && (
-                  <div className="mt-3 text-sm">
-                    <p>{c.resolution_note || "Legacy resolution: no explanation captured."}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Evidence:{" "}
-                      {data.documents.find((d) => d.id === c.resolution_document_id)?.name ||
-                        c.resolution_document_id ||
-                        "Not recorded"}{" "}
-                      · {c.resolution_evidence_reference || "No reference recorded"}
-                    </p>
-                  </div>
-                )}
-              </div>
-            ))}
-            {!data.contradictions.length && (
-              <p className="py-8 text-center text-sm text-muted-foreground">
-                No contradictions have been detected.
-              </p>
-            )}
-          </div>
-        </Panel>
+                  <p className="mt-2 text-sm text-muted-foreground">{c.description}</p>
+                  {[c.claim_a_id, c.claim_b_id].filter(Boolean).length > 0 && (
+                    <ul className="mt-3 space-y-1.5">
+                      {[c.claim_a_id, c.claim_b_id].filter(Boolean).map((id) => {
+                        const linked = data.claims.find((cl) => String(cl.id) === String(id));
+                        return (
+                          <li
+                            key={String(id)}
+                            className="flex items-start gap-2 rounded border border-disputed/25 bg-disputed/5 px-2 py-1.5 text-xs"
+                          >
+                            <DisputeBadge label="Linked" className="mt-0.5 shrink-0" />
+                            <span className="text-muted-foreground">
+                              {linked
+                                ? linked.claim_text
+                                : "Linked claim " + String(id).slice(0, 8)}
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                  {c.status === "FLAGGED" && (
+                    <div className="mt-4 space-y-3">
+                      <label className="block text-sm">
+                        Resolution explanation
+                        <textarea
+                          value={draft(c.id).explanation}
+                          onChange={(e) => editDraft(c.id, "explanation", e.target.value)}
+                          minLength={10}
+                          maxLength={4000}
+                          className="mt-1 min-h-24 w-full rounded border bg-background p-2"
+                          placeholder="Explain how the competing records were reconciled and what remains uncertain."
+                        />
+                      </label>
+                      <label className="block text-sm">
+                        Supporting case document
+                        <select
+                          value={draft(c.id).documentId}
+                          onChange={(e) => editDraft(c.id, "documentId", e.target.value)}
+                          className="mt-1 w-full rounded border bg-background p-2"
+                        >
+                          <option value="">Select source evidence</option>
+                          {data.documents.map((d) => (
+                            <option key={d.id} value={d.id}>
+                              {d.name} ({d.source_party || "source not recorded"})
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="block text-sm">
+                        Evidence location / reference
+                        <input
+                          value={draft(c.id).reference}
+                          onChange={(e) => editDraft(c.id, "reference", e.target.value)}
+                          maxLength={1000}
+                          className="mt-1 w-full rounded border bg-background p-2"
+                          placeholder="Page, row, event ID or section supporting the decision"
+                        />
+                      </label>
+                      <Button
+                        disabled={
+                          busy ||
+                          draft(c.id).explanation.trim().length < 10 ||
+                          !draft(c.id).documentId ||
+                          draft(c.id).reference.trim().length < 3
+                        }
+                        variant="ghost"
+                        className="py-1 text-xs"
+                        onClick={() => resolve(c.id)}
+                      >
+                        Save evidenced resolution
+                      </Button>
+                    </div>
+                  )}
+                  {c.status === "RESOLVED" && (
+                    <div className="mt-3 text-sm">
+                      <p>{c.resolution_note || "Legacy resolution: no explanation captured."}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Evidence:{" "}
+                        {data.documents.find((d) => d.id === c.resolution_document_id)?.name ||
+                          c.resolution_document_id ||
+                          "Not recorded"}{" "}
+                        · {c.resolution_evidence_reference || "No reference recorded"}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ))}
+              {!data.contradictions.length && (
+                <p className="py-8 text-center text-sm text-muted-foreground">
+                  No contradictions have been detected.
+                </p>
+              )}
+            </div>
+          </Panel>
+        </div>
       </div>
     </div>
   );

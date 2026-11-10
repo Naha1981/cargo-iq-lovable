@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import {
   createFileRoute,
   Link,
@@ -5,6 +6,7 @@ import {
   notFound,
   redirect,
   useRouterState,
+  useNavigate,
 } from "@tanstack/react-router";
 import { AppHeader, DisputeBadge } from "@/components/ui-kit";
 import { isSeededSampleCase } from "@/lib/sample-case";
@@ -77,9 +79,31 @@ const tabs = [
 
 function CaseLayout() {
   const data = Route.useLoaderData();
-  const mapPage = useRouterState({
-    select: (state) => /\/(map|live-harbour)$/.test(state.location.pathname),
-  });
+  const navigate = useNavigate();
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const mapPage = /\/(map|live-harbour)$/.test(pathname);
+  const section = pathname.split("/")[3] ?? "";
+  const groups = [
+    { name: "Overview", pages: ["", "appointments", "kpis", "intelligence", "gaps"] },
+    {
+      name: "Documents & evidence",
+      pages: ["documents", "definitions", "counts", "imports", "clocks", "matches"],
+    },
+    {
+      name: "Maps",
+      pages: ["map", "live-harbour", "simulation", "corridor", "scene", "geospatial"],
+    },
+    { name: "Money", pages: ["financials", "recovery"] },
+    { name: "Evidence pack", pages: ["pack"] },
+  ];
+  const activeGroup = groups.findIndex((g) => g.pages.includes(section));
+  const [chosenGroup, setChosenGroup] = useState(activeGroup < 0 ? 0 : activeGroup);
+  useEffect(() => {
+    setChosenGroup(activeGroup < 0 ? 0 : activeGroup);
+  }, [activeGroup]);
+  const shownTabs = tabs.filter((t) =>
+    groups[chosenGroup].pages.includes(t.to.split("/")[3] ?? ""),
+  );
   const c = data.case;
   const openDisputes = data.contradictions.filter((x) => x.status === "FLAGGED").length;
 
@@ -128,35 +152,118 @@ function CaseLayout() {
             </div>
           </div>
 
-          <nav
-            aria-label="Investigation pages"
-            className={
-              mapPage
-                ? "mt-3 flex flex-nowrap gap-1 overflow-x-auto pb-1 [&>a]:shrink-0 [&>a]:whitespace-nowrap"
-                : "mt-5 grid grid-cols-2 gap-1 pb-2 sm:flex sm:flex-wrap sm:pb-0"
-            }
-          >
-            {tabs.map((t) => (
-              <Link
-                key={t.to}
-                preload="intent"
-                to={t.to}
-                params={{ caseId: c.id }}
-                activeOptions={{ exact: "exact" in t }}
-                className="rounded-sm border-b-2 border-transparent px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground sm:whitespace-nowrap"
-                activeProps={{ className: "!border-primary !text-foreground" }}
-              >
-                {t.label}
-              </Link>
-            ))}
-            <a
-              href="https://canvas.nahalabs.co.za/#/t/cargoiq"
-              target="_blank"
-              rel="noopener"
-              className="rounded-sm border-b-2 border-transparent px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground sm:whitespace-nowrap"
+          <nav aria-label="Investigation pages" className="mt-4 pb-2">
+            <div className="grid grid-cols-2 gap-2 pb-2 sm:hidden">
+              <label className="text-xs text-muted-foreground">
+                Category
+                <select
+                  aria-label="Page group"
+                  value={chosenGroup}
+                  onChange={(e) => setChosenGroup(Number(e.target.value))}
+                  className="mt-1 min-h-11 w-full rounded border bg-card p-2 text-sm text-foreground"
+                >
+                  {groups.map((g, i) => (
+                    <option key={g.name} value={i}>
+                      {i === 1 ? "Documents" : g.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-xs text-muted-foreground">
+                Page
+                <select
+                  aria-label="Investigation page"
+                  value={
+                    shownTabs.some((t) => (t.to.split("/")[3] ?? "") === section)
+                      ? section
+                      : "choose"
+                  }
+                  onChange={(e) => {
+                    const tab = shownTabs.find(
+                      (t) => (t.to.split("/")[3] ?? "") === e.target.value,
+                    );
+                    if (tab) void navigate({ to: tab.to, params: { caseId: c.id } });
+                  }}
+                  className="mt-1 min-h-11 w-full rounded border bg-card p-2 text-sm text-foreground"
+                >
+                  <option value="choose" disabled>
+                    Choose a page
+                  </option>
+                  {shownTabs.map((t) => (
+                    <option key={t.to} value={t.to.split("/")[3] ?? ""}>
+                      {(
+                        {
+                          documents: "Documents",
+                          counts: "Counts",
+                          imports: "Imports",
+                          recovery: "Recovery",
+                          geospatial: "Geospatial",
+                          simulation: "Simulation",
+                          map: "Harbour map",
+                          "live-harbour": "Live harbour",
+                        } as Record<string, string>
+                      )[t.to.split("/")[3] ?? ""] ?? t.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <div aria-label="Page groups" className="hidden gap-2 pb-2 sm:flex sm:flex-wrap">
+              {groups.map((g, i) => (
+                <button
+                  key={g.name}
+                  type="button"
+                  aria-pressed={chosenGroup === i}
+                  onClick={() => setChosenGroup(i)}
+                  className={
+                    "min-h-11 rounded-lg border px-3 text-sm font-medium " +
+                    (chosenGroup === i
+                      ? "border-primary bg-primary/10 text-foreground"
+                      : "text-muted-foreground hover:text-foreground")
+                  }
+                >
+                  {g.name}
+                </button>
+              ))}
+            </div>
+            <div
+              className="hidden flex-wrap gap-1 sm:flex"
+              aria-label={groups[chosenGroup].name + " pages"}
             >
-              Case map ↗
-            </a>
+              {shownTabs.map((t) => (
+                <Link
+                  key={t.to}
+                  preload="intent"
+                  to={t.to}
+                  params={{ caseId: c.id }}
+                  activeOptions={{ exact: "exact" in t }}
+                  className="min-h-11 rounded border-b-2 border-transparent px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground"
+                  activeProps={{ className: "!border-primary !text-foreground" }}
+                >
+                  {t.label}
+                </Link>
+              ))}
+              {chosenGroup === 2 && (
+                <a
+                  href="https://canvas.nahalabs.co.za/#/t/cargoiq"
+                  target="_blank"
+                  rel="noopener"
+                  className="min-h-11 rounded px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground"
+                >
+                  Case map ↗
+                </a>
+              )}
+            </div>
+            {chosenGroup === 2 && (
+              <a
+                href="https://canvas.nahalabs.co.za/#/t/cargoiq"
+                target="_blank"
+                rel="noopener"
+                className="inline-flex min-h-11 items-center text-sm text-muted-foreground sm:hidden"
+              >
+                Case map ↗
+              </a>
+            )}
           </nav>
         </div>
       </div>

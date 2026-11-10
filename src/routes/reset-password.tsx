@@ -74,7 +74,7 @@ function ResetPasswordPage() {
                 <PasswordInput
                   required
                   minLength={8}
-                                    value={password}
+                  value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full rounded-md border bg-background px-3 py-2"
                 />
@@ -84,7 +84,7 @@ function ResetPasswordPage() {
                 <PasswordInput
                   required
                   minLength={8}
-                                    value={confirm}
+                  value={confirm}
                   onChange={(e) => setConfirm(e.target.value)}
                   className="w-full rounded-md border bg-background px-3 py-2"
                 />

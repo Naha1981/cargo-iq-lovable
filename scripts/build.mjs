@@ -22,7 +22,10 @@ if (!process.env.CARGO_BUILD_STAGE) {
       ],
       { stdio: "inherit", env: { ...process.env, CARGO_BUILD_STAGE: stage } },
     );
-    if (r.status !== 0) { console.error(`Build stage ${stage} failed: status=${r.status} signal=${r.signal}`); process.exit(r.status ?? 1); }
+    if (r.status !== 0) {
+      console.error(`Build stage ${stage} failed: status=${r.status} signal=${r.signal}`);
+      process.exit(r.status ?? 1);
+    }
   }
 } else {
   const { createBuilder } = await import("vite");

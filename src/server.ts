@@ -64,7 +64,7 @@ const HARBOUR_VIEW_CSP =
   "connect-src 'self' https://yeaflwgwrjznigykplur.supabase.co wss://yeaflwgwrjznigykplur.supabase.co https://naha1981.github.io " +
   "wss://cargoiq-gods-eye.onrender.com https://cargoiq-gods-eye.onrender.com https://api.open-meteo.com https://marine-api.open-meteo.com " +
   "https://terrain.reearth.land https://cdn.jsdelivr.net https://server.arcgisonline.com; " +
-  "worker-src 'self' blob: https://cdn.jsdelivr.net; frame-src https://restreamer.cd.net.za; " +
+  "worker-src 'self' blob: https://cdn.jsdelivr.net; media-src 'self' https://www.openbeelden.nl; frame-src https://restreamer.cd.net.za; " +
   "object-src 'none'; base-uri 'self'; frame-ancestors 'self'; form-action 'self'";
 
 // Report-only CSP for the app shell (audit item 8). Phase 1 of a staged rollout:

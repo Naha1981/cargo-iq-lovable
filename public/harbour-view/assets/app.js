@@ -611,7 +611,7 @@
       lat: -29.8665,
       img: DATA_BASE + "data/cam/vetchs/latest.jpg",
       live: "https://restreamer.cd.net.za/c1b53a50-06bb-47da-916a-01fb19d5c547.html",
-      source: "Point Yacht Club live stream (CC BY 4.0)",
+      source: "Point Yacht Club public player (CC BY 4.0)",
     },
     {
       id: "bluewaters",
@@ -620,7 +620,7 @@
       lat: -29.8628,
       img: DATA_BASE + "data/cam/bluewaters/latest.jpg",
       live: "https://restreamer.cd.net.za/7bd8fb34-74b3-4158-abc0-06fbbc8ffb2b.html",
-      source: "Point Yacht Club live stream (CC BY 4.0)",
+      source: "Point Yacht Club public player (CC BY 4.0)",
     },
   ];
   var camEntities = [];
@@ -653,41 +653,10 @@
     camEntities.push(ent);
   });
   function openCam(cam) {
-    $("cam-title").textContent = cam.name;
-    $("cam-source").textContent = cam.source + " - position approximate";
-    var img = $("cam-img");
-    var frame = $("cam-live");
-    if (cam.live && frame) {
-      img.classList.add("hidden");
-      frame.classList.remove("hidden");
-      frame.src = cam.live;
-    } else {
-      if (frame) {
-        frame.classList.add("hidden");
-        frame.src = "about:blank";
-      }
-      img.classList.remove("hidden");
-      img.src = cam.img + "?t=" + Date.now();
-    }
-    if (camRefreshTimer) {
-      clearInterval(camRefreshTimer);
-      camRefreshTimer = null;
-    }
-    $("cam-panel").classList.remove("hidden");
+    if (window.CargoCameraViewer) window.CargoCameraViewer.open(cam.id);
   }
   function closeCam() {
-    $("cam-panel").classList.add("hidden");
-    var frame = $("cam-live");
-    if (frame) {
-      frame.src = "about:blank";
-      frame.classList.add("hidden");
-    }
-    var img = $("cam-img");
-    if (img) img.classList.remove("hidden");
-    if (camRefreshTimer) {
-      clearInterval(camRefreshTimer);
-      camRefreshTimer = null;
-    }
+    if (window.CargoCameraViewer) window.CargoCameraViewer.close();
   }
   $("cam-close").addEventListener("click", closeCam);
   function nearestCamTo(lon, lat) {
@@ -2928,6 +2897,10 @@
     }
   }
   function sealEvidence() {
+    if (!$("cam-panel").classList.contains("hidden")) {
+      cargoSay("Camera viewing only. No camera footage is saved to case evidence.", "camera");
+      return;
+    }
     var subj = traySubject();
     var t = SCRUB.active && SCRUB.t ? SCRUB.t : Math.floor(Date.now() / 1000);
     var img = historicalReviewActive ? null : captureMapImage();

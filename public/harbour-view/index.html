@@ -7,7 +7,7 @@
      Keep in sync with public/_headers and src/server.ts. -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://server.arcgisonline.com https://cdn.jsdelivr.net; connect-src 'self' https://yeaflwgwrjznigykplur.supabase.co wss://yeaflwgwrjznigykplur.supabase.co https://naha1981.github.io wss://cargoiq-gods-eye.onrender.com https://cargoiq-gods-eye.onrender.com https://api.open-meteo.com https://marine-api.open-meteo.com https://terrain.reearth.land https://cdn.jsdelivr.net https://server.arcgisonline.com; worker-src 'self' blob: https://cdn.jsdelivr.net; frame-src https://restreamer.cd.net.za; object-src 'none'; base-uri 'self'; form-action 'self'"
+      content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://server.arcgisonline.com https://cdn.jsdelivr.net; connect-src 'self' https://yeaflwgwrjznigykplur.supabase.co wss://yeaflwgwrjznigykplur.supabase.co https://naha1981.github.io wss://cargoiq-gods-eye.onrender.com https://cargoiq-gods-eye.onrender.com https://api.open-meteo.com https://marine-api.open-meteo.com https://terrain.reearth.land https://cdn.jsdelivr.net https://server.arcgisonline.com; worker-src 'self' blob: https://cdn.jsdelivr.net; media-src 'self' https://www.openbeelden.nl; frame-src https://restreamer.cd.net.za; object-src 'none'; base-uri 'self'; form-action 'self'"
     />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>CargoIQ Live Harbour View - NahaLabs</title>
@@ -260,19 +260,55 @@
       <button id="track-stop" aria-label="Stop tracking">STOP</button>
     </div>
 
-    <section id="cam-panel" class="card hidden" aria-live="polite">
-      <button id="cam-close" class="card-close" aria-label="Close">&times;</button>
-      <h3 id="cam-title">Camera</h3>
+    <button id="cam-open" class="cond-chip" aria-controls="cam-panel" aria-expanded="false">
+      CAMERAS
+    </button>
+    <section
+      id="cam-panel"
+      class="card hidden"
+      role="dialog"
+      aria-modal="false"
+      aria-labelledby="cam-title"
+    >
+      <button id="cam-close" class="card-close" aria-label="Close camera">&times;</button>
+      <h3 id="cam-title">Harbour cameras</h3>
+      <label class="camera-label" for="cam-select">Choose a view</label>
+      <select id="cam-select">
+        <option value="vetchs">Marina - harbour entrance</option>
+        <option value="bluewaters">Beach - beachfront</option>
+        <option value="reference">Recorded player example (not Durban)</option>
+      </select>
+      <p id="cam-status" role="status" aria-live="polite"></p>
       <div class="cam-frame">
-        <img id="cam-img" alt="Live camera frame" /><iframe
+        <img id="cam-img" class="hidden" alt="Camera image" />
+        <iframe
           id="cam-live"
           class="hidden"
-          title="Live camera stream"
-          allow="autoplay"
-          style="width: 100%; height: 180px; border: 0; display: block"
+          title="External harbour camera player"
+          allow="autoplay; fullscreen; picture-in-picture"
+          allowfullscreen
+          referrerpolicy="strict-origin-when-cross-origin"
         ></iframe>
+        <video
+          id="cam-reference"
+          class="hidden"
+          controls
+          muted
+          playsinline
+          preload="metadata"
+          aria-label="Recorded player example, historic railway footage, not Durban or case evidence"
+        ></video>
       </div>
-      <p class="card-source" id="cam-source">Live public camera</p>
+      <p class="card-source" id="cam-source"></p>
+      <p class="camera-notice">
+        Public outside view only. Not case evidence. Recording and reuse rights are unverified; no
+        footage is saved to an evidence pack.
+      </p>
+      <div class="camera-actions">
+        <button id="cam-retry" type="button">Reload view</button>
+        <a id="cam-provider" target="_blank" rel="noopener noreferrer">Open provider player</a>
+        <button id="cam-fallback" type="button">Recorded player example</button>
+      </div>
     </section>
 
     <button id="cond-btn" class="cond-chip" aria-label="Port conditions">CONDITIONS</button>
@@ -423,6 +459,7 @@
     </div>
 
     <script src="assets/history-command.js"></script>
+    <script src="assets/camera-viewer.js"></script>
     <script src="assets/app.js"></script>
   </body>
 </html>

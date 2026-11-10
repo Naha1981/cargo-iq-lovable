@@ -1,3 +1,4 @@
+import { HarbourCameras } from "@/components/HarbourCameras";
 import { Route as CaseRoute } from "./cases.$caseId";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -583,9 +584,12 @@ export function MapPage() {
 
   return (
     <div className="flex flex-col gap-3">
-      <p className="order-first text-sm text-muted-foreground">
-        See where this shipment's recorded events happened. Use Full screen for a larger map.
-      </p>
+      <div className="order-first flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm text-muted-foreground">
+          See where this shipment's recorded events happened.
+        </p>
+        <HarbourCameras />
+      </div>
       <details className="rounded border bg-card px-3 py-2">
         <summary className="cursor-pointer text-sm font-medium">
           Case position and map details

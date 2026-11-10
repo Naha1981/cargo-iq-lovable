@@ -1163,3 +1163,116 @@ body.real-case #replay-card {
   text-align: left;
   overflow-wrap: anywhere;
 }
+
+/* Camera viewer: always reachable without selecting a tiny map pin. */
+#cam-open {
+  left: 14px;
+  right: auto;
+  top: auto;
+  bottom: calc(84px + env(safe-area-inset-bottom));
+  z-index: 26;
+  font-size: 12px;
+  color: #15434b;
+  background: #fff;
+}
+#cam-panel {
+  width: min(520px, calc(100vw - 28px));
+  max-width: none;
+  top: 92px;
+  right: 14px;
+  left: auto;
+  max-height: calc(100dvh - 110px);
+  overflow-y: auto;
+  background: #fff;
+  color: #17252b;
+  padding: 18px;
+  box-sizing: border-box;
+  box-shadow: 0 12px 40px #0005;
+}
+#cam-panel h3 {
+  padding-right: 30px;
+  margin: 0 0 14px;
+  font-size: 18px;
+}
+#cam-panel .camera-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 5px;
+}
+#cam-select {
+  width: 100%;
+  padding: 9px;
+  font-size: 14px;
+  color: #17252b;
+  background: #fff;
+  border: 1px solid #a7b0b3;
+  border-radius: 7px;
+}
+#cam-status {
+  font-size: 13px;
+  line-height: 1.45;
+  min-height: 36px;
+  margin: 10px 0;
+}
+#cam-live,
+#cam-reference {
+  width: 100%;
+  height: min(270px, 45vw);
+  min-height: 180px;
+  border: 0;
+  background: #111;
+  display: block;
+}
+#cam-panel .hidden {
+  display: none !important;
+}
+#cam-source,
+.camera-notice {
+  font-size: 12px;
+  line-height: 1.5;
+  color: #33434b;
+}
+.camera-notice {
+  background: #fff4d9;
+  padding: 9px;
+  border-radius: 6px;
+}
+.camera-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.camera-actions button,
+.camera-actions a {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 9px 11px;
+  border: 1px solid #71858b;
+  border-radius: 6px;
+  background: #f5f9f9;
+  color: #15434b;
+  text-decoration: none;
+  cursor: pointer;
+}
+#cam-close {
+  color: #17252b;
+  width: 36px;
+  height: 36px;
+}
+@media (max-width: 600px) {
+  #cam-panel {
+    position: fixed;
+    top: 12px;
+    right: 12px;
+    left: 12px;
+    width: auto;
+    max-height: calc(100dvh - 24px);
+    z-index: 80;
+  }
+  #cam-open {
+    top: auto;
+    bottom: calc(84px + env(safe-area-inset-bottom));
+  }
+}

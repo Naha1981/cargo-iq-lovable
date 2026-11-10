@@ -88,6 +88,13 @@ export function inferClass(name: string) {
   return "CUSTOMER_PRIMARY";
 }
 
+// Source provenance is supplied with the document, never established by its filename.
+export function documentEvidenceClass(value: unknown) {
+  return value === "CONTRACTUAL" || value === "OFFICIAL_PUBLIC" || value === "CUSTOMER_PRIMARY"
+    ? value
+    : "CUSTOMER_PRIMARY";
+}
+
 const MONTHS =
   "jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?";
 // A model may turn "February 2014" or "2012/2013" into 2014-02-01 or 2012-01-01. Keep a timestamp only when the claim
@@ -1421,7 +1428,7 @@ export async function extractDocumentClaimsForPath(input: {
       claim_text: line.text,
       claim_type: "TEXT_RECORD",
       normalized_value: line.text,
-      evidence_class: inferClass(doc.name),
+      evidence_class: documentEvidenceClass(doc.evidence_class),
       nature: "REPORTED" as const,
     }));
   };
@@ -1602,7 +1609,7 @@ export async function extractDocumentClaimsForPath(input: {
     claim_text: claim.claim_text,
     claim_type: claim.claim_type ?? null,
     normalized_value: claim.normalized_value ?? null,
-    evidence_class: claim.evidence_class || inferClass(doc.name),
+    evidence_class: claim.evidence_class || documentEvidenceClass(doc.evidence_class),
     nature: claim.nature,
     confidence: claim.confidence ?? 0.7,
     timestamp_claimed: claim.timestamp_claimed ?? null,

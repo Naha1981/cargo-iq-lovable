@@ -9,9 +9,9 @@ const args = process.argv.slice(2);
 if (!process.env.CARGO_BUILD_STAGE) {
   for (const stage of ["app", "worker"]) {
     // Stage-aware caps: the app stage (client + SSR graphs) is proven at 1100 MB,
-    // but the Nitro worker rebundle peaks just above that and was OOM-killed at
-    // 1100 during chunk rendering; it passes at 1400 MB.
-    const heapSize = stage === "worker" ? 1400 : 1100;
+    // the worker stays below the shared 2 GB machine limit with a 1200 MB heap
+    // and no second minification pass.
+    const heapSize = stage === "worker" ? 1200 : 1100;
     const r = spawnSync(
       process.execPath,
       [
@@ -22,7 +22,7 @@ if (!process.env.CARGO_BUILD_STAGE) {
       ],
       { stdio: "inherit", env: { ...process.env, CARGO_BUILD_STAGE: stage } },
     );
-    if (r.status !== 0) process.exit(r.status ?? 1);
+    if (r.status !== 0) { console.error(`Build stage ${stage} failed: status=${r.status} signal=${r.signal}`); process.exit(r.status ?? 1); }
   }
 } else {
   const { createBuilder } = await import("vite");
@@ -32,6 +32,11 @@ if (!process.env.CARGO_BUILD_STAGE) {
     await builder.build(builder.environments.client);
     await builder.build(builder.environments.ssr);
   } else {
+    // The final worker contains large PDF and schema libraries. Its second
+    // minification pass exhausted the 2 GB builder after app compilation.
+    // Client assets stay minified; keep the worker modules readable instead.
+    builder.environments.nitro.config.build.minify = false;
+    builder.environments.nitro.config.build.reportCompressedSize = false;
     builder.environments.client.isBuilt = true;
     builder.environments.ssr.isBuilt = true;
     // Nitro prepares (clears) its output before final bundling. Since this is a

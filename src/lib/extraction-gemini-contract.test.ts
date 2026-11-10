@@ -32,7 +32,7 @@ afterEach(() => {
     else process.env[k] = saved[k];
   }
 });
-function db(blob: Blob, name: string, type: string) {
+function db(blob: Blob, name: string, type: string, evidenceClass: unknown = "CUSTOMER_PRIMARY") {
   const inserted: FakeRow[] = [];
   const audits: FakeRow[] = [];
   const docUpdates: FakeRow[] = [];
@@ -64,7 +64,7 @@ function db(blob: Blob, name: string, type: string) {
         single: async () => ({
           data:
             table === "documents"
-              ? { name, file_type: type, file_path: "synthetic/test" }
+              ? { name, file_type: type, file_path: "synthetic/test", evidence_class: evidenceClass }
               : { id: "r" + inserted.length },
           error: null,
         }),
@@ -432,5 +432,25 @@ describe("day-precision guard", () => {
     expect(dayAnchored("Delivered in February 2014.", "2014-02-01T00:00:00Z")).toBe(false);
     expect(dayAnchored("IT manager in 2012/2013.", "2012-01-01T00:00:00Z")).toBe(false);
     expect(dayAnchored("Released on 8 February.", "2013-02-07T00:00:00Z")).toBe(false);
+  });
+});
+
+
+describe("no-AI document provenance", () => {
+  it.each(["terminal-record.txt", "port-record.txt", "contract-record.txt", "agreement-record.txt"])("does not promote %s from its filename", async (name) => {
+    const d = db(new Blob(["SYNTHETIC source line for provenance test"], {type:"text/plain"}), name, "text/plain");
+    await extractDocumentClaimsForPath({...base, noAi:true, supabase:d.supabase as unknown as SupabaseClient});
+    expect(d.inserted.length).toBeGreaterThan(0);
+    expect(d.inserted.every(c=>c.evidence_class === "CUSTOMER_PRIMARY")).toBe(true);
+  });
+  it.each(["CUSTOMER_PRIMARY", "CONTRACTUAL", "OFFICIAL_PUBLIC"])("preserves recorded class %s regardless of filename", async (kind) => {
+    const d = db(new Blob(["SYNTHETIC source line for provenance test"], {type:"text/plain"}), "ordinary-notes.txt", "text/plain", kind);
+    await extractDocumentClaimsForPath({...base, noAi:true, supabase:d.supabase as unknown as SupabaseClient});
+    expect(d.inserted.every(c=>c.evidence_class === kind)).toBe(true);
+  });
+  it.each([null, "", "UNVERIFIED_SENDER"])("uses a conservative class for absent or unknown provenance %s", async (kind) => {
+    const d = db(new Blob(["SYNTHETIC source line for provenance test"], {type:"text/plain"}), "terminal-port-contract.txt", "text/plain", kind);
+    await extractDocumentClaimsForPath({...base, noAi:true, supabase:d.supabase as unknown as SupabaseClient});
+    expect(d.inserted.every(c=>c.evidence_class === "CUSTOMER_PRIMARY")).toBe(true);
   });
 });

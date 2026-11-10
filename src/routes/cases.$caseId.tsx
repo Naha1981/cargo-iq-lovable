@@ -1,4 +1,11 @@
-import { createFileRoute, Link, Outlet, notFound, redirect } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  Link,
+  Outlet,
+  notFound,
+  redirect,
+  useRouterState,
+} from "@tanstack/react-router";
 import { AppHeader, DisputeBadge } from "@/components/ui-kit";
 import { isSeededSampleCase } from "@/lib/sample-case";
 import { getCaseWorkspace } from "@/lib/case.functions";
@@ -70,6 +77,9 @@ const tabs = [
 
 function CaseLayout() {
   const data = Route.useLoaderData();
+  const mapPage = useRouterState({
+    select: (state) => /\/(map|live-harbour)$/.test(state.location.pathname),
+  });
   const c = data.case;
   const openDisputes = data.contradictions.filter((x) => x.status === "FLAGGED").length;
 
@@ -120,7 +130,11 @@ function CaseLayout() {
 
           <nav
             aria-label="Investigation pages"
-            className="mt-5 grid grid-cols-2 gap-1 pb-2 sm:flex sm:flex-wrap sm:pb-0"
+            className={
+              mapPage
+                ? "mt-3 flex flex-nowrap gap-1 overflow-x-auto pb-1 [&>a]:shrink-0 [&>a]:whitespace-nowrap"
+                : "mt-5 grid grid-cols-2 gap-1 pb-2 sm:flex sm:flex-wrap sm:pb-0"
+            }
           >
             {tabs.map((t) => (
               <Link
@@ -147,7 +161,11 @@ function CaseLayout() {
         </div>
       </div>
 
-      <main className="mx-auto max-w-[1400px] px-6 py-8">
+      <main
+        className={
+          mapPage ? "mx-auto w-full px-2 py-3 sm:px-4" : "mx-auto max-w-[1400px] px-6 py-8"
+        }
+      >
         <Outlet />
       </main>
     </div>

@@ -124,6 +124,20 @@ export function MapPage() {
   const [layers, setLayers] = useState({ ais: true, infrastructure: true });
   const [refreshing, setRefreshing] = useState(false);
   const [large, setLarge] = useState(false);
+  const [mapToolsOpen, setMapToolsOpen] = useState(false);
+  useEffect(() => {
+    if (!large) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const close = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setLarge(false);
+    };
+    window.addEventListener("keydown", close);
+    return () => {
+      document.body.style.overflow = previous;
+      window.removeEventListener("keydown", close);
+    };
+  }, [large]);
   const [eventsOpen, setEventsOpen] = useState(true);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -172,7 +186,6 @@ export function MapPage() {
   const focus = pos && locked ? { x: pos.x, y: pos.y } : null;
   const [stageAspect, setStageAspect] = useState<number | null>(null);
   useEffect(() => {
-    if (!large) return;
     const el = svgRef.current;
     if (!el) return;
     const update = () => {
@@ -192,7 +205,7 @@ export function MapPage() {
     };
   }, [large]);
   const vbObj = panBy(
-    large && stageAspect ? fitViewBox(zoom, focus, stageAspect) : zoomViewBox(zoom, focus),
+    stageAspect ? fitViewBox(zoom, focus, stageAspect) : zoomViewBox(zoom, focus),
     pan.x,
     pan.y,
   );
@@ -569,7 +582,7 @@ export function MapPage() {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="flex flex-col gap-3">
       <div className="rounded border bg-card px-3 py-2">
         <p className="text-sm">
           {track.length
@@ -601,12 +614,6 @@ export function MapPage() {
               {new Date(dWindow.end).toISOString().slice(5, 10)})
             </button>
           )}
-          <button
-            onClick={() => setLarge(true)}
-            className="ml-auto rounded border border-primary/40 bg-primary/10 px-2.5 py-1 text-xs text-primary hover:bg-primary/20"
-          >
-            Full screen
-          </button>
         </div>
       </div>
       <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
@@ -669,25 +676,38 @@ export function MapPage() {
 
       <div
         ref={stageRef}
+        data-harbour-stage
         className={
           large
-            ? "fixed inset-0 z-50 flex flex-col bg-[#061016]"
-            : "overflow-hidden rounded-lg border bg-[#061016]"
+            ? "fixed inset-0 z-[100] flex h-[100dvh] flex-col bg-[#061016]"
+            : "order-first overflow-hidden rounded-lg border bg-[#061016]"
         }
       >
-        {large && (
-          <div className="flex items-center justify-between gap-2 border-b border-[#d2ff6b]/20 bg-black/80 px-3 py-2">
-            <span className="font-mono text-[10px] tracking-[0.2em] text-[#d2ff6b]">
-              HARBOUR EVIDENCE MAP · FULL SCREEN
-            </span>
+        <div className="flex shrink-0 items-center justify-between gap-2 border-b border-[#d2ff6b]/20 bg-black/80 px-3 py-2">
+          <span className="font-mono text-[10px] tracking-[0.2em] text-[#d2ff6b]">
+            HARBOUR EVIDENCE MAP {large ? "· FULL SCREEN" : ""}
+          </span>
+          <div className="flex shrink-0 items-center gap-2">
+            {large && (
+              <button
+                aria-expanded={mapToolsOpen}
+                onClick={() => setMapToolsOpen((open) => !open)}
+                className="min-h-10 rounded border border-[#d2ff6b]/40 px-3 text-xs text-[#d2ff6b]"
+              >
+                Map controls
+              </button>
+            )}
             <button
-              onClick={() => setLarge(false)}
-              className="rounded border border-[#d2ff6b]/40 px-3 py-1 text-xs text-[#d2ff6b]"
+              onClick={() => {
+                setLarge((value) => !value);
+                setMapToolsOpen(false);
+              }}
+              className="min-h-11 rounded border border-[#d2ff6b]/40 px-3 py-2 text-xs text-[#d2ff6b]"
             >
-              Close full screen
+              {large ? "Close full screen" : "Full screen"}
             </button>
           </div>
-        )}
+        </div>
         {large && (
           <div className="border-b border-[#d2ff6b]/20 px-3 py-1.5 font-mono text-[10px] leading-relaxed text-[#d2ff6b]">
             <div>{statusLine}</div>
@@ -695,16 +715,12 @@ export function MapPage() {
             {basisLine && <div>{basisLine}</div>}
           </div>
         )}
-        <div
-          className={large ? "relative flex min-h-0 flex-1 flex-col overflow-y-auto" : "relative"}
-        >
+        <div className={large ? "relative min-h-0 flex-1 overflow-hidden" : "relative"}>
           <svg
             ref={svgRef}
             viewBox={vb}
             className={
-              large
-                ? "block w-full min-h-[180px] flex-1"
-                : "block h-auto aspect-[1000/640] md:aspect-auto w-full md:h-[calc(100vh-380px)] md:min-h-[340px]"
+              large ? "block h-full min-h-0 w-full" : "block h-[72dvh] min-h-[360px] w-full"
             }
             role="img"
             aria-label="CargoIQ harbour evidence map"
@@ -926,7 +942,7 @@ export function MapPage() {
             )}
 
             {!track.length && (
-              <g pointerEvents="none">
+              <g pointerEvents="none" className="hidden md:block">
                 <rect
                   x="270"
                   y="262"
@@ -1021,6 +1037,16 @@ export function MapPage() {
             </g>
           </svg>
 
+          {!track.length && (
+            <div className="pointer-events-none absolute inset-x-4 top-[32dvh] z-10 rounded border border-[#d2ff6b]/40 bg-black/80 p-3 text-center text-xs text-white/80 md:hidden">
+              <p className="font-mono text-[10px] text-[#d2ff6b]">NO RECORDED POSITIONS</p>
+              <p className="mt-1">
+                No AIS position recordings are stored for this case. The map shows coastline and
+                approximate terminal areas, not an invented vessel position.
+              </p>
+            </div>
+          )}
+
           {/* fixed overlays: readable at every zoom, drawn into evidence exports separately */}
           {!large && (
             <div
@@ -1069,241 +1095,250 @@ export function MapPage() {
           )}
 
           <div
+            data-map-controls
+            hidden={large && !mapToolsOpen}
             className={
               large
-                ? "mx-3 mt-2 flex flex-wrap gap-1"
-                : "relative mx-3 mb-3 mt-1 flex flex-wrap gap-2 pr-1 md:absolute md:mx-0 md:mb-0 md:mt-0 md:right-4 md:top-8 md:max-w-[60%] md:justify-end md:gap-1 md:pr-0"
+                ? "absolute inset-x-0 bottom-0 z-20 max-h-[45%] overflow-y-auto border-t border-[#d2ff6b]/40 bg-[#061016]/95 pb-3"
+                : undefined
             }
           >
-            <button
-              aria-label="Zoom in"
-              onClick={() => setZoom((z) => clampZoom(z * 1.5))}
-              className="rounded border border-[#d2ff6b]/35 bg-black/65 px-2 py-1 font-mono text-[10px] uppercase text-[#d2ff6b]"
+            <div
+              className={
+                large
+                  ? "mx-3 mt-2 flex flex-wrap gap-1"
+                  : "relative mx-3 mb-3 mt-1 flex flex-wrap gap-2 pr-1 md:absolute md:mx-0 md:mb-0 md:mt-0 md:right-4 md:top-8 md:max-w-[60%] md:justify-end md:gap-1 md:pr-0"
+              }
             >
-              + Zoom in
-            </button>
-            <button
-              aria-label="Zoom out"
-              onClick={() => setZoom((z) => clampZoom(z / 1.5))}
-              className="rounded border border-[#d2ff6b]/35 bg-black/65 px-2 py-1 font-mono text-[10px] uppercase text-[#d2ff6b]"
-            >
-              - Zoom out
-            </button>
-            {zoom !== 1 && (
               <button
-                aria-label="Reset zoom"
-                onClick={resetView}
+                aria-label="Zoom in"
+                onClick={() => setZoom((z) => clampZoom(z * 1.5))}
                 className="rounded border border-[#d2ff6b]/35 bg-black/65 px-2 py-1 font-mono text-[10px] uppercase text-[#d2ff6b]"
               >
-                Reset view
+                + Zoom in
               </button>
-            )}
-            {Object.entries(layers).map(([key, enabled]) => (
               <button
-                key={key}
-                onClick={() => setLayers((value) => ({ ...value, [key]: !enabled }))}
-                className={cn(
-                  "rounded border border-[#d2ff6b]/35 bg-black/65 px-2 py-1 font-mono text-[10px] uppercase text-[#d2ff6b]",
-                  !enabled && "opacity-30",
-                )}
+                aria-label="Zoom out"
+                onClick={() => setZoom((z) => clampZoom(z / 1.5))}
+                className="rounded border border-[#d2ff6b]/35 bg-black/65 px-2 py-1 font-mono text-[10px] uppercase text-[#d2ff6b]"
               >
-                {(
-                  { ais: "Vessel track", infrastructure: "Terminal areas" } as Record<
-                    string,
-                    string
-                  >
-                )[key] ?? key}
+                - Zoom out
               </button>
-            ))}
-          </div>
-
-          <div
-            className={
-              large
-                ? "mx-3 mt-2 rounded border border-[#d2ff6b]/40 bg-black/65 px-3 py-2 font-mono text-[10px]"
-                : "relative mx-3 mt-3 md:absolute md:mx-0 md:mt-0 md:left-4 md:top-14 rounded border border-[#d2ff6b]/40 bg-black/65 px-3 py-2 font-mono text-[10px] backdrop-blur"
-            }
-          >
-            <div className="text-[#d2ff6b]">
-              {!track.length
-                ? "NO RECORDED POSITIONS"
-                : !pos
-                  ? "NO RECORDED POSITION AT THIS TIME"
-                  : locked
-                    ? "FOLLOWING RECORDED POSITION"
-                    : "FOLLOW OFF"}
-            </div>
-            {pos && pos.basis.kind === "fix" && (
-              <div className="mt-1 text-white/70">
-                RECORDED SPEED {pos.sog.toFixed(1)} kn · {hm(pos.basis.at)}
-              </div>
-            )}
-            {pos && pos.basis.kind === "stale" && (
-              <div className="mt-1 text-white/70">
-                LAST RECORDED SPEED {pos.sog.toFixed(1)} kn · {hm(pos.basis.at)} - NO NEWER
-                POSITIONS
-              </div>
-            )}
-            {pos && pos.basis.kind === "before-first" && (
-              <div className="mt-1 text-white/70">
-                FIRST RECORDED SPEED {pos.sog.toFixed(1)} kn · {hm(pos.basis.at)} - NO EARLIER
-                POSITIONS
-              </div>
-            )}
-            {pos && pos.basis.kind === "interpolated" && (
-              <div className="mt-1 text-white/70">SPEED DERIVED BETWEEN FIXES - APPROXIMATE</div>
-            )}
-            {inDisputedWindow && (
-              <div className="mt-1 font-semibold" style={{ color: "var(--disputed)" }}>
-                DISPUTED WINDOW
-              </div>
-            )}
-          </div>
-
-          <div
-            className={
-              large
-                ? "mx-3 mt-2 rounded border border-[#d2ff6b]/40 bg-black/70 px-3 py-2 font-mono text-[10px]"
-                : "relative mx-3 mt-3 md:absolute md:mx-0 md:mt-0 md:left-4 md:top-[8.25rem] md:w-64 md:max-w-[45%] rounded border border-[#d2ff6b]/40 bg-black/70 px-3 py-2 font-mono text-[10px] backdrop-blur"
-            }
-          >
-            <div className="flex items-center justify-between gap-2 text-[#d2ff6b]">
-              <span>EVENTS WITHIN 24H OF PLAYBACK</span>
-              <span className="flex items-center gap-2">
-                <span className="text-white/60">{nearby.length}</span>
+              {zoom !== 1 && (
                 <button
-                  onClick={() => setEventsOpen((v) => !v)}
-                  className="pointer-events-auto rounded border border-[#d2ff6b]/40 px-1.5 py-px text-[9px] uppercase tracking-wider text-[#d2ff6b] hover:bg-[#d2ff6b]/10"
+                  aria-label="Reset zoom"
+                  onClick={resetView}
+                  className="rounded border border-[#d2ff6b]/35 bg-black/65 px-2 py-1 font-mono text-[10px] uppercase text-[#d2ff6b]"
                 >
-                  {eventsOpen ? "Hide" : "Show"}
+                  Reset view
                 </button>
-              </span>
-            </div>
-            {eventsOpen && (
-              <ul className="mt-2 max-h-44 space-y-2 overflow-y-auto pr-1 md:max-h-[clamp(64px,calc(100vh-640px),34vh)]">
-                {nearby.map((e) => (
-                  <li
-                    key={e.id}
-                    className="border-t border-white/10 pt-1.5 first:border-t-0 first:pt-0"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-white/60">
-                        {String(e.timestamp).slice(5, 16).replace("T", " ")}Z
-                      </span>
-                      <span className="flex items-center gap-1.5">
-                        {Date.parse(String(e.timestamp)) > time ? (
-                          <span
-                            className="rounded border border-amber-300/60 px-1 py-px text-[8px] uppercase tracking-wider text-amber-300"
-                            title="After the selected playback time - not yet evidence at that moment"
-                          >
-                            Upcoming
-                          </span>
-                        ) : (
-                          <span
-                            className="rounded border border-white/20 px-1 py-px text-[8px] uppercase tracking-wider text-white/50"
-                            title="At or before the selected playback time"
-                          >
-                            Occurred
-                          </span>
-                        )}
-                        {isDisputeEvent(e, disputed) && <DisputeBadge />}
-                        {(String(e.nature).toLowerCase() !== "disputed" ||
-                          !isDisputeEvent(e, disputed)) && (
-                          <NatureBadge n={String(e.nature).toLowerCase() as Nature} />
-                        )}
-                      </span>
-                    </div>
-                    <div className="mt-0.5 font-sans text-[11px] leading-snug text-white/90">
-                      {e.title}
-                    </div>
-                    <div className="mt-0.5 font-sans text-[10px] text-white/50">
-                      {eventSourceNode(caseId, e)}
-                    </div>
-                  </li>
-                ))}
-                {!nearby.length && (
-                  <li className="font-sans text-[11px] text-white/60">
-                    No events near the selected time.
-                  </li>
-                )}
-              </ul>
-            )}
-          </div>
-
-          <div
-            className={
-              large
-                ? "mx-3 my-2 rounded border border-[#d2ff6b]/40 bg-black/75 px-3 py-2"
-                : "relative mx-3 my-3 md:absolute md:mx-0 md:my-0 md:inset-x-3 md:bottom-3 rounded border border-[#d2ff6b]/40 bg-black/75 px-3 py-2 backdrop-blur"
-            }
-          >
-            <div className="flex flex-wrap items-center gap-2">
-              {hasTemporalEvidence ? (
-                <Button className="py-1 text-xs" onClick={() => setPlaying((value) => !value)}>
-                  {playing ? "Pause" : "Play timeline"}
-                </Button>
-              ) : (
-                <span className="px-2 py-1 text-xs text-white/50">
-                  Play timeline - no recorded positions, satellite passes or case events yet
-                </span>
               )}
-              {track.length > 0 && (
+              {Object.entries(layers).map(([key, enabled]) => (
+                <button
+                  key={key}
+                  onClick={() => setLayers((value) => ({ ...value, [key]: !enabled }))}
+                  className={cn(
+                    "rounded border border-[#d2ff6b]/35 bg-black/65 px-2 py-1 font-mono text-[10px] uppercase text-[#d2ff6b]",
+                    !enabled && "opacity-30",
+                  )}
+                >
+                  {(
+                    { ais: "Vessel track", infrastructure: "Terminal areas" } as Record<
+                      string,
+                      string
+                    >
+                  )[key] ?? key}
+                </button>
+              ))}
+            </div>
+
+            <div
+              className={
+                large
+                  ? "mx-3 mt-2 rounded border border-[#d2ff6b]/40 bg-black/65 px-3 py-2 font-mono text-[10px]"
+                  : "relative mx-3 mt-3 md:absolute md:mx-0 md:mt-0 md:left-4 md:top-14 rounded border border-[#d2ff6b]/40 bg-black/65 px-3 py-2 font-mono text-[10px] backdrop-blur"
+              }
+            >
+              <div className="text-[#d2ff6b]">
+                {!track.length
+                  ? "NO RECORDED POSITIONS"
+                  : !pos
+                    ? "NO RECORDED POSITION AT THIS TIME"
+                    : locked
+                      ? "FOLLOWING RECORDED POSITION"
+                      : "FOLLOW OFF"}
+              </div>
+              {pos && pos.basis.kind === "fix" && (
+                <div className="mt-1 text-white/70">
+                  RECORDED SPEED {pos.sog.toFixed(1)} kn · {hm(pos.basis.at)}
+                </div>
+              )}
+              {pos && pos.basis.kind === "stale" && (
+                <div className="mt-1 text-white/70">
+                  LAST RECORDED SPEED {pos.sog.toFixed(1)} kn · {hm(pos.basis.at)} - NO NEWER
+                  POSITIONS
+                </div>
+              )}
+              {pos && pos.basis.kind === "before-first" && (
+                <div className="mt-1 text-white/70">
+                  FIRST RECORDED SPEED {pos.sog.toFixed(1)} kn · {hm(pos.basis.at)} - NO EARLIER
+                  POSITIONS
+                </div>
+              )}
+              {pos && pos.basis.kind === "interpolated" && (
+                <div className="mt-1 text-white/70">SPEED DERIVED BETWEEN FIXES - APPROXIMATE</div>
+              )}
+              {inDisputedWindow && (
+                <div className="mt-1 font-semibold" style={{ color: "var(--disputed)" }}>
+                  DISPUTED WINDOW
+                </div>
+              )}
+            </div>
+
+            <div
+              className={
+                large
+                  ? "mx-3 mt-2 rounded border border-[#d2ff6b]/40 bg-black/70 px-3 py-2 font-mono text-[10px]"
+                  : "relative mx-3 mt-3 md:absolute md:mx-0 md:mt-0 md:left-4 md:top-[8.25rem] md:w-64 md:max-w-[45%] rounded border border-[#d2ff6b]/40 bg-black/70 px-3 py-2 font-mono text-[10px] backdrop-blur"
+              }
+            >
+              <div className="flex items-center justify-between gap-2 text-[#d2ff6b]">
+                <span>EVENTS WITHIN 24H OF PLAYBACK</span>
+                <span className="flex items-center gap-2">
+                  <span className="text-white/60">{nearby.length}</span>
+                  <button
+                    onClick={() => setEventsOpen((v) => !v)}
+                    className="pointer-events-auto rounded border border-[#d2ff6b]/40 px-1.5 py-px text-[9px] uppercase tracking-wider text-[#d2ff6b] hover:bg-[#d2ff6b]/10"
+                  >
+                    {eventsOpen ? "Hide" : "Show"}
+                  </button>
+                </span>
+              </div>
+              {eventsOpen && (
+                <ul className="mt-2 max-h-44 space-y-2 overflow-y-auto pr-1 md:max-h-[clamp(64px,calc(100vh-640px),34vh)]">
+                  {nearby.map((e) => (
+                    <li
+                      key={e.id}
+                      className="border-t border-white/10 pt-1.5 first:border-t-0 first:pt-0"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-white/60">
+                          {String(e.timestamp).slice(5, 16).replace("T", " ")}Z
+                        </span>
+                        <span className="flex items-center gap-1.5">
+                          {Date.parse(String(e.timestamp)) > time ? (
+                            <span
+                              className="rounded border border-amber-300/60 px-1 py-px text-[8px] uppercase tracking-wider text-amber-300"
+                              title="After the selected playback time - not yet evidence at that moment"
+                            >
+                              Upcoming
+                            </span>
+                          ) : (
+                            <span
+                              className="rounded border border-white/20 px-1 py-px text-[8px] uppercase tracking-wider text-white/50"
+                              title="At or before the selected playback time"
+                            >
+                              Occurred
+                            </span>
+                          )}
+                          {isDisputeEvent(e, disputed) && <DisputeBadge />}
+                          {(String(e.nature).toLowerCase() !== "disputed" ||
+                            !isDisputeEvent(e, disputed)) && (
+                            <NatureBadge n={String(e.nature).toLowerCase() as Nature} />
+                          )}
+                        </span>
+                      </div>
+                      <div className="mt-0.5 font-sans text-[11px] leading-snug text-white/90">
+                        {e.title}
+                      </div>
+                      <div className="mt-0.5 font-sans text-[10px] text-white/50">
+                        {eventSourceNode(caseId, e)}
+                      </div>
+                    </li>
+                  ))}
+                  {!nearby.length && (
+                    <li className="font-sans text-[11px] text-white/60">
+                      No events near the selected time.
+                    </li>
+                  )}
+                </ul>
+              )}
+            </div>
+
+            <div
+              className={
+                large
+                  ? "mx-3 my-2 rounded border border-[#d2ff6b]/40 bg-black/75 px-3 py-2"
+                  : "relative mx-3 my-3 md:absolute md:mx-0 md:my-0 md:inset-x-3 md:bottom-3 rounded border border-[#d2ff6b]/40 bg-black/75 px-3 py-2 backdrop-blur"
+              }
+            >
+              <div className="flex flex-wrap items-center gap-2">
+                {hasTemporalEvidence ? (
+                  <Button className="py-1 text-xs" onClick={() => setPlaying((value) => !value)}>
+                    {playing ? "Pause" : "Play timeline"}
+                  </Button>
+                ) : (
+                  <span className="px-2 py-1 text-xs text-white/50">
+                    Play timeline - no recorded positions, satellite passes or case events yet
+                  </span>
+                )}
+                {track.length > 0 && (
+                  <Button
+                    variant="ghost"
+                    className="py-1 text-xs"
+                    disabled={!pos}
+                    title={
+                      pos
+                        ? "Centre the map on the recorded or derived position"
+                        : "No recorded position at this time to follow"
+                    }
+                    onClick={() => setLocked((value) => !value)}
+                  >
+                    {!pos
+                      ? "No position to follow"
+                      : locked
+                        ? "Following position"
+                        : "Follow recorded position"}
+                  </Button>
+                )}
                 <Button
                   variant="ghost"
                   className="py-1 text-xs"
-                  disabled={!pos}
-                  title={
-                    pos
-                      ? "Centre the map on the recorded or derived position"
-                      : "No recorded position at this time to follow"
-                  }
-                  onClick={() => setLocked((value) => !value)}
+                  disabled={refreshing}
+                  onClick={refreshSensors}
                 >
-                  {!pos
-                    ? "No position to follow"
-                    : locked
-                      ? "Following position"
-                      : "Follow recorded position"}
+                  {refreshing ? "Refreshing…" : "Refresh satellite & marine data"}
                 </Button>
-              )}
-              <Button
-                variant="ghost"
-                className="py-1 text-xs"
-                disabled={refreshing}
-                onClick={refreshSensors}
-              >
-                {refreshing ? "Refreshing…" : "Refresh satellite & marine data"}
-              </Button>
-              <Button
-                variant="ghost"
-                className="py-1 text-xs"
-                disabled={saving}
-                onClick={saveSnapshot}
-              >
-                {saving ? "Sealing…" : "Add to evidence pack"}
-              </Button>
-              <span className="ml-auto font-mono text-[10px] text-white/70">
-                {new Date(time).toISOString().replace("T", " ").slice(0, 16)}Z
-              </span>
-            </div>
-            <input
-              type="range"
-              min={initialTime}
-              max={maxTime}
-              step={15 * 60 * 1000}
-              value={time}
-              onChange={(e) => setTime(Number(e.target.value))}
-              className="mt-1 w-full accent-[#d2ff6b]"
-              aria-label="Investigation timeline"
-            />
-            <div className="flex justify-between font-mono text-[9px] text-white/50">
-              <span>{new Date(initialTime).toISOString().slice(0, 16)}Z</span>
-              <span>{new Date(maxTime).toISOString().slice(0, 16)}Z</span>
+                <Button
+                  variant="ghost"
+                  className="py-1 text-xs"
+                  disabled={saving}
+                  onClick={saveSnapshot}
+                >
+                  {saving ? "Sealing…" : "Add to evidence pack"}
+                </Button>
+                <span className="ml-auto font-mono text-[10px] text-white/70">
+                  {new Date(time).toISOString().replace("T", " ").slice(0, 16)}Z
+                </span>
+              </div>
+              <input
+                type="range"
+                min={initialTime}
+                max={maxTime}
+                step={15 * 60 * 1000}
+                value={time}
+                onChange={(e) => setTime(Number(e.target.value))}
+                className="mt-1 w-full accent-[#d2ff6b]"
+                aria-label="Investigation timeline"
+              />
+              <div className="flex justify-between font-mono text-[9px] text-white/50">
+                <span>{new Date(initialTime).toISOString().slice(0, 16)}Z</span>
+                <span>{new Date(maxTime).toISOString().slice(0, 16)}Z</span>
+              </div>
             </div>
           </div>
-
           {large && (
-            <div className="mx-3 mb-2 font-mono text-[9px] leading-relaxed text-[#d2ff6b]/80">
+            <div className="pointer-events-none absolute bottom-1 left-3 right-3 font-mono text-[9px] leading-relaxed text-[#d2ff6b]/80">
               {attributionLine}
             </div>
           )}

@@ -273,4 +273,30 @@ describe("Harbour map rendering - evidence truth", () => {
     dumpPage(container, "map-page-playing.html");
     fireEvent.click(getByText("Pause"));
   });
+  it("map-first viewport layout, fullscreen controls and Escape keep navigation usable", () => {
+    const { container, getByText, getByRole } = renderMap({
+      ...base,
+      observations: [],
+      timeline: [],
+    });
+    const stage = container.querySelector("[data-harbour-stage]")!;
+    expect(stage.className).toContain("order-first");
+    expect(
+      container
+        .querySelector('svg[aria-label="CargoIQ harbour evidence map"]')!
+        .classList.contains("h-[72dvh]"),
+    ).toBe(true);
+    fireEvent.click(getByText("Full screen"));
+    expect(stage.className).toContain("h-[100dvh]");
+    expect(document.body.style.overflow).toBe("hidden");
+    const tools = container.querySelector("[data-map-controls]") as HTMLElement;
+    expect(tools.hidden).toBe(true);
+    fireEvent.click(getByRole("button", { name: "Map controls" }));
+    expect(tools.hidden).toBe(false);
+    fireEvent.click(getByRole("button", { name: "Zoom in" }));
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(stage.className).not.toContain("fixed");
+    expect(document.body.style.overflow).not.toBe("hidden");
+    expect(tools.hidden).toBe(false);
+  });
 });

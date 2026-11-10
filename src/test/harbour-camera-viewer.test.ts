@@ -52,7 +52,9 @@ describe("harbour camera viewer", () => {
     expect(get("cam-reference").getAttribute("src")).toMatch(/\.mp4$/);
     expect(get("cam-source").textContent).toContain("Not live, not Durban, not this case");
     expect(get("cam-live").hasAttribute("src")).toBe(false);
-    expect(document.querySelector(".camera-notice")?.textContent).toContain("no footage is saved");
+    expect(document.querySelector(".camera-notice")?.textContent?.replace(/\s+/g, " ")).toContain(
+      "no footage is saved",
+    );
   });
   it("shows reference-ready, actual playing and media failure states", () => {
     api().open("reference");

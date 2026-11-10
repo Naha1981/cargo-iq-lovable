@@ -583,97 +583,104 @@ export function MapPage() {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="rounded border bg-card px-3 py-2">
-        <p className="text-sm">
-          {track.length
-            ? "Vessel position recordings for this case plotted in place and time, so the disputed period can be checked against physical evidence. Estimates derived between recordings are explicitly labelled as derived, stale positions carry their last recorded time, and recording gaps stay visible as gaps."
-            : "No vessel positions are recorded for this case yet. Playback still moves through the case events and satellite passes in time, and the vessel marker appears once AIS positions are stored - nothing on this map shows an invented location."}
-        </p>
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-            What to look at:
-          </span>
-          <button
-            onClick={guideVessel}
-            className="rounded border px-2.5 py-1 text-xs hover:bg-accent"
-          >
-            The case vessel
-          </button>
-          <button
-            onClick={guideBerth}
-            className="rounded border px-2.5 py-1 text-xs hover:bg-accent"
-          >
-            Berth & terminals
-          </button>
-          {dWindow && (
+      <p className="order-first text-sm text-muted-foreground">
+        See where this shipment's recorded events happened. Use Full screen for a larger map.
+      </p>
+      <details className="rounded border bg-card px-3 py-2">
+        <summary className="cursor-pointer text-sm font-medium">
+          Case position and map details
+        </summary>
+        <div className="mt-3">
+          <p className="text-sm">
+            {track.length
+              ? "Vessel position recordings for this case plotted in place and time, so the disputed period can be checked against physical evidence. Estimates derived between recordings are explicitly labelled as derived, stale positions carry their last recorded time, and recording gaps stay visible as gaps."
+              : "No vessel positions are recorded for this case yet. Playback still moves through the case events and satellite passes in time, and the vessel marker appears once AIS positions are stored - nothing on this map shows an invented location."}
+          </p>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+              What to look at:
+            </span>
             <button
-              onClick={guideDispute}
-              className="rounded border border-disputed/40 bg-disputed/10 px-2.5 py-1 text-xs text-disputed hover:bg-disputed/20"
+              onClick={guideVessel}
+              className="rounded border px-2.5 py-1 text-xs hover:bg-accent"
             >
-              The disputed window ({new Date(dWindow.start).toISOString().slice(5, 10)} –{" "}
-              {new Date(dWindow.end).toISOString().slice(5, 10)})
+              The case vessel
             </button>
-          )}
-        </div>
-      </div>
-      <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
-        {[
-          [
-            "DATA STATUS",
-            inDisputedWindow
-              ? "DISPUTED WINDOW"
-              : isSample
-                ? "SAMPLE DATA"
-                : "RECORDED OBSERVATIONS · CORROBORATION",
-          ],
-          ["TIME (UTC)", new Date(time).toISOString().replace("T", " ").slice(0, 19) + "Z"],
-          [
-            "VESSEL POSITION" + (pos && locked ? " · " + gridBasis(pos.basis) : ""),
-            !pos
-              ? gap
-                ? "GAP - NO RECORDED DATA"
-                : "NO RECORDED POSITIONS"
-              : !locked
-                ? "FOLLOW OFF"
-                : pos.lat.toFixed(5) + " / " + pos.lon.toFixed(5),
-          ],
-          [
-            "VESSEL COURSE" + (pos?.cog != null ? " · " + gridBasis(pos!.basis) : ""),
-            pos?.cog == null ? "—" : Math.round(pos!.cog!) + "°",
-          ],
-          ["MAP ZOOM", zoom + "×"],
-        ].map(([label, value]) => (
-          <div
-            key={label}
-            className={cn(
-              "min-w-0 rounded border bg-card px-3 py-2 font-mono",
-              label === "DATA STATUS" && "col-span-2 md:col-span-1",
+            <button
+              onClick={guideBerth}
+              className="rounded border px-2.5 py-1 text-xs hover:bg-accent"
+            >
+              Berth & terminals
+            </button>
+            {dWindow && (
+              <button
+                onClick={guideDispute}
+                className="rounded border border-disputed/40 bg-disputed/10 px-2.5 py-1 text-xs text-disputed hover:bg-disputed/20"
+              >
+                The disputed window ({new Date(dWindow.start).toISOString().slice(5, 10)} –{" "}
+                {new Date(dWindow.end).toISOString().slice(5, 10)})
+              </button>
             )}
-          >
-            <div className="text-[9px] tracking-[0.2em] text-muted-foreground">{label}</div>
-            <div className="mt-1 truncate text-[11px] text-primary">{value}</div>
           </div>
-        ))}
-      </div>
+        </div>
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
+          {[
+            [
+              "DATA STATUS",
+              inDisputedWindow
+                ? "DISPUTED WINDOW"
+                : isSample
+                  ? "SAMPLE DATA"
+                  : "RECORDED OBSERVATIONS · CORROBORATION",
+            ],
+            ["TIME (UTC)", new Date(time).toISOString().replace("T", " ").slice(0, 19) + "Z"],
+            [
+              "VESSEL POSITION" + (pos && locked ? " · " + gridBasis(pos.basis) : ""),
+              !pos
+                ? gap
+                  ? "GAP - NO RECORDED DATA"
+                  : "NO RECORDED POSITIONS"
+                : !locked
+                  ? "FOLLOW OFF"
+                  : pos.lat.toFixed(5) + " / " + pos.lon.toFixed(5),
+            ],
+            [
+              "VESSEL COURSE" + (pos?.cog != null ? " · " + gridBasis(pos!.basis) : ""),
+              pos?.cog == null ? "—" : Math.round(pos!.cog!) + "°",
+            ],
+            ["MAP ZOOM", zoom + "×"],
+          ].map(([label, value]) => (
+            <div
+              key={label}
+              className={cn(
+                "min-w-0 rounded border bg-card px-3 py-2 font-mono",
+                label === "DATA STATUS" && "col-span-2 md:col-span-1",
+              )}
+            >
+              <div className="text-[9px] tracking-[0.2em] text-muted-foreground">{label}</div>
+              <div className="mt-1 truncate text-[11px] text-primary">{value}</div>
+            </div>
+          ))}
+        </div>
 
-      <Link
-        to="/cases/$caseId/live-harbour"
-        params={{ caseId: data.case.id }}
-        className="flex items-center justify-between gap-3 rounded border border-primary/40 bg-primary/5 px-3 py-2 hover:bg-primary/10"
-      >
-        <span>
-          <span className="font-mono text-[10px] tracking-[0.2em] text-primary">
-            LIVE HARBOUR VIEW
+        <Link
+          to="/cases/$caseId/live-harbour"
+          params={{ caseId: data.case.id }}
+          className="flex items-center justify-between gap-3 rounded border border-primary/40 bg-primary/5 px-3 py-2 hover:bg-primary/10"
+        >
+          <span>
+            <span className="font-mono text-[10px] tracking-[0.2em] text-primary">
+              LIVE HARBOUR VIEW
+            </span>
+            <span className="mt-0.5 block text-xs text-muted-foreground">
+              Real-time vessels off the South African coast, inside this case.
+            </span>
           </span>
-          <span className="mt-0.5 block text-xs text-muted-foreground">
-            Real-time vessels off the South African coast, inside this case.
+          <span aria-hidden className="text-primary">
+            →
           </span>
-        </span>
-        <span aria-hidden className="text-primary">
-          →
-        </span>
-      </Link>
-
+        </Link>
+      </details>
       <div
         ref={stageRef}
         data-harbour-stage
@@ -1356,49 +1363,54 @@ export function MapPage() {
         </div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Panel title="Satellite coverage">
-          <ul className="space-y-3">
-            {scenes.slice(0, 8).map((s) => (
-              <li key={s.id} className="rounded border p-3">
-                <div className="flex justify-between font-mono text-[10px] text-observed">
-                  <span>{s.observation_type}</span>
-                  <span>{s.observed_at ? new Date(s.observed_at).toISOString() : "—"}</span>
-                </div>
-                <div className="mt-1 text-xs text-muted-foreground">
-                  {payloadOf(s).id ?? s.id} · orbit {payloadOf(s).relativeOrbit ?? "—"} · cloud{" "}
-                  {payloadOf(s).cloudPercent ?? "n/a"}
-                </div>
-              </li>
-            ))}
-            {!scenes.length && (
-              <li className="text-sm text-muted-foreground">
-                No Sentinel observations stored yet. Refresh data to query Copernicus satellites.
-              </li>
-            )}
-          </ul>
-        </Panel>
+      <details className="rounded border bg-card px-3 py-2">
+        <summary className="cursor-pointer text-sm font-medium">
+          Satellite coverage and discrepancies
+        </summary>
+        <div className="mt-3 grid gap-6 lg:grid-cols-2">
+          <Panel title="Satellite coverage">
+            <ul className="space-y-3">
+              {scenes.slice(0, 8).map((s) => (
+                <li key={s.id} className="rounded border p-3">
+                  <div className="flex justify-between font-mono text-[10px] text-observed">
+                    <span>{s.observation_type}</span>
+                    <span>{s.observed_at ? new Date(s.observed_at).toISOString() : "—"}</span>
+                  </div>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    {payloadOf(s).id ?? s.id} · orbit {payloadOf(s).relativeOrbit ?? "—"} · cloud{" "}
+                    {payloadOf(s).cloudPercent ?? "n/a"}
+                  </div>
+                </li>
+              ))}
+              {!scenes.length && (
+                <li className="text-sm text-muted-foreground">
+                  No Sentinel observations stored yet. Refresh data to query Copernicus satellites.
+                </li>
+              )}
+            </ul>
+          </Panel>
 
-        <Panel title="Discrepancy callouts">
-          {flagged.map((c) => (
-            <div
-              key={c.id}
-              className="mb-3 rounded border border-disputed/40 bg-disputed/5 p-3 text-sm"
-            >
-              <div className="flex items-center gap-2">
-                <DisputeBadge />
-                <span className="font-medium text-disputed">{c.title}</span>
+          <Panel title="Discrepancy callouts">
+            {flagged.map((c) => (
+              <div
+                key={c.id}
+                className="mb-3 rounded border border-disputed/40 bg-disputed/5 p-3 text-sm"
+              >
+                <div className="flex items-center gap-2">
+                  <DisputeBadge />
+                  <span className="font-medium text-disputed">{c.title}</span>
+                </div>
+                <div className="mt-1 text-xs text-muted-foreground">{c.description}</div>
               </div>
-              <div className="mt-1 text-xs text-muted-foreground">{c.description}</div>
-            </div>
-          ))}
-          {!flagged.length && (
-            <p className="text-sm text-muted-foreground">
-              No unresolved discrepancies at the current case state.
-            </p>
-          )}
-        </Panel>
-      </div>
+            ))}
+            {!flagged.length && (
+              <p className="text-sm text-muted-foreground">
+                No unresolved discrepancies at the current case state.
+              </p>
+            )}
+          </Panel>
+        </div>
+      </details>
     </div>
   );
 }

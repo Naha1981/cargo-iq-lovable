@@ -1,3 +1,4 @@
+import { CaseVoiceCommands } from "@/components/CaseVoiceCommands";
 import { useEffect, useState } from "react";
 import {
   createFileRoute,
@@ -273,6 +274,9 @@ function CaseLayout() {
           mapPage ? "mx-auto w-full px-2 py-3 sm:px-4" : "mx-auto max-w-[1400px] px-6 py-8"
         }
       >
+        <div className="mb-6">
+          <CaseVoiceCommands caseId={c.id} />
+        </div>
         <Outlet />
       </main>
     </div>

@@ -1107,10 +1107,10 @@
       dynamicSay(text);
     }
   }
-  var TTS_URL = "https://cargoiq-gods-eye.onrender.com/tts";
+  var TTS_URL = null; // Dynamic TTS stays off pending current free/privacy approval.
   var ttsAudioCache = {};
   function dynamicSay(text) {
-    if (!text || text.length > 480) return;
+    if (!TTS_URL || !text || text.length > 480) return;
     var cached = ttsAudioCache[text];
     if (cached) {
       cached.currentTime = 0;

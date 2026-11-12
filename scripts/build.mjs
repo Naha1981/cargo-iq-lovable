@@ -9,14 +9,15 @@ const args = process.argv.slice(2);
 if (!process.env.CARGO_BUILD_STAGE) {
   for (const stage of ["app", "worker"]) {
     // Stage-aware caps: the app stage (client + SSR graphs) is proven at 1100 MB,
-    // the worker stays below the shared 2 GB machine limit with a 1200 MB heap
+    // the worker stays below the shared 2 GB machine limit with a 1380 MB heap
+    // and 1 MB semi-space (lower caps failed on the expanded route graph)
     // and no second minification pass.
-    const heapSize = stage === "worker" ? 1200 : 1100;
+    const heapSize = stage === "worker" ? 1380 : 1100;
     const r = spawnSync(
       process.execPath,
       [
         `--max-old-space-size=${heapSize}`,
-        "--max-semi-space-size=8",
+        `--max-semi-space-size=${stage === "worker" ? 1 : 8}`,
         fileURLToPath(import.meta.url),
         ...args,
       ],
@@ -40,6 +41,7 @@ if (!process.env.CARGO_BUILD_STAGE) {
     // Client assets stay minified; keep the worker modules readable instead.
     builder.environments.nitro.config.build.minify = false;
     builder.environments.nitro.config.build.reportCompressedSize = false;
+    builder.environments.nitro.config.build.rollupOptions.output.compact = true;
     builder.environments.client.isBuilt = true;
     builder.environments.ssr.isBuilt = true;
     // Nitro prepares (clears) its output before final bundling. Since this is a

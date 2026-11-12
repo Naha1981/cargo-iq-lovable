@@ -16,7 +16,8 @@ describe("phone investigation layout", () => {
     expect(timeline).not.toContain("absolute top-1/2");
   });
   it("keeps map events and playback below the phone map, not over it", () => {
-    const map = source("src/routes/cases.$caseId.map.tsx");
+    const map = source("src/components/HarbourEvidenceMap.tsx");
+    expect(source("src/routes/cases.$caseId.map.tsx")).toContain("<HarbourEvidenceMap");
     expect(map).toContain("relative mx-3 mt-3 md:absolute");
     expect(map).toContain("EVENTS WITHIN 24H OF PLAYBACK");
     expect(map).not.toContain("h-[480px]");

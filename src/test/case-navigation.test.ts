@@ -24,7 +24,11 @@ describe("case navigation cache safety", () => {
   });
   it("invalidates the shared snapshot after every tab mutation", () => {
     for (const tab of ["map", "documents", "financials", "pack"]) {
-      expect(source(`src/routes/cases.$caseId.${tab}.tsx`)).toContain("await router.invalidate()");
+      const file =
+        tab === "map"
+          ? "src/components/HarbourEvidenceMap.tsx"
+          : `src/routes/cases.$caseId.${tab}.tsx`;
+      expect(source(file)).toContain("await router.invalidate()");
     }
   });
 });

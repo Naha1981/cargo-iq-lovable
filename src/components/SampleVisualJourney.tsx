@@ -98,7 +98,7 @@ export function SampleVisualJourney() {
   }
   return (
     <section aria-label="Visual sample journey" className="sample-visual-journey">
-      <style>{`.sample-visual-journey{margin:24px 0;border:1px solid #bcc9cb;background:#f4f6f4;border-radius:8px;overflow:hidden;color:#17343d}.sv-heading{padding:20px 24px;background:#fff;border-bottom:1px solid #ccd6d5}.sv-heading h2{font-size:23px;font-weight:650;margin:4px 0}.sv-kicker{font-size:11px;color:#93631f;letter-spacing:.08em;font-weight:700}.sv-tabs{display:flex;gap:8px;flex-wrap:wrap;padding:16px 24px}.sv-tabs button{min-height:44px;border:1px solid #aebec1;border-radius:5px;padding:9px 16px;background:white;color:#17343d}.sv-tabs button[aria-pressed=true]{background:#17343d;color:white}.sv-screen{padding:0 20px 20px}.sv-screen iframe{width:100%;height:580px;border:1px solid #bac9cb;border-radius:6px;background:#162e38}.sv-context{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;padding:0 24px 20px}.sv-context article{border-left:3px solid #b3853f;padding:6px 12px;background:#fff}.sv-heading p{max-width:70ch}.sv-screen button{min-height:44px;padding:10px;border:1px solid #aec0c4;border-radius:4px;background:#fff;color:#17343d}.sample-visual-journey select{display:block;max-width:100%;width:100%;padding:10px;border:1px solid #adbec1;border-radius:4px;margin-top:6px}.sv-context small{display:block;color:#60757b;margin-top:5px}.sv-note{padding:10px 16px;margin:0 0 14px;background:#faf3e4;color:#71501e;font-size:13px;line-height:1.5}.sv-camera{background:#fff;border:1px solid #cbd6d7;padding:24px;min-height:220px}.sv-camera h3{font-size:20px;margin-bottom:10px}@media(max-width:640px){.sv-context{grid-template-columns:1fr}.sv-heading,.sv-tabs{padding:16px}.sv-screen{padding:0 12px 12px}.sv-screen iframe{height:620px}}`}</style>
+      <style>{`.sample-visual-journey{margin:24px 0;border:1px solid #bcc9cb;background:#f4f6f4;border-radius:8px;overflow:hidden;color:#17343d}.sv-heading{padding:20px 24px;background:#fff;border-bottom:1px solid #ccd6d5}.sv-heading h2{font-size:23px;font-weight:650;margin:4px 0}.sv-kicker{font-size:11px;color:#93631f;letter-spacing:.08em;font-weight:700}.sv-mobile-view{display:none}.sv-tabs{display:flex;gap:8px;flex-wrap:wrap;padding:16px 24px}.sv-tabs button{min-height:44px;border:1px solid #aebec1;border-radius:5px;padding:9px 16px;background:white;color:#17343d}.sv-tabs button[aria-pressed=true]{background:#17343d;color:white}.sv-screen{padding:0 20px 20px}.sv-screen iframe{width:100%;height:580px;border:1px solid #bac9cb;border-radius:6px;background:#162e38}.sv-context{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;padding:0 24px 20px}.sv-context article{border-left:3px solid #b3853f;padding:6px 12px;background:#fff}.sv-heading p{max-width:70ch}.sv-screen button{min-height:44px;padding:10px;border:1px solid #aec0c4;border-radius:4px;background:#fff;color:#17343d}.sample-visual-journey select{display:block;max-width:100%;width:100%;padding:10px;border:1px solid #adbec1;border-radius:4px;margin-top:6px}.sv-context small{display:block;color:#60757b;margin-top:5px}.sv-note{padding:10px 16px;margin:0 0 14px;background:#faf3e4;color:#71501e;font-size:13px;line-height:1.5}.sv-camera{background:#fff;border:1px solid #cbd6d7;padding:24px;min-height:220px}.sv-camera h3{font-size:20px;margin-bottom:10px}@media(max-width:640px){.sv-tabs{display:none}.sv-mobile-view{display:block;padding:16px}.sv-context{grid-template-columns:1fr}.sv-heading,.sv-tabs{padding:16px}.sv-screen{padding:0 12px 12px}.sv-screen iframe{height:620px}}`}</style>
       <div className="sv-heading">
         <span className="sv-kicker">FICTIONAL WORKED EXAMPLE / TEST COPY</span>
         <h2>Explore the place. Review the record. Build the pack.</h2>
@@ -135,6 +135,20 @@ export function SampleVisualJourney() {
         </p>
         <p role="status">{notice}</p>
       </div>
+      <label className="sv-mobile-view">
+        Visual tool
+        <select
+          aria-label="Visual tool"
+          value={view}
+          onChange={(e) => setView(e.target.value as (typeof views)[number])}
+        >
+          {views.map((v) => (
+            <option key={v} value={v}>
+              {v}
+            </option>
+          ))}
+        </select>
+      </label>
       <nav className="sv-tabs" aria-label="Visual journey views">
         {views.map((v) => (
           <button key={v} aria-pressed={view === v} onClick={() => setView(v)}>
@@ -174,7 +188,7 @@ export function SampleVisualJourney() {
             </p>
             <iframe
               ref={frameRef}
-              src="/harbour-view/?embed=1&sample=0"
+              src="/harbour-view/index.html?embed=1&sample=0"
               title="Durban reference harbour globe"
             />
           </>
@@ -234,7 +248,7 @@ export function SampleVisualJourney() {
             </p>
             <iframe
               ref={frameRef}
-              src="/splat-sample/?embed=1"
+              src="/splat-sample/index.html?embed=1"
               title="Illustrative Gaussian harbour scene"
             />
           </>
@@ -248,7 +262,7 @@ export function SampleVisualJourney() {
             </p>
             <iframe
               ref={frameRef}
-              src="/splat-real-tree/?embed=1"
+              src="/splat-real-tree/index.html?embed=1"
               title="Real-world Tree Gaussian reference"
             />
           </>

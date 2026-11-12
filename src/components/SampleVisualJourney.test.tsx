@@ -6,7 +6,7 @@ describe("worked example visual journey", () => {
   it("starts on the real harbour reference, without invented shipment coordinates", () => {
     render(<SampleVisualJourney />);
     expect(screen.getByTitle("Durban reference harbour globe").getAttribute("src")).toBe(
-      "/harbour-view/?embed=1&sample=0",
+      "/harbour-view/index.html?embed=1&sample=0",
     );
     expect(screen.getByText(/none are invented/)).toBeTruthy();
   });
@@ -24,6 +24,15 @@ describe("worked example visual journey", () => {
     fireEvent.click(screen.getByRole("button", { name: "Real-world splat" }));
     expect(screen.getByTitle("Real-world Tree Gaussian reference")).toBeTruthy();
     expect(screen.getByText(/not a port or cargo scan/)).toBeTruthy();
+  });
+  it("selects a mobile visual tool without losing the source claim", () => {
+    render(<SampleVisualJourney />);
+    fireEvent.change(screen.getByLabelText("Visual tool"), {
+      target: { value: "Saved CCTV footage" },
+    });
+    expect(screen.getByText("Saved CCTV references")).toBeTruthy();
+    expect(screen.getByLabelText("Selected sample source claim")).toHaveValue("Q02");
+    expect(screen.getByText(/Customer CCTV ingest/)).toBeTruthy();
   });
   it("retains unresolved conflict in the same-case draft", () => {
     render(<SampleVisualJourney />);

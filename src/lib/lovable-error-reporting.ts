@@ -63,12 +63,17 @@ export function reportLovableError(error: unknown, context: Record<string, unkno
   try {
     const route = window.location.pathname;
     import("@/lib/supabase/client")
-      .then(({ createClient }) => {
+      .then(async ({ createClient }) => {
         try {
           const client = createClient();
+          const {
+            data: { user },
+          } = await client.auth.getUser();
+          if (!user) return;
           const boundary = (context as Record<string, unknown>).boundary;
           void Promise.resolve(
             client.from("app_errors").insert({
+              user_id: user.id,
               route,
               message: String(message).slice(0, 2000),
               stack: stack ? String(stack).slice(0, 4000) : null,

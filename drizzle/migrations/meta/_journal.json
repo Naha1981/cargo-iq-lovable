@@ -43,6 +43,13 @@
       "when": 1793605799430,
       "tag": "0005_whatsapp_quote_foundation",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794498341830,
+      "tag": "0006_restrict_app_errors_to_authenticated_owner",
+      "breakpoints": true
     }
   ]
 }

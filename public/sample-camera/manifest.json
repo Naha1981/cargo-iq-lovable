@@ -1,0 +1,18 @@
+{
+  "title": "PYC Marina",
+  "sourceUrl": "https://restreamer.cd.net.za/c1b53a50-06bb-47da-916a-01fb19d5c547.html",
+  "imageUrl": "https://restreamer.cd.net.za/memfs/c1b53a50-06bb-47da-916a-01fb19d5c547.jpg",
+  "configUrl": "https://restreamer.cd.net.za/channels/c1b53a50-06bb-47da-916a-01fb19d5c547/config.js",
+  "license": "CC BY 4.0",
+  "attribution": "PYC Marina / Point Yacht Club; stream sponsored by EdgeConnect. Source config author field is blank.",
+  "retrievedAt": "2026-11-12T07:33:28Z",
+  "sourceClockText": "12/11/2026 09:33:05",
+  "sourceClockVerified": false,
+  "sha256": "21d3ad0bdbfb39473db14b97c59420db36a2071f6314a69ae2a29cd225c88af5",
+  "limits": [
+    "Current reference still, not footage of a past disputed event.",
+    "Camera clock/timezone not independently verified.",
+    "No vessel/container/truck identity inferred.",
+    "Unmodified source JPEG, no crop."
+  ]
+}

@@ -1,0 +1,3 @@
+Tree by Yvig. CC BY4.0. https://yvig.fr/work/gaussian-splatting/
+Original scene: https://superspl.at/scene/4fe2c19c
+Decoded YSP1 quantized positions/scales/quaternions/colours into standard32-byte Gaussian .splat records. No claim of original precision.

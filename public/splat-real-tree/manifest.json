@@ -1,0 +1,19 @@
+{
+  "title": "Tree, real-world capture by Yvig",
+  "source": "Yvig, Tree. iPhone capture, trained Gaussian splat, low-resolution version.",
+  "sourceUrl": "https://yvig.fr/work/gaussian-splatting/",
+  "originalSceneUrl": "https://superspl.at/scene/4fe2c19c",
+  "downloadUrl": "https://yvig.fr/models/splats/tree-lo.bin",
+  "gaussians": 75322,
+  "licence": "CC BY 4.0",
+  "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+  "sha256": "6b419aa383b862d3ccfd2b4dd34ead386350760b696174c9fe931ac4cb28e378",
+  "sourceSha256": "3afe7f66af2a6bf8b0df5f485e91f712909881cf92c3390fe2c17130cf42fb26",
+  "changes": "Decoded YSP1 quantized positions/scales/quaternions/colours into standard32-byte Gaussian .splat records. No claim of original precision.",
+  "limitations": [
+    "Real tree scene, not Durban harbour or cargo evidence.",
+    "Exact capture location and acquisition time not supplied by the source page.",
+    "Viewer screenshot is derived, not an original source photograph.",
+    "Attribution and CC BY4.0 notice must accompany reuse."
+  ]
+}

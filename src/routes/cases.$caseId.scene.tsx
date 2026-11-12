@@ -1,3 +1,4 @@
+import { GaussianSplatPanel } from "@/components/GaussianSplatPanel";
 import { IntegratedFeatureGate } from "@/components/IntegratedFeatureGate";
 import { Route as CaseRoute } from "./cases.$caseId";
 import { createFileRoute } from "@tanstack/react-router";
@@ -29,9 +30,14 @@ function ScenePage() {
 }
 
 function ScenePageGate() {
+  const data = CaseRoute.useLoaderData();
+  const { caseId } = Route.useParams();
   return (
-    <IntegratedFeatureGate title="3D Scene">
-      <ScenePage />
-    </IntegratedFeatureGate>
+    <div className="space-y-6">
+      <GaussianSplatPanel caseId={caseId} tenantId={data.tenantId} />
+      <IntegratedFeatureGate title="3D Scene">
+        <ScenePage />
+      </IntegratedFeatureGate>
+    </div>
   );
 }

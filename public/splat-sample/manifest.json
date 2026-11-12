@@ -1,0 +1,12 @@
+{
+  "name": "Illustrative harbour study",
+  "format": "splat",
+  "gaussians": 22670,
+  "sha256": "a027e97f01ba755ac96ba009f9af05cbd26dd6c9aa0e9361e528f824521a345d",
+  "bytes": 725440,
+  "source": "Original CargoIQ procedural geometry",
+  "licence": "CC0-1.0",
+  "acquiredAt": null,
+  "classification": "ILLUSTRATIVE_SYNTHETIC",
+  "limitations": "Not a scan of Durban, a vessel, a berth or a shipment. No georeferencing, capture time, measurements or historical evidence. Demonstrates Gaussian rendering and viewpoint capture only."
+}

@@ -666,9 +666,17 @@ export function buildEvidencePackPdf(pack: EvidencePackInput): Uint8Array {
 
   const allObs: PackObservation[] = p.externalObservations ?? [];
   const snapshots = allObs.filter((o) => o.observation_type === "MAP_SNAPSHOT");
+  const splatViews = allObs.filter((o) => o.observation_type === "GAUSSIAN_SPLAT_VIEW");
+  const references = allObs.filter((o) => o.observation_type === "REFERENCE_VIEW");
   const reviews = allObs.filter((o) => o.observation_type === "HISTORICAL_RECORD_REVIEW");
   const obs = allObs.filter(
-    (o) => !["MAP_SNAPSHOT", "HISTORICAL_RECORD_REVIEW"].includes(o.observation_type ?? ""),
+    (o) =>
+      ![
+        "MAP_SNAPSHOT",
+        "HISTORICAL_RECORD_REVIEW",
+        "GAUSSIAN_SPLAT_VIEW",
+        "REFERENCE_VIEW",
+      ].includes(o.observation_type ?? ""),
   );
   if (reviews.length) {
     d.heading("7a. Historical record reviews (" + reviews.length + ")");
@@ -809,6 +817,97 @@ export function buildEvidencePackPdf(pack: EvidencePackInput): Uint8Array {
         { indent: 14, size: 8, gray: 0.35 },
       );
     });
+  }
+
+  if (splatViews.length) {
+    d.heading("7c. Illustrative Gaussian viewpoints (not shipment evidence)");
+    d.text(
+      "These are browser-rendered stills of an original synthetic scene. They are not scans, measurements, satellite captures or proof of an actual vessel, location or disputed event.",
+      { size: 8.5 },
+    );
+    for (const o of splatViews) {
+      const pl = o.payload ?? {};
+      d.text(
+        "Source: " +
+          String(o.source ?? "Unknown") +
+          " | Licence: " +
+          String(pl.licence ?? "Unknown"),
+        { size: 8 },
+      );
+      d.text(
+        "Acquisition: none (synthetic). Browser capture: " +
+          String(pl.capturedAt ?? o.observed_at ?? "Unknown") +
+          "; server received: " +
+          String(pl.serverReceivedAt ?? "Not recorded"),
+        { size: 8 },
+      );
+      d.text("Scene SHA-256: " + String(pl.sceneSha256 ?? "Not recorded"), { size: 8 });
+      d.text("JPEG SHA-256: " + String(pl.sha256 ?? "Not recorded"), { size: 8 });
+      d.text("Camera pose: " + JSON.stringify(pl.camera ?? null), { size: 8 });
+      if (pl.selectedEventId)
+        d.text(
+          "Linked sample event: " +
+            String(pl.selectedEventId) +
+            " | Claim: " +
+            String(pl.selectedClaimId ?? "Not recorded") +
+            " | Event time: " +
+            String(pl.eventAt ?? "Not recorded"),
+          { size: 8 },
+        );
+      if (pl.windowStart || pl.windowEnd)
+        d.text(
+          "Disputed sample window: " +
+            String(pl.windowStart ?? "Unknown") +
+            " to " +
+            String(pl.windowEnd ?? "Unknown") +
+            ". This is not scene acquisition time.",
+          { size: 8 },
+        );
+      d.text("Limitations: " + String(pl.limitations ?? "Not recorded"), { size: 8 });
+      d.text(
+        String(
+          pl.provenanceNote ??
+            "Capture supplied by the investigator browser, not a trusted renderer attestation.",
+        ),
+        { size: 8 },
+      );
+    }
+  }
+
+  if (references.length) {
+    d.heading("7d. Reference views (not disputed-event observations)");
+    d.text(
+      "Current camera stills and external scene renditions are reference material only. They do not place this shipment, truck or container at the selected event. Acquisition, retrieval and browser capture times remain separate.",
+      { size: 8.5 },
+    );
+    for (const o of references) {
+      const r = o.payload ?? {};
+      d.text(String(r.title ?? "Reference view") + " | Source: " + String(o.source ?? "Unknown"), {
+        bold: true,
+        size: 9,
+      });
+      for (const [label, key] of [
+        ["Source URL", "sourceUrl"],
+        ["Licence / credit", "attribution"],
+        ["Retrieved / browser capture", "capturedAt"],
+        ["Source acquisition / clock", "acquisitionNote"],
+        ["Source SHA-256", "sourceSha256"],
+        ["Rendered image SHA-256", "imageSha256"],
+        ["Scene SHA-256", "sceneSha256"],
+        ["Selected sample claim", "selectedClaimId"],
+        ["Claim event time", "eventAt"],
+        ["Sample window start", "windowStart"],
+        ["Sample window end", "windowEnd"],
+        ["Camera pose", "camera"],
+        ["Limits", "limitations"],
+      ]) {
+        if (r[key] !== undefined)
+          d.text(
+            label + ": " + (typeof r[key] === "object" ? JSON.stringify(r[key]) : String(r[key])),
+            { size: 8 },
+          );
+      }
+    }
   }
 
   const operationalSections: [string, string, (x: PackOperationalRecord) => string][] = [
@@ -1224,11 +1323,25 @@ export function buildEvidencePackPdf(pack: EvidencePackInput): Uint8Array {
       obs.payload as MapSnapshotPayload & { imageJpeg?: string; imageJpegSha256?: string }
     )?.imageJpeg;
     if (image) {
-      d.heading("Map exhibit rendition");
+      const isSplat = obs.observation_type === "GAUSSIAN_SPLAT_VIEW";
+      const isReference = obs.observation_type === "REFERENCE_VIEW";
+      d.heading(
+        isReference
+          ? "Reference rendition (not disputed-event evidence)"
+          : isSplat
+            ? "Illustrative Gaussian viewpoint (not shipment evidence)"
+            : "Map exhibit rendition",
+      );
       d.text(
-        "Retained JPEG map snapshot, embedded without altering its source bytes. Camera footage is not included. Original file hash and source attribution are listed in the map snapshot section.",
+        isReference
+          ? String(obs.payload?.title ?? "Reference") +
+              ". Retained JPEG bytes. Source, licence, hashes, time distinctions and limitations appear in section 7d. This image is not proof that a sample event occurred."
+          : isSplat
+            ? "Original synthetic harbour study, not an actual ship or site scan. Retained JPEG viewpoint; camera pose, scene hash, JPEG hash and limitations appear in section 7c. The interactive scene is not embedded in this PDF."
+            : "Retained JPEG map snapshot, embedded without altering its source bytes. Camera footage is not included. Original file hash and source attribution are listed in the map snapshot section.",
         { size: 8 },
       );
+      d.gap(10);
       d.jpeg(image);
     }
   }

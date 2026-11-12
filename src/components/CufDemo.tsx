@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { SampleVisualJourney } from "./SampleVisualJourney";
 import { AppHeader } from "@/components/ui-kit";
 import {
   demoRecords,
@@ -66,6 +67,7 @@ export function CufDemo() {
           reconcile the true timestamp conflict before calculating. No existing investigation is
           changed.
         </p>
+        <SampleVisualJourney />
         <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">
           {[
             ["Source records", "15"],

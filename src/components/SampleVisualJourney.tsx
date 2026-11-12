@@ -1,4 +1,11 @@
 import { useEffect, useRef, useState } from "react";
+import {
+  PublicHarbourMap,
+  PublicCorridor,
+  PublicSimulation,
+  PublicGeospatial,
+  SavedSampleFootage,
+} from "./PublicSampleTools";
 import { HarbourCameras } from "./HarbourCameras";
 import { demoRecords } from "@/lib/cuf-demo";
 import {
@@ -8,7 +15,14 @@ import {
 } from "@/lib/sample-visual-pack";
 
 const views = [
+  "Harbour Map",
   "Harbour globe",
+  "Simulation Lab",
+  "Corridor",
+  "3D Scene",
+  "Geospatial",
+  "Saved CCTV footage",
+  "Recorded player",
   "Cameras",
   "3D Gaussian scene",
   "Real-world splat",
@@ -129,6 +143,28 @@ export function SampleVisualJourney() {
         ))}
       </nav>
       <div className="sv-screen">
+        {view === "Harbour Map" && <PublicHarbourMap />}
+        {view === "Simulation Lab" && <PublicSimulation />}
+        {view === "Corridor" && <PublicCorridor />}
+        {view === "Geospatial" && <PublicGeospatial />}
+        {view === "Saved CCTV footage" && <SavedSampleFootage />}
+        {view === "Recorded player" && (
+          <>
+            <p className="sv-note">
+              Historic railway player example, not Durban or case evidence. Saved Durban clips are
+              under Saved CCTV footage.
+            </p>
+            <video
+              style={{ width: "100%" }}
+              controls
+              playsInline
+              preload="metadata"
+              src="/harbour-view/media/railway-reference-1939.mp4"
+              aria-label="Historic recorded player example"
+            />
+          </>
+        )}
+
         {view === "Harbour globe" && (
           <>
             <p className="sv-note">
@@ -189,7 +225,7 @@ export function SampleVisualJourney() {
             <HarbourCameras />
           </div>
         )}
-        {view === "3D Gaussian scene" && (
+        {(view === "3D Gaussian scene" || view === "3D Scene") && (
           <>
             <p className="sv-note">
               Original illustrative harbour, not a Durban scan or historical evidence. Rotate, zoom

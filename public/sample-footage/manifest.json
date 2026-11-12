@@ -1,0 +1,42 @@
+{
+  "caseReference": "SYN-COUNT-CLOCK-01",
+  "classification": "current_reference_not_case_event",
+  "clips": [
+    {
+      "id": "marina",
+      "title": "PYC Marina",
+      "file": "marina-20261112.mp4",
+      "poster": "marina-poster.jpg",
+      "durationSeconds": 30.0,
+      "bytes": 2498128,
+      "sha256": "c51bae7975e37a96099fd6d8bbe89d64d6d8ec09f79dd72e80044d47d83d0f20",
+      "sourceUrl": "https://restreamer.cd.net.za/c1b53a50-06bb-47da-916a-01fb19d5c547.html",
+      "configUrl": "https://restreamer.cd.net.za/channels/c1b53a50-06bb-47da-916a-01fb19d5c547/config.js",
+      "license": "CC BY 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+      "attribution": "PYC Marina / Point Yacht Club. Stream hosted by EdgeConnect. Source config author field blank.",
+      "captureStartedAt": "2026-11-12T10:56:34.880117+00:00",
+      "captureFinishedAt": "2026-11-12T10:57:07.143417+00:00",
+      "changes": "30-second excerpt; re-encoded to H.264 at 1280px width, audio removed. No crop or other image change.",
+      "limits": "Recorded on 12 November 2026. Not live, not footage of the fictional 14 October case. Camera clock and latency not independently verified. No endorsement."
+    },
+    {
+      "id": "beach",
+      "title": "PYC Beach",
+      "file": "beach-20261112.mp4",
+      "poster": "beach-poster.jpg",
+      "durationSeconds": 30.0,
+      "bytes": 2242369,
+      "sha256": "5f7d5fddd0282969dc26892121c7f84921d3ad69d55c1d130ce95656a1a58133",
+      "sourceUrl": "https://restreamer.cd.net.za/7bd8fb34-74b3-4158-abc0-06fbbc8ffb2b.html",
+      "configUrl": "https://restreamer.cd.net.za/channels/7bd8fb34-74b3-4158-abc0-06fbbc8ffb2b/config.js",
+      "license": "CC BY 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+      "attribution": "PYC Beach / Point Yacht Club. Stream hosted by EdgeConnect. Source config author field blank.",
+      "captureStartedAt": "2026-11-12T10:56:34.880117+00:00",
+      "captureFinishedAt": "2026-11-12T10:57:07.143417+00:00",
+      "changes": "30-second excerpt; re-encoded to H.264 at 1280px width, audio removed. No crop or other image change.",
+      "limits": "Recorded on 12 November 2026. Not live, not footage of the fictional 14 October case. Camera clock and latency not independently verified. No endorsement."
+    }
+  ]
+}

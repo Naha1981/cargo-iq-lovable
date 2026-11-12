@@ -1,0 +1,30 @@
+{
+  "retrievedAt": "2026-11-12T10:56:34.880007+00:00",
+  "config": {
+    "autoplay": true,
+    "mute": false,
+    "statistics": false,
+    "chromecast": false,
+    "airplay": false,
+    "color": {
+      "seekbar": "#ffffff",
+      "buttons": "#ffffff"
+    },
+    "ga": {
+      "account": "",
+      "name": ""
+    },
+    "logo": {
+      "image": "",
+      "position": "top-left",
+      "link": ""
+    },
+    "poster": "memfs/7bd8fb34-74b3-4158-abc0-06fbbc8ffb2b.jpg",
+    "source": "memfs/7bd8fb34-74b3-4158-abc0-06fbbc8ffb2b.m3u8",
+    "license": {
+      "license": "CC BY 4.0",
+      "title": "PYC Beach, ",
+      "author": ""
+    }
+  }
+}

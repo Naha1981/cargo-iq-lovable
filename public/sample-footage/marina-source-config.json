@@ -1,0 +1,30 @@
+{
+  "retrievedAt": "2026-11-12T10:56:34.879753+00:00",
+  "config": {
+    "autoplay": true,
+    "mute": true,
+    "statistics": false,
+    "chromecast": false,
+    "airplay": false,
+    "color": {
+      "seekbar": "#ffffff",
+      "buttons": "#ffffff"
+    },
+    "ga": {
+      "account": "",
+      "name": ""
+    },
+    "logo": {
+      "image": "channels/c1b53a50-06bb-47da-916a-01fb19d5c547/logo.png",
+      "position": "top-right",
+      "link": "www.edgeconnect.co.za"
+    },
+    "poster": "memfs/c1b53a50-06bb-47da-916a-01fb19d5c547.jpg",
+    "source": "memfs/c1b53a50-06bb-47da-916a-01fb19d5c547.m3u8",
+    "license": {
+      "license": "CC BY 4.0",
+      "title": "PYC Marina",
+      "author": ""
+    }
+  }
+}
